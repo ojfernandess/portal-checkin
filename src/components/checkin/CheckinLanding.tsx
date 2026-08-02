@@ -1,10 +1,10 @@
 import {
   ArrowRight,
-  CalendarPlus,
   Clock3,
   ExternalLink,
-  FileCheck2,
   Hash,
+  Headset,
+  Heart,
   HelpCircle,
   Loader2,
   Phone,
@@ -40,8 +40,12 @@ const FEATURES = [
   { icon: Smartphone, titleKey: "checkin.landing.featureDigitalTitle", descKey: "checkin.landing.featureDigitalDesc" },
   { icon: Clock3, titleKey: "checkin.landing.featureFastTitle", descKey: "checkin.landing.featureFastDesc" },
   { icon: ShieldCheck, titleKey: "checkin.landing.featureSecureTitle", descKey: "checkin.landing.featureSecureDesc" },
-  { icon: FileCheck2, titleKey: "checkin.landing.featureReceiptTitle", descKey: "checkin.landing.featureReceiptDesc" },
-  { icon: CalendarPlus, titleKey: "checkin.landing.featureExtensionTitle", descKey: "checkin.landing.featureExtensionDesc" },
+  { icon: Headset, titleKey: "checkin.landing.featureSupport24hTitle", descKey: "checkin.landing.featureSupport24hDesc" },
+  {
+    icon: Heart,
+    titleKey: "checkin.landing.featureProtectedEstablishmentsTitle",
+    descKey: "checkin.landing.featureProtectedEstablishmentsDesc",
+  },
 ] as const;
 
 const AUDAR_WEBSITE = "https://audaar.com.br/";
