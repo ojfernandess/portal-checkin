@@ -208,6 +208,17 @@ export function CheckinLanding({
             <p className="text-center text-xs leading-relaxed text-muted-foreground lg:text-left">
               {t("checkin.landing.footer")}
             </p>
+            <p className="text-center text-[10px] text-muted-foreground/45 lg:text-left">
+              {t("checkin.landing.developedBy")}{" "}
+              <a
+                href="https://www.agentslabs.cloud/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="transition-colors hover:text-muted-foreground/70 hover:underline"
+              >
+                AgentsLabs
+              </a>
+            </p>
           </div>
         </div>
       </div>

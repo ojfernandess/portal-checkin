@@ -214,6 +214,7 @@ export const ptBR = {
       needHelp: "Precisa de ajuda?",
       website: "Site",
       footer: "Check-in online rápido e seguro. Complete em minutos e evite filas na recepção.",
+      developedBy: "Desenvolvido por",
       featureDigitalTitle: "Digital",
       featureDigitalDesc: "100% online",
       featureFastTitle: "Rápido",

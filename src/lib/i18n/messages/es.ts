@@ -216,6 +216,7 @@ export const es: MessageTree = {
       needHelp: "¿Necesita ayuda?",
       website: "Sitio web",
       footer: "Check-in online rápido y seguro. Complete en minutos y evite filas en recepción.",
+      developedBy: "Desarrollado por",
       featureDigitalTitle: "Digital",
       featureDigitalDesc: "100% online",
       featureFastTitle: "Rápido",
