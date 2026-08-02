@@ -74,3 +74,28 @@ export function formatDateWithTime(
 
   return time ? `${formattedDate} ${atWord} ${time}` : formattedDate;
 }
+
+/** Verifica se a data de check-out já passou (comparação por dia civil local). */
+export function isCheckoutPast(
+  checkoutDate?: string | null,
+  checkoutTime?: string | null,
+): boolean {
+  if (!checkoutDate?.trim()) return false;
+
+  const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(checkoutDate.trim());
+  if (!iso) return false;
+
+  const checkoutDay = new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]));
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  if (checkoutDay < today) return true;
+  if (checkoutDay > today) return false;
+
+  const timeMatch = checkoutTime?.trim() ? /^(\d{1,2}):(\d{2})/.exec(checkoutTime.trim()) : null;
+  if (!timeMatch) return false;
+
+  const checkoutMinutes = Number(timeMatch[1]) * 60 + Number(timeMatch[2]);
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  return nowMinutes > checkoutMinutes;
+}

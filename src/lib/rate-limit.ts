@@ -1,6 +1,18 @@
 const WINDOW_MS = 60 * 60 * 1000;
 const MAX_REQUESTS = 30;
 
+export type RateLimitConfig = {
+  maxRequests?: number;
+  windowMs?: number;
+};
+
+function resolveConfig(config?: RateLimitConfig) {
+  return {
+    maxRequests: config?.maxRequests ?? MAX_REQUESTS,
+    windowMs: config?.windowMs ?? WINDOW_MS,
+  };
+}
+
 /** In-memory fallback when Supabase table is unavailable. */
 const memoryBuckets = new Map<string, { count: number; windowStart: number }>();
 
@@ -59,20 +71,28 @@ async function writeBucket(bucketKey: string, count: number, windowStart: number
  * Verifica se o IP ainda pode buscar localizador (sem incrementar).
  * Só incremente após a API TecHospitality responder (sucesso ou 404).
  */
-export async function assertRateLimitAllowed(bucketKey: string): Promise<void> {
+export async function assertRateLimitAllowed(
+  bucketKey: string,
+  config?: RateLimitConfig,
+): Promise<void> {
   if (!isRateLimitEnabled()) return;
 
+  const { maxRequests, windowMs } = resolveConfig(config);
   const now = Date.now();
-  const count = await getCurrentCount(bucketKey, now);
-  if (count >= MAX_REQUESTS) {
-    throw new Error("Muitas tentativas de busca. Aguarde uma hora e tente novamente.");
+  const count = await getCurrentCount(bucketKey, now, windowMs);
+  if (count >= maxRequests) {
+    throw new Error("Muitas tentativas. Aguarde uma hora e tente novamente.");
   }
 }
 
 /** Registra uma busca que chegou à API (não conta erros de token/config). */
-export async function recordRateLimitHit(bucketKey: string): Promise<void> {
+export async function recordRateLimitHit(
+  bucketKey: string,
+  config?: RateLimitConfig,
+): Promise<void> {
   if (!isRateLimitEnabled()) return;
 
+  const { windowMs } = resolveConfig(config);
   const now = Date.now();
 
   try {
@@ -83,7 +103,7 @@ export async function recordRateLimitHit(bucketKey: string): Promise<void> {
     }
 
     const windowStart = new Date(row.window_start).getTime();
-    if (now - windowStart >= WINDOW_MS) {
+    if (now - windowStart >= windowMs) {
       await writeBucket(bucketKey, 1, now);
       return;
     }
@@ -91,7 +111,7 @@ export async function recordRateLimitHit(bucketKey: string): Promise<void> {
     await writeBucket(bucketKey, row.count + 1, windowStart);
   } catch {
     const bucket = memoryBuckets.get(bucketKey);
-    if (!bucket || now - bucket.windowStart >= WINDOW_MS) {
+    if (!bucket || now - bucket.windowStart >= windowMs) {
       memoryBuckets.set(bucketKey, { count: 1, windowStart: now });
       return;
     }
@@ -99,16 +119,29 @@ export async function recordRateLimitHit(bucketKey: string): Promise<void> {
   }
 }
 
-async function getCurrentCount(bucketKey: string, now: number): Promise<number> {
+/** Verifica e registra em uma única operação. */
+export async function enforceRateLimit(
+  bucketKey: string,
+  config?: RateLimitConfig,
+): Promise<void> {
+  await assertRateLimitAllowed(bucketKey, config);
+  await recordRateLimitHit(bucketKey, config);
+}
+
+async function getCurrentCount(
+  bucketKey: string,
+  now: number,
+  windowMs: number = WINDOW_MS,
+): Promise<number> {
   try {
     const row = await readBucket(bucketKey);
     if (!row) return 0;
     const windowStart = new Date(row.window_start).getTime();
-    if (now - windowStart >= WINDOW_MS) return 0;
+    if (now - windowStart >= windowMs) return 0;
     return row.count;
   } catch {
     const bucket = memoryBuckets.get(bucketKey);
-    if (!bucket || now - bucket.windowStart >= WINDOW_MS) return 0;
+    if (!bucket || now - bucket.windowStart >= windowMs) return 0;
     return bucket.count;
   }
 }

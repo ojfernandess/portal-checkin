@@ -28,6 +28,7 @@ function AdminAuditPage() {
   const account = useAdminAccount();
   const listFn = useServerFn(adminListAuditLogs);
   const [action, setAction] = useState("");
+  const [appliedAction, setAppliedAction] = useState("");
   const [logs, setLogs] = useState<AuditRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -36,7 +37,7 @@ function AdminAuditPage() {
     setLoading(true);
     setError(null);
     try {
-      const result = await listFn({ data: { action: action || undefined, limit: 100 } });
+      const result = await listFn({ data: { action: appliedAction || undefined, limit: 100 } });
       setLogs(result.logs as AuditRow[]);
     } catch (err) {
       setLogs([]);
@@ -44,7 +45,7 @@ function AdminAuditPage() {
     } finally {
       setLoading(false);
     }
-  }, [listFn, action, t]);
+  }, [listFn, appliedAction, t]);
 
   useEffect(() => {
     void load();
@@ -64,7 +65,7 @@ function AdminAuditPage() {
         className="mb-6 flex gap-3"
         onSubmit={(e) => {
           e.preventDefault();
-          void load();
+          setAppliedAction(action.trim());
         }}
       >
         <Input

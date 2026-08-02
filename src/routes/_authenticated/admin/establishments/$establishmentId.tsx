@@ -174,7 +174,14 @@ function EstablishmentConfigPage() {
     establishmentName || t("admin.establishmentConfig.titleFallback", { id: establishmentId });
 
   return (
-    <AdminShell title={pageTitle} account={account}>
+    <AdminShell
+      title={pageTitle}
+      account={account}
+      breadcrumbs={[
+        { label: t("admin.establishments"), to: "/admin/establishments" },
+        { label: pageTitle },
+      ]}
+    >
       <p className="mb-4 font-code text-xs text-muted-foreground">
         {t("admin.establishmentsPage.establishmentId")}: {establishmentId}
       </p>

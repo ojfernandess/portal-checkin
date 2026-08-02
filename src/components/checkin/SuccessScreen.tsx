@@ -1,10 +1,10 @@
-import { CheckCircle2, Download, KeyRound, MessageCircle, Phone, Share2 } from "lucide-react";
+import { CheckCircle2, Download, KeyRound, MessageCircle, Phone, Share2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EstablishmentAddressBlock } from "@/components/checkin/EstablishmentAddressBlock";
 import { PhoneDisplay } from "@/components/checkin/PhoneDisplay";
 import { paymentBadgeClass } from "@/components/checkin/ReservationCard";
 import { Badge } from "@/components/ui/badge";
-import { formatDate, formatDateTime, formatDateWithTime } from "@/lib/format-dates";
+import { formatDate, formatDateTime, formatDateWithTime, isCheckoutPast } from "@/lib/format-dates";
 import {
   formatBirthDate,
   formatDocumentLine,
@@ -66,6 +66,12 @@ export function SuccessScreen({ reservation, mainGuest, dependents, alreadyCompl
   const accessUnit = unitName?.trim() || null;
   const categoryName = reservation.categoryName ?? reservation.room?.categoryName;
   const capacity = reservation.capacity ?? reservation.room?.capacity;
+
+  const isCancelled = reservation.isCancelled === true;
+  const checkoutPast = isCheckoutPast(checkoutDate, checkoutTime);
+  const hideGuestDetails = isCancelled || checkoutPast;
+  const showRoomPassword = !isCancelled && !checkoutPast && roomPassword != null && roomPassword !== "";
+  const showAccessBlock = isCancelled || showRoomPassword || (!checkoutPast && !!accessUnit);
 
   const checkinWhen = reservation.checkin?.localizedDate
     ? formatDateTime(String(reservation.checkin.localizedDate), locale)
@@ -143,27 +149,34 @@ export function SuccessScreen({ reservation, mainGuest, dependents, alreadyCompl
           </dl>
         </section>
 
-        {(roomPassword != null && roomPassword !== "") || accessUnit ? (
-          <div className="flex items-start gap-3 rounded-xl border border-accent/50 bg-accent/10 px-4 py-3">
-            <KeyRound className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden />
-            <div className="min-w-0 space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                {t("common.access")}
-              </p>
-              {accessUnit ? (
-                <p className="text-sm">
-                  <span className="text-muted-foreground">{t("common.unit")}: </span>
-                  <span className="font-medium wrap-anywhere">{accessUnit}</span>
-                </p>
-              ) : null}
-              {roomPassword != null && roomPassword !== "" ? (
-                <p className="text-sm">
-                  <span className="text-muted-foreground">{t("common.password")}: </span>
-                  <span className="font-code text-lg font-semibold wrap-anywhere">{roomPassword}</span>
-                </p>
-              ) : null}
+        {showAccessBlock ? (
+          isCancelled ? (
+            <div className="flex items-start gap-3 rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-3">
+              <AlertTriangle className="mt-0.5 size-5 shrink-0 text-destructive" aria-hidden />
+              <p className="text-sm text-destructive">{t("checkin.success.cancelledAccessNotice")}</p>
             </div>
-          </div>
+          ) : (
+            <div className="flex items-start gap-3 rounded-xl border border-accent/50 bg-accent/10 px-4 py-3">
+              <KeyRound className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden />
+              <div className="min-w-0 space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  {t("common.access")}
+                </p>
+                {accessUnit ? (
+                  <p className="text-sm">
+                    <span className="text-muted-foreground">{t("common.unit")}: </span>
+                    <span className="font-medium wrap-anywhere">{accessUnit}</span>
+                  </p>
+                ) : null}
+                {showRoomPassword ? (
+                  <p className="text-sm">
+                    <span className="text-muted-foreground">{t("common.password")}: </span>
+                    <span className="font-code text-lg font-semibold wrap-anywhere">{roomPassword}</span>
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          )
         ) : null}
 
         <section className="space-y-3">
@@ -172,31 +185,35 @@ export function SuccessScreen({ reservation, mainGuest, dependents, alreadyCompl
           </h4>
           <dl className="grid min-w-0 grid-cols-2 gap-3 text-sm">
             <Field label={t("common.name")} value={guestName} />
-            <Field label={t("common.email")} value={guest?.email} />
-            <Field
-              label={t("common.phone")}
-              value={
-                guest?.mobilePhoneNumber ? <PhoneDisplay phone={guest.mobilePhoneNumber} /> : undefined
-              }
-            />
-            <Field label={t("common.document")} value={formatDocumentLine(guest, locale)} />
-            <Field
-              label={t("guest.rg")}
-              value={
-                guest?.rg
-                  ? guest.expeditor
-                    ? `${guest.rg} (${guest.expeditor})`
-                    : guest.rg
-                  : undefined
-              }
-            />
-            <Field label={t("common.birthDate")} value={formatBirthDate(guest?.birthDate, locale)} />
-            <Field label={t("common.gender")} value={formatGender(guest?.gender, locale)} />
-            <Field label={t("common.profession")} value={guest?.profession} />
-            <Field label={t("common.nationality")} value={guest?.citizenship} />
-            <div className="col-span-2">
-              <Field label={t("common.address")} value={formatGuestAddress(guest)} />
-            </div>
+            {!hideGuestDetails ? (
+              <>
+                <Field label={t("common.email")} value={guest?.email} />
+                <Field
+                  label={t("common.phone")}
+                  value={
+                    guest?.mobilePhoneNumber ? <PhoneDisplay phone={guest.mobilePhoneNumber} /> : undefined
+                  }
+                />
+                <Field label={t("common.document")} value={formatDocumentLine(guest, locale)} />
+                <Field
+                  label={t("guest.rg")}
+                  value={
+                    guest?.rg
+                      ? guest.expeditor
+                        ? `${guest.rg} (${guest.expeditor})`
+                        : guest.rg
+                      : undefined
+                  }
+                />
+                <Field label={t("common.birthDate")} value={formatBirthDate(guest?.birthDate, locale)} />
+                <Field label={t("common.gender")} value={formatGender(guest?.gender, locale)} />
+                <Field label={t("common.profession")} value={guest?.profession} />
+                <Field label={t("common.nationality")} value={guest?.citizenship} />
+                <div className="col-span-2">
+                  <Field label={t("common.address")} value={formatGuestAddress(guest)} />
+                </div>
+              </>
+            ) : null}
           </dl>
           {dependents.length > 0 ? (
             <div className="space-y-2 border-t border-border pt-3">
@@ -207,16 +224,18 @@ export function SuccessScreen({ reservation, mainGuest, dependents, alreadyCompl
                 {dependents.map((dependent) => (
                   <li key={dependent.documentNumber || dependent.name}>
                     <p className="font-medium">{dependent.name}</p>
-                    <p className="text-muted-foreground">
-                      {formatDocumentLine(
-                        {
-                          documentNumber: dependent.documentNumber,
-                          documentType: dependent.documentType,
-                        },
-                        locale,
-                      )}
-                      {dependent.gender ? ` · ${formatGender(dependent.gender, locale)}` : ""}
-                    </p>
+                    {!hideGuestDetails ? (
+                      <p className="text-muted-foreground">
+                        {formatDocumentLine(
+                          {
+                            documentNumber: dependent.documentNumber,
+                            documentType: dependent.documentType,
+                          },
+                          locale,
+                        )}
+                        {dependent.gender ? ` · ${formatGender(dependent.gender, locale)}` : ""}
+                      </p>
+                    ) : null}
                   </li>
                 ))}
               </ul>

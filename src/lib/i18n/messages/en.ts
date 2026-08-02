@@ -414,6 +414,8 @@ export const en: MessageTree = {
       bannerBody:
         "Your digital check-in is complete. This property has no physical front desk — access your accommodation as instructed above.",
       helpTitle: "Need help during your stay?",
+      cancelledAccessNotice:
+        "This reservation is marked as cancelled. If you have any questions, please contact our support center.",
       shareTitle: "Check-in confirmed",
       shareText: "Check-in confirmed at {establishment} — {date}",
       submitFailed: "Could not complete check-in.",
@@ -456,6 +458,8 @@ export const en: MessageTree = {
     audit: "Audit",
     users: "Users",
     signOut: "Sign out",
+    navLabel: "Panel menu",
+    openMenu: "Open menu",
     dashboardPage: {
       title: "Dashboard",
       subtitle:

@@ -125,7 +125,7 @@ function AdminUsersPage() {
             <Label htmlFor="password">{t("admin.usersPage.tempPassword")}</Label>
             <Input
               id="password"
-              type="text"
+              type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder={t("admin.usersPage.minPassword")}

@@ -12,6 +12,7 @@ import { normalizeReservationPayload } from "./reservation-normalizer";
 import type { Reservation } from "./types";
 import type { TecHospitalityTokenScope } from "./techospitality.server";
 import { mapCheckinRecordRow, type CheckinRecordRow } from "@/lib/checkin-records";
+import { buildIlikeContains } from "@/lib/security";
 
 export type { CheckinRecordRow };
 
@@ -259,6 +260,7 @@ export const adminMe = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
+    await assertStaff(context);
     const [{ data: profile }, { data: roles }] = await Promise.all([
       supabase.from("profiles").select("id, email, full_name").eq("id", userId).maybeSingle(),
       supabase.from("user_roles").select("role").eq("user_id", userId),
@@ -278,7 +280,17 @@ async function assertAdmin(context: { supabase: any; userId: string }) {
     _role: "admin",
   });
   if (error) throw new Error(error.message);
-  if (!data) throw new Error("Apenas administradores podem gerenciar usuários.");
+  if (!data) throw new Error("Apenas administradores podem realizar esta ação.");
+}
+
+async function assertStaff(context: { supabase: any; userId: string }) {
+  const { data, error } = await context.supabase
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", context.userId)
+    .limit(1);
+  if (error) throw new Error(error.message);
+  if (!data?.length) throw new Error("Acesso negado: perfil de equipe não encontrado.");
 }
 
 export const adminListStaff = createServerFn({ method: "GET" })
@@ -641,7 +653,8 @@ export const adminGetTerms = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
     z.object({ establishmentId: z.string().trim().min(1).max(64) }).parse(input),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: row } = await supabaseAdmin
       .from("establishment_terms")
@@ -794,7 +807,8 @@ export const adminGetContact = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
     z.object({ establishmentId: z.string().trim().min(1).max(64) }).parse(input),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: row } = await supabaseAdmin
       .from("establishment_contacts")
@@ -865,7 +879,8 @@ export const adminGetSettings = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
     z.object({ establishmentId: z.string().trim().min(1).max(64) }).parse(input),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { parseEstablishmentSettings } = await import("@/lib/establishment-settings");
     const { data: row } = await supabaseAdmin
@@ -933,7 +948,8 @@ export const adminListExtraFields = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
     z.object({ establishmentId: z.string().trim().min(1).max(64) }).parse(input),
   )
-  .handler(async ({ data }): Promise<{ fields: ExtraField[] }> => {
+  .handler(async ({ data, context }): Promise<{ fields: ExtraField[] }> => {
+    await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: rows } = await supabaseAdmin
       .from("establishment_extra_fields")
@@ -1044,7 +1060,7 @@ export const adminListAuditLogs = createServerFn({ method: "POST" })
       .select("*")
       .order("created_at", { ascending: false })
       .limit(data.limit);
-    if (data.action) query = query.ilike("action", `%${data.action}%`);
+    if (data.action) query = query.ilike("action", buildIlikeContains(data.action));
     const { data: rows, error } = await query;
     if (error) throw new Error(error.message);
     return { logs: rows ?? [] };
@@ -1055,7 +1071,8 @@ export const adminDashboardPortalStats = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
     z.object({ date: z.string().trim().max(20).optional() }).parse(input ?? {}),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    await assertStaff(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const selectedDate = data.date || new Date().toISOString().slice(0, 10);
     const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
@@ -1114,7 +1131,8 @@ export const adminDashboardCheckouts = createServerFn({ method: "POST" })
       })
       .parse(input ?? {}),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    await assertStaff(context);
     const today = todayIso();
     const limit = data.limit ?? dashboardFeedLimit();
     const payload = await fetchAdminDashboardApi(checkoutsApiPath(), CHECKOUTS_TOKEN_ENV, {
@@ -1145,7 +1163,8 @@ export const adminDashboardCreatedReservations = createServerFn({ method: "POST"
       })
       .parse(input ?? {}),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    await assertStaff(context);
     const today = todayIso();
     const tomorrow = addDaysIso(today, 1);
     const startDate = monthStartIso(today);
@@ -1185,7 +1204,8 @@ export const adminDashboardStats = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
     z.object({ date: z.string().trim().max(20).optional() }).parse(input ?? {}),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    await assertStaff(context);
     const payload = await fetchAdminReservationsApi("/api/reservations", {
       query: data.date ? { date: data.date } : {},
     });
@@ -1234,7 +1254,8 @@ export const adminListReservations = createServerFn({ method: "POST" })
       })
       .parse(input ?? {}),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    await assertStaff(context);
     if (data.localizer) {
       const payload = await fetchAdminReservationsApi(
         `/api/reservations/localizer/${encodeURIComponent(data.localizer)}`,
@@ -1265,7 +1286,8 @@ export const adminGetReservation = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
     z.object({ localizer: z.string().trim().min(1).max(40) }).parse(input),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    await assertStaff(context);
     const payload = await fetchAdminReservationsApi(
       `/api/reservations/localizer/${encodeURIComponent(data.localizer)}`,
     );
@@ -1284,7 +1306,8 @@ export const adminListCheckinRecords = createServerFn({ method: "POST" })
       })
       .parse(input ?? {}),
   )
-  .handler(async ({ data }): Promise<{ records: CheckinRecordRow[] }> => {
+  .handler(async ({ data, context }): Promise<{ records: CheckinRecordRow[] }> => {
+    await assertStaff(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     let query = supabaseAdmin
@@ -1294,7 +1317,7 @@ export const adminListCheckinRecords = createServerFn({ method: "POST" })
       .limit(200);
 
     if (data.localizer) {
-      query = query.ilike("localizer", `%${data.localizer.trim().toUpperCase()}%`);
+      query = query.ilike("localizer", buildIlikeContains(data.localizer.trim().toUpperCase()));
     }
     if (data.establishmentId) {
       query = query.eq("establishment_id", data.establishmentId);
@@ -1320,7 +1343,8 @@ export const adminGetCheckinRecord = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
     z.object({ id: z.string().uuid() }).parse(input),
   )
-  .handler(async ({ data }): Promise<{ record: CheckinRecordRow | null }> => {
+  .handler(async ({ data, context }): Promise<{ record: CheckinRecordRow | null }> => {
+    await assertStaff(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: row, error } = await supabaseAdmin
       .from("checkin_records")

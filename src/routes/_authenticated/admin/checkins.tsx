@@ -33,6 +33,7 @@ function AdminCheckinsPage() {
   const detailFn = useServerFn(adminGetCheckinRecord);
   const [localizer, setLocalizer] = useState("");
   const [date, setDate] = useState("");
+  const [applied, setApplied] = useState({ localizer: "", date: "" });
   const [rows, setRows] = useState<CheckinRecordRow[]>([]);
   const [detail, setDetail] = useState<CheckinRecordRow | null>(null);
   const [loading, setLoading] = useState(false);
@@ -44,8 +45,8 @@ function AdminCheckinsPage() {
     try {
       const result = await listFn({
         data: {
-          localizer: localizer.trim() || undefined,
-          date: date || undefined,
+          localizer: applied.localizer || undefined,
+          date: applied.date || undefined,
         },
       });
       setRows(result.records);
@@ -55,7 +56,7 @@ function AdminCheckinsPage() {
     } finally {
       setLoading(false);
     }
-  }, [listFn, localizer, date, t]);
+  }, [listFn, applied, t]);
 
   useEffect(() => {
     void load();
@@ -78,7 +79,7 @@ function AdminCheckinsPage() {
         className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
         onSubmit={(e) => {
           e.preventDefault();
-          void load();
+          setApplied({ localizer: localizer.trim().toUpperCase(), date });
         }}
       >
         <Input

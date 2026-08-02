@@ -3,7 +3,7 @@ import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { writeAuditLog } from "@/lib/audit";
 import { saveCheckinRecord } from "@/lib/checkin-records";
-import { assertRateLimitAllowed, getClientIp, recordRateLimitHit } from "@/lib/rate-limit";
+import { assertRateLimitAllowed, enforceRateLimit, getClientIp, recordRateLimitHit } from "@/lib/rate-limit";
 import { cloneDefaultSections, parseTermsContent, flattenTermsSections } from "@/lib/establishment-terms";
 import { onlyDigits } from "@/lib/validators";
 import { BRAZIL_PMS_COUNTRY, formatCitizenshipForApi, formatPmsCountryForAddressField } from "@/lib/guest-countries";
@@ -305,9 +305,22 @@ async function fetchReservationByLocalizer(localizer: string): Promise<Reservati
   return normalizeReservationPayload(raw);
 }
 
+function clientIpBucket(prefix: string): string {
+  const request = getRequest();
+  const ip = request?.headers ? getClientIp(request.headers) : "unknown";
+  return `${prefix}:${ip}`;
+}
+
+const LOCALIZER_SCHEMA = z
+  .string()
+  .trim()
+  .min(3)
+  .max(40)
+  .regex(/^[A-Za-z0-9-]+$/, "Localizador inválido.");
+
 export const findReservation = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
-    z.object({ localizer: z.string().trim().min(3).max(40) }).parse(input),
+    z.object({ localizer: LOCALIZER_SCHEMA }).parse(input),
   )
   .handler(async ({ data }) => {
     const request = getRequest();
@@ -334,12 +347,15 @@ export const findReservation = createServerFn({ method: "POST" })
     }
   });
 
-/** Detalhes completos após check-in — sem rate limit (confirmação da própria reserva). */
+/** Detalhes completos após localizador validado. */
 export const getReservationDetails = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
-    z.object({ localizer: z.string().trim().min(1).max(40) }).parse(input),
+    z.object({ localizer: LOCALIZER_SCHEMA }).parse(input),
   )
-  .handler(async ({ data }) => fetchReservationByLocalizer(data.localizer));
+  .handler(async ({ data }) => {
+    await enforceRateLimit(clientIpBucket("reservation-details"), { maxRequests: 30 });
+    return fetchReservationByLocalizer(data.localizer);
+  });
 
 export const getEstablishmentTerms = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
@@ -441,6 +457,7 @@ export const lookupGuest = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data }) => {
+    await enforceRateLimit(clientIpBucket("guest-lookup"), { maxRequests: 20 });
     const { apiFetch, unwrap } = await import("./techospitality.server");
     const query: Record<string, string> =
       "email" in data
@@ -492,6 +509,7 @@ export const uploadCheckinMedia = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data }) => {
+    await enforceRateLimit(clientIpBucket("media-upload"), { maxRequests: 40 });
     const { apiFetch, unwrap } = await import("./techospitality.server");
     const payload = await apiFetch<unknown>(
       `/api/reservations/hub/${encodeURIComponent(data.reservationId)}/checkin/media`,
@@ -547,6 +565,7 @@ export const submitCheckin = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data }) => {
+    await enforceRateLimit(clientIpBucket("submit-checkin"), { maxRequests: 10 });
     const { apiFetch, unwrap } = await import("./techospitality.server");
     const labels = buildCheckinErrorLabelsPt();
     const mainGuestInput = data.mainGuest as MainGuest;

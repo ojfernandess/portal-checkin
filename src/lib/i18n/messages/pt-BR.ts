@@ -413,6 +413,8 @@ export const ptBR = {
       bannerBody:
         "Seu check-in digital foi finalizado. Este empreendimento não possui recepção física — você pode acessar a acomodação conforme as instruções acima.",
       helpTitle: "Precisa de ajuda durante a estadia?",
+      cancelledAccessNotice:
+        "Essa reserva consta como cancelada. Caso tenha alguma dúvida, entre em contato com nossa central.",
       shareTitle: "Check-in confirmado",
       shareText: "Check-in confirmado em {establishment} — {date}",
       submitFailed: "Não foi possível concluir o check-in.",
@@ -455,6 +457,8 @@ export const ptBR = {
     audit: "Auditoria",
     users: "Usuários",
     signOut: "Sair",
+    navLabel: "Menu do painel",
+    openMenu: "Abrir menu",
     dashboardPage: {
       title: "Dashboard",
       subtitle:
