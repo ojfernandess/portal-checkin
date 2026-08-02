@@ -1,0 +1,17 @@
+node_modules
+.output
+dist
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+.dev.vars
+*.md
+check.json
+.cursor
+.vscode
+terminals
+agent-transcripts
+npm-debug.log*
+.DS_Store

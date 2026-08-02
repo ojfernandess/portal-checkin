@@ -1,0 +1,137 @@
+import { useEffect, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { Camera, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { CameraCapture } from "@/components/checkin/CameraCapture";
+import { getCheckinPhotoDisplay } from "@/lib/api/checkin.functions";
+import { useI18n } from "@/lib/i18n/context";
+import { cn } from "@/lib/utils";
+
+type Props = {
+  title: string;
+  photoType: "profile" | "document";
+  registeredUrl?: string | null;
+  mediaId?: string | number | null;
+  label: string;
+  facingMode: "user" | "environment";
+  editing: boolean;
+  editValue: string | null;
+  onStartEdit: () => void;
+  onCancelEdit: () => void;
+  onCapture: (value: string) => void;
+};
+
+export function RegisteredPhotoTile({
+  title,
+  photoType,
+  registeredUrl,
+  mediaId,
+  label,
+  facingMode,
+  editing,
+  editValue,
+  onStartEdit,
+  onCancelEdit,
+  onCapture,
+}: Props) {
+  const { t } = useI18n();
+  const loadPhoto = useServerFn(getCheckinPhotoDisplay);
+  const [displayUrl, setDisplayUrl] = useState<string | null>(registeredUrl ?? null);
+  const [loadingPhoto, setLoadingPhoto] = useState(false);
+  const [photoError, setPhotoError] = useState(false);
+
+  useEffect(() => {
+    if (editing) return;
+    if (!registeredUrl && mediaId == null) {
+      setDisplayUrl(null);
+      setPhotoError(false);
+      return;
+    }
+
+    let active = true;
+    setLoadingPhoto(true);
+    setPhotoError(false);
+
+    void loadPhoto({
+      data: {
+        type: photoType,
+        url: registeredUrl ?? undefined,
+        id: mediaId ?? undefined,
+      },
+    })
+      .then((result) => {
+        if (!active) return;
+        setDisplayUrl(result.displayUrl ?? registeredUrl ?? null);
+        setPhotoError(!result.displayUrl && !registeredUrl);
+      })
+      .catch(() => {
+        if (!active) return;
+        setDisplayUrl(registeredUrl ?? null);
+        setPhotoError(!registeredUrl);
+      })
+      .finally(() => {
+        if (active) setLoadingPhoto(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [editing, loadPhoto, mediaId, photoType, registeredUrl]);
+
+  if (editing) {
+    return (
+      <div className="space-y-2">
+        <CameraCapture
+          compact
+          title={title}
+          facingMode={facingMode}
+          value={editValue}
+          label={label}
+          onCapture={onCapture}
+        />
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="tap-safe h-8 w-full text-xs"
+          onClick={onCancelEdit}
+        >
+          {t("checkin.photos.keepRegistered")}
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</p>
+      <div
+        className={cn(
+          "relative aspect-square overflow-hidden rounded-xl border border-border bg-muted",
+          displayUrl && !photoError && "ring-2 ring-success/40 ring-offset-2 ring-offset-background",
+        )}
+      >
+        {loadingPhoto ? (
+          <div className="flex size-full items-center justify-center text-muted-foreground">
+            <Loader2 className="size-6 animate-spin" aria-hidden />
+          </div>
+        ) : displayUrl && !photoError ? (
+          <img
+            src={displayUrl}
+            alt={label}
+            className="size-full object-cover"
+            onError={() => setPhotoError(true)}
+          />
+        ) : (
+          <div className="flex size-full flex-col items-center justify-center gap-2 p-3 text-center text-muted-foreground">
+            <Camera className="size-5" aria-hidden />
+            <span className="text-xs">{t("checkin.photos.unavailable")}</span>
+          </div>
+        )}
+      </div>
+      <Button type="button" variant="outline" size="sm" className="tap-safe w-full" onClick={onStartEdit}>
+        {t("checkin.photos.changePhoto")}
+      </Button>
+    </div>
+  );
+}

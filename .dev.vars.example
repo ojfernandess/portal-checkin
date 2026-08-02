@@ -1,0 +1,5 @@
+# Wrangler / Cloudflare Workers (dev local) — copie para .dev.vars
+# O .env sozinho NÃO injeta variáveis no runtime Cloudflare em npm run dev.
+TECHOSPITALITY_BASE_URL=https://backend.techospitality.com
+TECHOSPITALITY_RESERVATIONS_TOKEN=vkr_loc_
+TECHOSPITALITY_HUB_TOKEN=vkr_chk_

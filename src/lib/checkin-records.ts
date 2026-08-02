@@ -1,0 +1,105 @@
+import type { Dependent, EmbraturForm, MainGuest, Reservation } from "@/lib/api/types";
+
+export type CheckinRecordRow = {
+  id: string;
+  localizer: string;
+  reservation_id: string | null;
+  establishment_id: string | null;
+  establishment_name: string | null;
+  guest_name: string;
+  guest_email: string | null;
+  guest_document: string | null;
+  guest_document_type: string | null;
+  guest_phone: string | null;
+  main_guest: MainGuest;
+  dependents: Dependent[];
+  embratur: EmbraturForm | null;
+  reservation_snapshot: Reservation | null;
+  extra_fields: Record<string, unknown> | null;
+  terms_accepted: boolean;
+  terms_accepted_at: string | null;
+  terms_version: number | null;
+  checked_in_at: string;
+  created_at: string;
+};
+
+export type SaveCheckinRecordInput = {
+  localizer: string;
+  reservationId?: string;
+  establishmentId?: string;
+  establishmentName?: string;
+  mainGuest: MainGuest;
+  dependents?: Dependent[];
+  embratur?: EmbraturForm;
+  reservationSnapshot?: Reservation | null;
+  extraFields?: Record<string, unknown>;
+  termsAcceptedAt?: string | null;
+  termsVersion?: number | null;
+};
+
+export async function saveCheckinRecord(input: SaveCheckinRecordInput): Promise<string | null> {
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const guest = input.mainGuest;
+
+    const { data, error } = await supabaseAdmin
+      .from("checkin_records")
+      .insert({
+        localizer: input.localizer.toUpperCase(),
+        reservation_id: input.reservationId ?? null,
+        establishment_id: input.establishmentId ?? null,
+        establishment_name: input.establishmentName ?? null,
+        guest_name: String(guest.name ?? "Hóspede"),
+        guest_email: guest.email ?? null,
+        guest_document: guest.documentNumber ?? null,
+        guest_document_type: guest.documentType ?? null,
+        guest_phone: guest.mobilePhoneNumber ?? null,
+        main_guest: guest,
+        dependents: input.dependents ?? [],
+        embratur: input.embratur ?? null,
+        reservation_snapshot: input.reservationSnapshot ?? null,
+        extra_fields: input.extraFields ?? null,
+        terms_accepted: !!input.termsAcceptedAt,
+        terms_accepted_at: input.termsAcceptedAt ?? null,
+        terms_version: input.termsVersion ?? null,
+        checked_in_at: new Date().toISOString(),
+      })
+      .select("id")
+      .single();
+
+    if (error) {
+      console.error("[checkin-records] insert failed:", error.message);
+      return null;
+    }
+
+    return data?.id ?? null;
+  } catch (error) {
+    console.error("[checkin-records]", error);
+    return null;
+  }
+}
+
+export function mapCheckinRecordRow(row: Record<string, unknown>): CheckinRecordRow {
+  return {
+    id: String(row.id),
+    localizer: String(row.localizer),
+    reservation_id: row.reservation_id != null ? String(row.reservation_id) : null,
+    establishment_id: row.establishment_id != null ? String(row.establishment_id) : null,
+    establishment_name: row.establishment_name != null ? String(row.establishment_name) : null,
+    guest_name: String(row.guest_name),
+    guest_email: row.guest_email != null ? String(row.guest_email) : null,
+    guest_document: row.guest_document != null ? String(row.guest_document) : null,
+    guest_document_type: row.guest_document_type != null ? String(row.guest_document_type) : null,
+    guest_phone: row.guest_phone != null ? String(row.guest_phone) : null,
+    main_guest: (row.main_guest as MainGuest) ?? {},
+    dependents: Array.isArray(row.dependents) ? (row.dependents as Dependent[]) : [],
+    embratur: (row.embratur as EmbraturForm | null) ?? null,
+    reservation_snapshot: (row.reservation_snapshot as Reservation | null) ?? null,
+    extra_fields: (row.extra_fields as Record<string, unknown> | null) ?? null,
+    terms_accepted: row.terms_accepted === true,
+    terms_accepted_at: row.terms_accepted_at != null ? String(row.terms_accepted_at) : null,
+    terms_version: row.terms_version != null ? Number(row.terms_version) : null,
+    checked_in_at: String(row.checked_in_at),
+    created_at: String(row.created_at),
+  };
+}
