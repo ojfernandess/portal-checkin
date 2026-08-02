@@ -2,15 +2,18 @@ import {
   ArrowRight,
   CalendarPlus,
   Clock3,
+  ExternalLink,
   FileCheck2,
   Hash,
   HelpCircle,
   Loader2,
+  Phone,
   ShieldCheck,
   Smartphone,
 } from "lucide-react";
 import { BrandLogo } from "@/components/BrandLogo";
 import { PhoneDisplay } from "@/components/checkin/PhoneDisplay";
+import { WhatsAppIcon } from "@/components/icons/WhatsAppIcon";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { Button } from "@/components/ui/button";
 import {
@@ -41,6 +44,9 @@ const FEATURES = [
   { icon: CalendarPlus, titleKey: "checkin.landing.featureExtensionTitle", descKey: "checkin.landing.featureExtensionDesc" },
 ] as const;
 
+const AUDAR_WEBSITE = "https://audaar.com.br/";
+const SUPPORT_PHONE = "+55 11 2388-0408";
+const SUPPORT_PHONE_TEL = "tel:+551123880408";
 const SUPPORT_WHATSAPP = "+55 11 96747-0800";
 const SUPPORT_WHATSAPP_LINK = "https://wa.me/5511967470800";
 
@@ -163,14 +169,34 @@ export function CheckinLanding({
 
                 <div className="rounded-xl border border-border bg-muted/30 px-4 py-4 text-center lg:text-left">
                   <p className="text-sm font-medium text-foreground">{t("checkin.landing.needHelp")}</p>
-                  <a
-                    href={SUPPORT_WHATSAPP_LINK}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-2 inline-flex items-center justify-center gap-2 text-sm text-primary hover:underline lg:justify-start"
-                  >
-                    {t("common.whatsapp")}: <PhoneDisplay phone={SUPPORT_WHATSAPP} />
-                  </a>
+                  <div className="mt-3 flex flex-col items-center gap-2 lg:items-start">
+                    <a
+                      href={AUDAR_WEBSITE}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground hover:underline"
+                    >
+                      <ExternalLink className="size-4 shrink-0" aria-hidden />
+                      audaar.com.br
+                    </a>
+                    <a
+                      href={SUPPORT_PHONE_TEL}
+                      className="inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                      <Phone className="size-4 shrink-0" aria-hidden />
+                      <PhoneDisplay phone={SUPPORT_PHONE} />
+                    </a>
+                    <a
+                      href={SUPPORT_WHATSAPP_LINK}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
+                      aria-label={t("common.whatsapp")}
+                    >
+                      <WhatsAppIcon className="size-4 shrink-0 text-[#25D366]" />
+                      <PhoneDisplay phone={SUPPORT_WHATSAPP} />
+                    </a>
+                  </div>
                 </div>
               </>
             )}

@@ -214,6 +214,7 @@ export const es: MessageTree = {
       localizerHint: "El localizador fue enviado por correo cuando hizo la reserva.",
       continueButton: "Continuar con localizador",
       needHelp: "¿Necesita ayuda?",
+      website: "Sitio web",
       footer: "Check-in online rápido y seguro. Complete en minutos y evite filas en recepción.",
       featureDigitalTitle: "Digital",
       featureDigitalDesc: "100% online",

@@ -213,6 +213,7 @@ export const en: MessageTree = {
       localizerHint: "The locator was emailed to you when you booked.",
       continueButton: "Continue with locator",
       needHelp: "Need help?",
+      website: "Website",
       footer: "Fast, secure online check-in. Finish in minutes and skip the front desk queue.",
       featureDigitalTitle: "Digital",
       featureDigitalDesc: "100% online",

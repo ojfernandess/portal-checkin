@@ -212,6 +212,7 @@ export const ptBR = {
       localizerHint: "O localizador foi enviado por e-mail quando você fez a reserva.",
       continueButton: "Continuar com Localizador",
       needHelp: "Precisa de ajuda?",
+      website: "Site",
       footer: "Check-in online rápido e seguro. Complete em minutos e evite filas na recepção.",
       featureDigitalTitle: "Digital",
       featureDigitalDesc: "100% online",
