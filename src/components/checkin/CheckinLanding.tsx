@@ -82,8 +82,8 @@ const SUPPORT_PHONE = "+55 11 2388-0408";
 const SUPPORT_PHONE_TEL = "tel:+551123880408";
 const SUPPORT_WHATSAPP = "+55 11 96747-0800";
 const SUPPORT_WHATSAPP_LINK = "https://wa.me/5511967470800";
-const SUPPORT_EMAIL = "atendimento@audaar.com.br";
-const SUPPORT_EMAIL_LINK = "mailto:atendimento@audaar.com.br";
+const SUPPORT_EMAIL = "central@audaar.com.br";
+const SUPPORT_EMAIL_LINK = "mailto:central@audaar.com.br";
 
 function HeroBackground({ className }: { className?: string }) {
   return (
