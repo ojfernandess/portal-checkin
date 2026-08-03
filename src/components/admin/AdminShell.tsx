@@ -9,6 +9,7 @@ import {
   LogOut,
   Menu,
   ScrollText,
+  Shield,
   Users,
 } from "lucide-react";
 import { BrandLogo } from "@/components/BrandLogo";
@@ -113,6 +114,7 @@ export function AdminShell({ title, subtitle, account, breadcrumbs, children }: 
     { to: "/admin/dashboard", label: t("admin.dashboard"), icon: LayoutDashboard },
     { to: "/admin/checkins", label: t("admin.checkins"), icon: ClipboardList },
     { to: "/admin/establishments", label: t("admin.establishments"), icon: Building2, adminOnly: true },
+    { to: "/admin/security", label: t("admin.security"), icon: Shield, adminOnly: true },
     { to: "/admin/audit", label: t("admin.audit"), icon: ScrollText, adminOnly: true },
     { to: "/admin/users", label: t("admin.users"), icon: Users, adminOnly: true },
   ].filter((item) => !item.adminOnly || isAdmin);

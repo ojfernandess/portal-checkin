@@ -188,6 +188,27 @@ export type Database = {
         }
         Relationships: []
       }
+      app_settings: {
+        Row: {
+          id: string
+          settings: Json
+          updated_by: string | null
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          settings?: Json
+          updated_by?: string | null
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          settings?: Json
+          updated_by?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       establishment_extra_fields: {
         Row: {
           id: string

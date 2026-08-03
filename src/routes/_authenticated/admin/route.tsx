@@ -1,7 +1,7 @@
 import { createFileRoute, Outlet, redirect, isRedirect } from "@tanstack/react-router";
 import { adminMe } from "@/lib/api/admin.functions";
 
-const ADMIN_ONLY_PREFIXES = ["/admin/establishments", "/admin/audit", "/admin/users"];
+const ADMIN_ONLY_PREFIXES = ["/admin/establishments", "/admin/audit", "/admin/users", "/admin/security"];
 
 export const Route = createFileRoute("/_authenticated/admin")({
   beforeLoad: async ({ location }) => {

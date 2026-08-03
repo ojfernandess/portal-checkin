@@ -201,6 +201,8 @@ export const en: MessageTree = {
       start: "Start check-in",
       another: "Search another reservation",
       notFound: "Reservation not found. Please check the code.",
+      establishmentNotRegistered:
+        "Unfortunately, this reservation could not be found. Please contact our support center for assistance.",
       error: "Error looking up reservation.",
     },
     landing: {
@@ -509,6 +511,7 @@ export const en: MessageTree = {
     dashboard: "Dashboard",
     checkins: "Check-ins",
     establishments: "Properties",
+    security: "Global security",
     audit: "Audit",
     users: "Users",
     signOut: "Sign out",
@@ -661,6 +664,16 @@ export const en: MessageTree = {
       saveSecuritySettings: "Save security options",
       settingsSaved: "Settings saved.",
       settingsSaveFailed: "Failed to save settings.",
+    },
+    securityPage: {
+      title: "Global security",
+      body: "Security settings that apply to the entire check-in portal.",
+      requireRegisteredEstablishment: "Require registered property",
+      requireRegisteredEstablishmentHint:
+        "When enabled, guests can only look up reservations and complete check-in if the establishmentId is registered under Properties.",
+      save: "Save settings",
+      saved: "Security settings saved.",
+      saveFailed: "Failed to save security settings.",
     },
     termsEditor: {
       previewTitle: "Property policies",

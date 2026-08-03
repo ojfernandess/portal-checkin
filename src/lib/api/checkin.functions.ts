@@ -330,6 +330,10 @@ export const findReservation = createServerFn({ method: "POST" })
 
     try {
       const reservation = await fetchReservationByLocalizer(data.localizer);
+      const { assertRegisteredEstablishmentAccess, resolveReservationEstablishmentId } = await import(
+        "@/lib/establishment-registry.server"
+      );
+      await assertRegisteredEstablishmentAccess(resolveReservationEstablishmentId(reservation));
       await recordRateLimitHit(bucketKey);
       return reservation;
     } catch (error) {
@@ -354,7 +358,12 @@ export const getReservationDetails = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     await enforceRateLimit(clientIpBucket("reservation-details"), { maxRequests: 30 });
-    return fetchReservationByLocalizer(data.localizer);
+    const reservation = await fetchReservationByLocalizer(data.localizer);
+    const { assertRegisteredEstablishmentAccess, resolveReservationEstablishmentId } = await import(
+      "@/lib/establishment-registry.server"
+    );
+    await assertRegisteredEstablishmentAccess(resolveReservationEstablishmentId(reservation));
+    return reservation;
   });
 
 export const getEstablishmentTerms = createServerFn({ method: "POST" })
@@ -362,6 +371,8 @@ export const getEstablishmentTerms = createServerFn({ method: "POST" })
     z.object({ establishmentId: z.string().trim().min(1).max(64) }).parse(input),
   )
   .handler(async ({ data }) => {
+    const { assertRegisteredEstablishmentAccess } = await import("@/lib/establishment-registry.server");
+    await assertRegisteredEstablishmentAccess(data.establishmentId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: row } = await supabaseAdmin
       .from("establishment_terms")
@@ -385,6 +396,8 @@ export const getEstablishmentContact = createServerFn({ method: "POST" })
     z.object({ establishmentId: z.string().trim().min(1).max(64) }).parse(input),
   )
   .handler(async ({ data }) => {
+    const { assertRegisteredEstablishmentAccess } = await import("@/lib/establishment-registry.server");
+    await assertRegisteredEstablishmentAccess(data.establishmentId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: row } = await supabaseAdmin
       .from("establishment_contacts")
@@ -399,6 +412,8 @@ export const getEstablishmentSettings = createServerFn({ method: "POST" })
     z.object({ establishmentId: z.string().trim().min(1).max(64) }).parse(input),
   )
   .handler(async ({ data }) => {
+    const { assertRegisteredEstablishmentAccess } = await import("@/lib/establishment-registry.server");
+    await assertRegisteredEstablishmentAccess(data.establishmentId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { parseEstablishmentSettings } = await import("@/lib/establishment-settings");
     const { data: row } = await supabaseAdmin
@@ -491,6 +506,8 @@ export const checkReaccessBirthDateRequired = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     await enforceRateLimit(clientIpBucket("reaccess-gate"), { maxRequests: 30 });
+    const { assertRegisteredEstablishmentAccess } = await import("@/lib/establishment-registry.server");
+    await assertRegisteredEstablishmentAccess(data.establishmentId);
     const { parseEstablishmentSettings } = await import("@/lib/establishment-settings");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
@@ -517,6 +534,8 @@ export const verifyReaccessBirthDate = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     await enforceRateLimit(clientIpBucket("reaccess-verify"), { maxRequests: 15 });
+    const { assertRegisteredEstablishmentAccess } = await import("@/lib/establishment-registry.server");
+    await assertRegisteredEstablishmentAccess(data.establishmentId);
     const { parseEstablishmentSettings, birthDatesMatch } = await import(
       "@/lib/establishment-settings"
     );
@@ -555,6 +574,8 @@ export const getEstablishmentExtraFields = createServerFn({ method: "POST" })
     z.object({ establishmentId: z.string().trim().min(1).max(64) }).parse(input),
   )
   .handler(async ({ data }): Promise<{ fields: CheckinExtraField[] }> => {
+    const { assertRegisteredEstablishmentAccess } = await import("@/lib/establishment-registry.server");
+    await assertRegisteredEstablishmentAccess(data.establishmentId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: rows } = await supabaseAdmin
       .from("establishment_extra_fields")
@@ -581,15 +602,19 @@ export const lookupGuest = createServerFn({ method: "POST" })
         z.object({
           documentNumber: z.string().trim().min(3).max(30),
           documentType: z.enum(["CPF", "PASSPORT", "RG"]).optional(),
+          establishmentId: z.string().trim().min(1).max(64).optional(),
         }),
         z.object({
           email: z.string().trim().email().max(200),
+          establishmentId: z.string().trim().min(1).max(64).optional(),
         }),
       ])
       .parse(input),
   )
   .handler(async ({ data }) => {
     await enforceRateLimit(clientIpBucket("guest-lookup"), { maxRequests: 20 });
+    const { assertRegisteredEstablishmentAccess } = await import("@/lib/establishment-registry.server");
+    await assertRegisteredEstablishmentAccess(data.establishmentId);
     const { apiFetch, unwrap } = await import("./techospitality.server");
     const query: Record<string, string> =
       "email" in data
@@ -637,11 +662,14 @@ export const uploadCheckinMedia = createServerFn({ method: "POST" })
         reservationId: z.string().min(1),
         data: z.string().min(50),
         type: z.enum(["profile", "document"]),
+        establishmentId: z.string().trim().min(1).max(64).optional(),
       })
       .parse(input),
   )
   .handler(async ({ data }) => {
     await enforceRateLimit(clientIpBucket("media-upload"), { maxRequests: 40 });
+    const { assertRegisteredEstablishmentAccess } = await import("@/lib/establishment-registry.server");
+    await assertRegisteredEstablishmentAccess(data.establishmentId);
     const { apiFetch, unwrap } = await import("./techospitality.server");
     const payload = await apiFetch<unknown>(
       `/api/reservations/hub/${encodeURIComponent(data.reservationId)}/checkin/media`,
@@ -698,6 +726,15 @@ export const submitCheckin = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     await enforceRateLimit(clientIpBucket("submit-checkin"), { maxRequests: 10 });
+    const { assertRegisteredEstablishmentAccess, resolveReservationEstablishmentId } = await import(
+      "@/lib/establishment-registry.server"
+    );
+    await assertRegisteredEstablishmentAccess(
+      data.establishmentId ??
+        resolveReservationEstablishmentId(
+          (data.reservationSnapshot as Reservation | undefined) ?? null,
+        ),
+    );
     const { apiFetch, unwrap } = await import("./techospitality.server");
     const labels = buildCheckinErrorLabelsPt();
     const mainGuestInput = data.mainGuest as MainGuest;

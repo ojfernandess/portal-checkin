@@ -22,6 +22,7 @@ import { EmbraturStep } from "@/components/checkin/EmbraturStep";
 import { CameraCapture } from "@/components/checkin/CameraCapture";
 import { RegisteredPhotoTile } from "@/components/checkin/RegisteredPhotoTile";
 import { CheckinFinalizingScreen } from "@/components/checkin/CheckinFinalizingScreen";
+import { isEstablishmentNotRegisteredError } from "@/lib/checkin-access";
 import { SuccessScreen } from "@/components/checkin/SuccessScreen";
 import { ExtraFieldsPanel, validateExtraFields } from "@/components/checkin/ExtraFieldsPanel";
 import { cn } from "@/lib/utils";
@@ -362,7 +363,10 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
     if (!value) return null;
     if (!isDataUrl(value)) return { url: value };
 
-    const result = await upload({ data: { reservationId, data: value, type } });
+    const establishmentId = String(reservation?.establishmentId ?? "").trim() || undefined;
+    const result = await upload({
+      data: { reservationId, data: value, type, establishmentId },
+    });
     return {
       url:
         (type === "profile" ? result.profilePhotoUrl : result.documentPhotoUrl) ??
@@ -494,7 +498,13 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
         setStep(0);
       }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : t("checkin.search.error"));
+      toast.error(
+        isEstablishmentNotRegisteredError(error)
+          ? t("checkin.search.establishmentNotRegistered")
+          : error instanceof Error
+            ? error.message
+            : t("checkin.search.error"),
+      );
     } finally {
       setLoading(false);
     }
@@ -628,6 +638,8 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
   }
 
   async function handleLookup() {
+    const establishmentId = String(reservation?.establishmentId ?? "").trim() || undefined;
+
     if (foreign) {
       const email = document.trim().toLowerCase();
       if (!isValidEmail(email)) {
@@ -636,7 +648,7 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
       }
       setLoading(true);
       try {
-        const found = await lookup({ data: { email } });
+        const found = await lookup({ data: { email, establishmentId } });
         if (found) {
           afterLookupFound(found, { email });
         } else {
@@ -666,7 +678,7 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
     setLoading(true);
     try {
       const found = await lookup({
-        data: { documentNumber: value.replace(/\D/g, "") },
+        data: { documentNumber: value.replace(/\D/g, ""), establishmentId },
       });
       const fallbackGuest = {
         documentNumber: value.replace(/\D/g, ""),
@@ -885,6 +897,11 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
         },
       });
     } catch (error) {
+      if (isEstablishmentNotRegisteredError(error)) {
+        showCheckinError(t("checkin.search.establishmentNotRegistered"));
+        setLoading(false);
+        return;
+      }
       const labels = buildCheckinErrorLabels(t);
       const message =
         error instanceof Error

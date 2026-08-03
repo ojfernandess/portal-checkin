@@ -966,6 +966,73 @@ export const adminSaveSettings = createServerFn({ method: "POST" })
     return { ok: true as const };
   });
 
+export const adminGetAppSettings = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { parseAppSettings } = await import("@/lib/app-settings");
+    const { data: row } = await supabaseAdmin
+      .from("app_settings")
+      .select("settings, updated_at")
+      .eq("id", "global")
+      .maybeSingle();
+    return {
+      settings: parseAppSettings(row?.settings ?? null),
+      updatedAt: row?.updated_at ?? null,
+    };
+  });
+
+export const adminSaveAppSettings = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        requireRegisteredEstablishment: z.boolean(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { parseAppSettings } = await import("@/lib/app-settings");
+    const email = await getStaffEmail(context);
+
+    const { data: existing } = await supabaseAdmin
+      .from("app_settings")
+      .select("*")
+      .eq("id", "global")
+      .maybeSingle();
+
+    const settings = {
+      ...parseAppSettings(existing?.settings ?? null),
+      requireRegisteredEstablishment: data.requireRegisteredEstablishment,
+    };
+
+    const { error } = await supabaseAdmin.from("app_settings").upsert(
+      {
+        id: "global",
+        settings,
+        updated_by: context.userId,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "id" },
+    );
+    if (error) throw new Error(error.message);
+
+    await writeAuditLog({
+      userId: context.userId,
+      userEmail: email,
+      action: "app_settings.update",
+      entityType: "app_settings",
+      entityId: "global",
+      oldData: existing,
+      newData: settings,
+    });
+
+    return { ok: true as const };
+  });
+
 export const adminListExtraFields = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>

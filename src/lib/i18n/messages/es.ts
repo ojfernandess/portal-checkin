@@ -202,6 +202,8 @@ export const es: MessageTree = {
       start: "Realizar check-in",
       another: "Buscar otra reserva",
       notFound: "Reserva no encontrada. Verifique el código.",
+      establishmentNotRegistered:
+        "Lamentablemente, no se pudo localizar esta reserva. Contacte con nuestra central de atención para obtener ayuda.",
       error: "Error al buscar la reserva.",
     },
     landing: {
@@ -510,6 +512,7 @@ export const es: MessageTree = {
     dashboard: "Panel",
     checkins: "Check-ins",
     establishments: "Establecimientos",
+    security: "Seguridad global",
     audit: "Auditoría",
     users: "Usuarios",
     signOut: "Salir",
@@ -665,6 +668,16 @@ export const es: MessageTree = {
       saveSecuritySettings: "Guardar opciones de seguridad",
       settingsSaved: "Configuración guardada.",
       settingsSaveFailed: "Error al guardar la configuración.",
+    },
+    securityPage: {
+      title: "Seguridad global",
+      body: "Configuraciones de seguridad que se aplican a todo el portal de check-in.",
+      requireRegisteredEstablishment: "Exigir establecimiento registrado",
+      requireRegisteredEstablishmentHint:
+        "Cuando está activa, los huéspedes solo pueden consultar reservas y completar el check-in si el establishmentId está registrado en Establecimientos.",
+      save: "Guardar configuración",
+      saved: "Configuración de seguridad guardada.",
+      saveFailed: "Error al guardar la configuración de seguridad.",
     },
     termsEditor: {
       previewTitle: "Políticas del establecimiento",

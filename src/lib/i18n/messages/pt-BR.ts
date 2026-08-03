@@ -200,6 +200,8 @@ export const ptBR = {
       start: "Realizar check-in",
       another: "Buscar outra reserva",
       notFound: "Reserva não encontrada. Confira o código informado.",
+      establishmentNotRegistered:
+        "Infelizmente essa reserva não foi localizada. Entre em contato com nossa central de atendimento para obter ajuda.",
       error: "Erro ao buscar a reserva.",
     },
     landing: {
@@ -508,6 +510,7 @@ export const ptBR = {
     dashboard: "Dashboard",
     checkins: "Check-ins",
     establishments: "Estabelecimentos",
+    security: "Segurança global",
     audit: "Auditoria",
     users: "Usuários",
     signOut: "Sair",
@@ -663,6 +666,16 @@ export const ptBR = {
       saveSecuritySettings: "Salvar opções de segurança",
       settingsSaved: "Configurações salvas.",
       settingsSaveFailed: "Erro ao salvar configurações.",
+    },
+    securityPage: {
+      title: "Segurança global",
+      body: "Configurações de segurança que se aplicam a todo o portal de check-in.",
+      requireRegisteredEstablishment: "Exigir estabelecimento cadastrado",
+      requireRegisteredEstablishmentHint:
+        "Quando ativa, hóspedes só podem consultar reservas e concluir check-in se o establishmentId estiver registrado em Estabelecimentos.",
+      save: "Salvar configurações",
+      saved: "Configurações de segurança salvas.",
+      saveFailed: "Erro ao salvar configurações de segurança.",
     },
     termsEditor: {
       previewTitle: "Políticas do estabelecimento",
