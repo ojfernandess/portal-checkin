@@ -207,11 +207,12 @@ export const en: MessageTree = {
       heroTitlePrefix: "Complete your online check-in in",
       heroTitleHighlight: "just minutes",
       heroSubtitle:
-        "Used by hotels in the Congonhas area. No queues. Secure. 100% online.",
+        "Complete your check-in quickly, securely, and fully online. Everything you need to speed up your arrival.",
       stepLocalizer: "Locator",
       stepData: "Details",
       stepDocuments: "Documents",
       stepFinished: "Complete",
+      stepperAriaLabel: "Online check-in steps",
       chooseLanguage: "Choose your language",
       formTitle: "Online Check-in",
       formSubtitle: "Enter your reservation locator to get started.",

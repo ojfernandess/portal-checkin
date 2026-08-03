@@ -1,7 +1,8 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowRight,
   BadgeCheck,
+  Check,
   CircleCheck,
   ExternalLink,
   Headset,
@@ -102,31 +103,61 @@ function HeroBackground({ className }: { className?: string }) {
   );
 }
 
+const STEP_INTERVAL_MS = 2800;
+
 function ProcessStepper() {
   const { t } = useI18n();
+  const [activeStep, setActiveStep] = useState(0);
+
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    const tick = () => {
+      if (document.hidden) return;
+      setActiveStep((prev) => (prev + 1) % STEPS.length);
+    };
+
+    const id = window.setInterval(tick, STEP_INTERVAL_MS);
+    return () => window.clearInterval(id);
+  }, []);
 
   return (
-    <ol className="flex items-start gap-0">
+    <ol
+      className="flex items-start gap-0"
+      aria-label={t("checkin.landing.stepperAriaLabel")}
+      aria-live="polite"
+    >
       {STEPS.map((stepKey, index) => {
-        const active = index === 0;
+        const completed = index < activeStep;
+        const active = index === activeStep;
         const isLast = index === STEPS.length - 1;
+
         return (
           <li key={stepKey} className="flex min-w-0 flex-1 items-start">
             <div className="flex min-w-0 flex-col items-center gap-2">
               <div
                 className={cn(
-                  "flex size-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold",
-                  active
-                    ? "bg-[#2B6BF3] text-white shadow-[0_0_0_4px_rgba(43,107,243,0.25)]"
-                    : "border-2 border-white/35 bg-transparent text-white/70",
+                  "flex size-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold transition-all duration-500",
+                  completed && "bg-[#2B6BF3] text-white",
+                  active &&
+                    "animate-step-pulse bg-[#2B6BF3] text-white shadow-[0_0_0_4px_rgba(43,107,243,0.25)]",
+                  !completed &&
+                    !active &&
+                    "border-2 border-white/35 bg-transparent text-white/70",
                 )}
+                aria-current={active ? "step" : undefined}
               >
-                {index + 1}
+                {completed ? (
+                  <Check className="size-4 animate-step-check" strokeWidth={2.5} aria-hidden />
+                ) : (
+                  index + 1
+                )}
               </div>
               <span
                 className={cn(
-                  "max-w-[4.5rem] text-center text-[11px] leading-tight xl:max-w-none xl:text-xs",
-                  active ? "font-medium text-white" : "text-white/55",
+                  "max-w-[4.5rem] text-center text-[11px] leading-tight transition-colors duration-500 xl:max-w-none xl:text-xs",
+                  (active || completed) && "font-medium text-white",
+                  !active && !completed && "text-white/55",
                 )}
               >
                 {t(stepKey)}
@@ -134,9 +165,16 @@ function ProcessStepper() {
             </div>
             {!isLast ? (
               <div
-                className="mx-1 mt-4 h-px min-w-[1rem] flex-1 bg-white/25 xl:mx-2"
+                className="relative mx-1 mt-4 h-0.5 min-w-4 flex-1 overflow-hidden rounded-full bg-white/20 xl:mx-2"
                 aria-hidden
-              />
+              >
+                <div
+                  className={cn(
+                    "absolute inset-y-0 left-0 rounded-full bg-[#6CA0FF] transition-[width] duration-700 ease-out",
+                    completed ? "w-full" : "w-0",
+                  )}
+                />
+              </div>
             ) : null}
           </li>
         );

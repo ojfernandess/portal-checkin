@@ -208,11 +208,12 @@ export const es: MessageTree = {
       heroTitlePrefix: "Haga su check-in online en",
       heroTitleHighlight: "pocos minutos",
       heroSubtitle:
-        "Utilizado por hoteles de la región de Congonhas. Sin filas. Seguro. 100% online.",
+        "Realice su check-in de forma rápida, segura y totalmente online. Todo lo que necesita para agilizar su llegada.",
       stepLocalizer: "Localizador",
       stepData: "Datos",
       stepDocuments: "Documentos",
       stepFinished: "Finalizado",
+      stepperAriaLabel: "Etapas del check-in online",
       chooseLanguage: "Elija su idioma",
       formTitle: "Check-in Online",
       formSubtitle: "Ingrese el localizador de su reserva para comenzar.",

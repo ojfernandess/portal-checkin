@@ -206,11 +206,12 @@ export const ptBR = {
       heroTitlePrefix: "Faça seu check-in online em",
       heroTitleHighlight: "poucos minutos",
       heroSubtitle:
-        "Utilizado pelos hotéis da região de Congonhas. Sem filas. Seguro. 100% online.",
+        "Realize seu check-in de forma rápida, segura e totalmente online. Tudo o que você precisa para agilizar sua chegada.",
       stepLocalizer: "Localizador",
       stepData: "Dados",
       stepDocuments: "Documentos",
       stepFinished: "Finalizado",
+      stepperAriaLabel: "Etapas do check-in online",
       chooseLanguage: "Escolha seu idioma",
       formTitle: "Check-in Online",
       formSubtitle: "Insira o localizador da sua reserva para começar.",
