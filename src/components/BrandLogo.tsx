@@ -9,7 +9,7 @@ export function BrandLogo({ className, imageClassName }: BrandLogoProps) {
   return (
     <img
       src="/logo-DRuOXAi_.svg"
-      alt="StayOS"
+      alt="Audaar"
       className={cn("h-auto w-auto max-w-[320px] object-contain", className, imageClassName)}
       decoding="async"
     />
