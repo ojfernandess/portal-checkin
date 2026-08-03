@@ -270,6 +270,14 @@ export const en: MessageTree = {
       birthDateRequired: "Enter your date of birth to continue.",
       birthDateMismatch: "The date of birth does not match our records.",
     },
+    reaccess: {
+      birthDateVerifyTitle: "Confirm your identity",
+      birthDateVerifyBody:
+        "This check-in is already complete. Enter the main guest's date of birth to view the details.",
+      verifyFailed: "Could not validate the date of birth. Please try again.",
+      unavailable:
+        "We could not find a registered date of birth for this reservation. Please contact the front desk.",
+    },
     photos: {
       title: "Your photos",
       body: "Selfie and document — you can change them before submitting.",
@@ -568,6 +576,7 @@ export const en: MessageTree = {
       tabTerms: "Terms & policies",
       tabContact: "Contact",
       tabCheckin: "Check-in",
+      tabSecurity: "Security options",
       tabFields: "Extra fields",
       contactBody: "Phone shown to guests after check-in. Enter at least one contact channel.",
       supportPhone: "Support phone",
@@ -585,13 +594,20 @@ export const en: MessageTree = {
       contactRequired: "Enter support phone or WhatsApp.",
       contactSaved: "Contact saved.",
       fieldAdded: "Field added.",
-      checkinBody: "Security and behavior options for the web check-in flow.",
+      checkinBody: "Web check-in flow behavior while the guest fills in their details.",
       requireBirthDateConfirmation: "Require date of birth confirmation",
       requireBirthDateConfirmationHint:
         "When a guest is found by CPF or email, they must enter their registered date of birth before continuing.",
       saveCheckinSettings: "Save check-in settings",
-      settingsSaved: "Check-in settings saved.",
-      settingsSaveFailed: "Failed to save check-in settings.",
+      securityBody:
+        "Additional protection when a guest opens a check-in that is already complete.",
+      requireBirthDateConfirmationOnReaccess:
+        "Require date of birth confirmation when reopening a completed check-in",
+      requireBirthDateConfirmationOnReaccessHint:
+        "When refreshing the page or entering the localizer again, the main guest must confirm their date of birth before viewing details. Does not apply immediately after completing check-in.",
+      saveSecuritySettings: "Save security options",
+      settingsSaved: "Settings saved.",
+      settingsSaveFailed: "Failed to save settings.",
     },
     termsEditor: {
       previewTitle: "Property policies",

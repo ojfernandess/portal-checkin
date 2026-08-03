@@ -409,6 +409,138 @@ export const getEstablishmentSettings = createServerFn({ method: "POST" })
     return parseEstablishmentSettings(row?.settings ?? null);
   });
 
+async function lookupGuestBirthDateByIdentity(reservation: Reservation): Promise<string | null> {
+  const { apiFetch, unwrap } = await import("./techospitality.server");
+  const doc = reservation.mainGuest?.documentNumber ?? reservation.responsible?.documentNumber;
+  const email = reservation.mainGuest?.email ?? reservation.responsible?.email;
+  const docType = reservation.mainGuest?.documentType;
+
+  const attempts: Record<string, string>[] = [];
+  if (doc?.trim()) {
+    const query: Record<string, string> = { documentNumber: doc.trim() };
+    if (docType === "PASSPORT") query.documentType = docType;
+    attempts.push(query);
+  }
+  if (email?.trim()) {
+    attempts.push({ email: email.trim().toLowerCase() });
+  }
+
+  for (const query of attempts) {
+    try {
+      const payload = await apiFetch<unknown>("/api/reservations/hub/main-guest/lookup", { query });
+      const guest = parseLookupGuest(unwrap<unknown>(payload));
+      if (guest?.birthDate?.trim()) return guest.birthDate.trim();
+    } catch {
+      // tenta próximo identificador
+    }
+  }
+
+  return null;
+}
+
+async function resolveMainGuestBirthDateForReaccess(localizer: string): Promise<string | null> {
+  const code = localizer.trim().toUpperCase();
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+  const { data: record } = await supabaseAdmin
+    .from("checkin_records")
+    .select("main_guest, reservation_snapshot")
+    .eq("localizer", code)
+    .order("checked_in_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (record) {
+    const storedGuest = record.main_guest as { birthDate?: string } | null | undefined;
+    if (storedGuest?.birthDate?.trim()) {
+      return storedGuest.birthDate.trim();
+    }
+
+    const snapshot = record.reservation_snapshot as { mainGuest?: { birthDate?: string } } | null;
+    if (snapshot?.mainGuest?.birthDate?.trim()) {
+      return snapshot.mainGuest.birthDate.trim();
+    }
+  }
+
+  let reservation: Reservation | null = null;
+  try {
+    reservation = await fetchReservationByLocalizer(code);
+    if (reservation?.mainGuest?.birthDate?.trim()) {
+      return reservation.mainGuest.birthDate.trim();
+    }
+  } catch {
+    // continua com lookup por documento/e-mail
+  }
+
+  if (reservation) {
+    return lookupGuestBirthDateByIdentity(reservation);
+  }
+
+  return null;
+}
+
+/** Indica se o hóspede deve confirmar a data de nascimento ao reabrir um check-in já concluído. */
+export const checkReaccessBirthDateRequired = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        localizer: LOCALIZER_SCHEMA,
+        establishmentId: z.string().trim().min(1).max(64),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    await enforceRateLimit(clientIpBucket("reaccess-gate"), { maxRequests: 30 });
+    const { parseEstablishmentSettings } = await import("@/lib/establishment-settings");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: row } = await supabaseAdmin
+      .from("establishment_settings")
+      .select("settings")
+      .eq("establishment_id", data.establishmentId)
+      .maybeSingle();
+
+    const settings = parseEstablishmentSettings(row?.settings ?? null);
+    return { required: settings.requireBirthDateConfirmationOnReaccess };
+  });
+
+/** Valida a data de nascimento informada ao reabrir um check-in já concluído. */
+export const verifyReaccessBirthDate = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        localizer: LOCALIZER_SCHEMA,
+        establishmentId: z.string().trim().min(1).max(64),
+        birthDate: z.string().trim().min(4).max(32),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    await enforceRateLimit(clientIpBucket("reaccess-verify"), { maxRequests: 15 });
+    const { parseEstablishmentSettings, birthDatesMatch } = await import(
+      "@/lib/establishment-settings"
+    );
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: row } = await supabaseAdmin
+      .from("establishment_settings")
+      .select("settings")
+      .eq("establishment_id", data.establishmentId)
+      .maybeSingle();
+
+    const settings = parseEstablishmentSettings(row?.settings ?? null);
+    if (!settings.requireBirthDateConfirmationOnReaccess) {
+      return { ok: true };
+    }
+
+    const expected = await resolveMainGuestBirthDateForReaccess(data.localizer);
+    if (!expected?.trim()) {
+      return { ok: false, unavailable: true };
+    }
+
+    return { ok: birthDatesMatch(expected, data.birthDate) };
+  });
+
 export type CheckinExtraField = {
   id: string;
   label: string;

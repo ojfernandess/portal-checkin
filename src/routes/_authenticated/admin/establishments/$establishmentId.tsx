@@ -74,6 +74,8 @@ function EstablishmentConfigPage() {
     required: false,
   });
   const [requireBirthDateConfirmation, setRequireBirthDateConfirmation] = useState(false);
+  const [requireBirthDateConfirmationOnReaccess, setRequireBirthDateConfirmationOnReaccess] =
+    useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -96,6 +98,9 @@ function EstablishmentConfigPage() {
         setWhatsapp(contact.whatsapp ?? "");
         setFields(extra.fields);
         setRequireBirthDateConfirmation(settings.settings.requireBirthDateConfirmation);
+        setRequireBirthDateConfirmationOnReaccess(
+          settings.settings.requireBirthDateConfirmationOnReaccess,
+        );
       })
       .finally(() => setLoading(false));
   }, [establishmentId, getEstablishment, getTerms, getContact, listFields, getSettings]);
@@ -158,7 +163,11 @@ function EstablishmentConfigPage() {
     setSavingSettings(true);
     try {
       await saveSettings({
-        data: { establishmentId, requireBirthDateConfirmation },
+        data: {
+          establishmentId,
+          requireBirthDateConfirmation,
+          requireBirthDateConfirmationOnReaccess,
+        },
       });
       toast.success(t("admin.establishmentConfig.settingsSaved"));
     } catch (err) {
@@ -193,6 +202,7 @@ function EstablishmentConfigPage() {
             <TabsTrigger value="terms">{t("admin.establishmentConfig.tabTerms")}</TabsTrigger>
             <TabsTrigger value="contact">{t("admin.establishmentConfig.tabContact")}</TabsTrigger>
             <TabsTrigger value="checkin">{t("admin.establishmentConfig.tabCheckin")}</TabsTrigger>
+            <TabsTrigger value="security">{t("admin.establishmentConfig.tabSecurity")}</TabsTrigger>
             <TabsTrigger value="fields">{t("admin.establishmentConfig.tabFields")}</TabsTrigger>
           </TabsList>
 
@@ -263,6 +273,30 @@ function EstablishmentConfigPage() {
             </label>
             <Button disabled={savingSettings} onClick={() => void handleSaveSettings()}>
               {t("admin.establishmentConfig.saveCheckinSettings")}
+            </Button>
+          </TabsContent>
+
+          <TabsContent value="security" className="mt-6 space-y-4">
+            <p className="text-sm text-muted-foreground">{t("admin.establishmentConfig.securityBody")}</p>
+            <label className="flex items-start gap-3 rounded-xl border border-border p-4">
+              <Checkbox
+                checked={requireBirthDateConfirmationOnReaccess}
+                onCheckedChange={(checked) =>
+                  setRequireBirthDateConfirmationOnReaccess(checked === true)
+                }
+                className="mt-0.5"
+              />
+              <span className="space-y-1">
+                <span className="block text-sm font-medium">
+                  {t("admin.establishmentConfig.requireBirthDateConfirmationOnReaccess")}
+                </span>
+                <span className="block text-xs text-muted-foreground">
+                  {t("admin.establishmentConfig.requireBirthDateConfirmationOnReaccessHint")}
+                </span>
+              </span>
+            </label>
+            <Button disabled={savingSettings} onClick={() => void handleSaveSettings()}>
+              {t("admin.establishmentConfig.saveSecuritySettings")}
             </Button>
           </TabsContent>
 

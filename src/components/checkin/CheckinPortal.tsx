@@ -36,6 +36,7 @@ import {
   lookupGuest,
   submitCheckin,
   uploadCheckinMedia,
+  verifyReaccessBirthDate,
   type CheckinExtraField,
 } from "@/lib/api/checkin.functions";
 import { normalizeEmbratur } from "@/lib/embratur";
@@ -212,6 +213,7 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
   const upload = useServerFn(uploadCheckinMedia);
   const loadReference = useServerFn(getEmbraturReference);
   const submit = useServerFn(submitCheckin);
+  const verifyReaccess = useServerFn(verifyReaccessBirthDate);
 
   const [step, setStep] = useState(0);
   const [subStep, setSubStep] = useState<
@@ -220,7 +222,7 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
   const [loading, setLoading] = useState(false);
 
   const [localizer, setLocalizer] = useState(initialLocalizer.toUpperCase());
-  const autoSearchStarted = useRef(false);
+  const autoSearchStarted = useRef<string | null>(null);
   const registeredPhotoBaseline = useRef<{
     profileUrl?: string | null;
     profileId?: string | number;
@@ -341,6 +343,11 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
   );
   const [birthDateConfirmInput, setBirthDateConfirmInput] = useState("");
   const [birthDateConfirmError, setBirthDateConfirmError] = useState("");
+  const [reaccessVerifiedFor, setReaccessVerifiedFor] = useState<string | null>(null);
+  const [reaccessSecurityRequired, setReaccessSecurityRequired] = useState(false);
+  const [reaccessBirthDateInput, setReaccessBirthDateInput] = useState("");
+  const [reaccessBirthDateError, setReaccessBirthDateError] = useState("");
+  const [reaccessVerifying, setReaccessVerifying] = useState(false);
 
   const reservationId = String(reservation?.localizer ?? reservation?.reservationId ?? localizer);
   const capacity = Number(reservation?.room?.capacity ?? 1);
@@ -427,9 +434,12 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
     setStep(6);
   }
 
-  async function loadEstablishmentConfig(found: Reservation) {
+  async function loadEstablishmentConfig(found: Reservation): Promise<EstablishmentSettings> {
     const establishmentId = String(found.establishmentId ?? "");
-    if (!establishmentId) return;
+    if (!establishmentId) {
+      setEstablishmentSettings(DEFAULT_ESTABLISHMENT_SETTINGS);
+      return DEFAULT_ESTABLISHMENT_SETTINGS;
+    }
     const [terms, contact, extra, settings] = await Promise.all([
       loadTerms({ data: { establishmentId } }),
       loadContact({ data: { establishmentId } }),
@@ -443,25 +453,43 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
     setExtraFieldValues({});
     setExtraFieldErrors({});
     setEstablishmentSettings(settings);
+    return settings;
+  }
+
+  function applyReaccessSecurityForLocalizer(
+    localizerCode: string,
+    settings: EstablishmentSettings,
+  ) {
+    setReaccessSecurityRequired(settings.requireBirthDateConfirmationOnReaccess);
+    setReaccessVerifiedFor(
+      settings.requireBirthDateConfirmationOnReaccess ? null : localizerCode,
+    );
   }
 
   async function searchByCode(code: string) {
-    if (code.length < 3) return;
+    const normalized = code.trim().toUpperCase();
+    if (normalized.length < 3) return;
+
+    setReaccessVerifiedFor(null);
+    setReaccessSecurityRequired(false);
+    resetReaccessBirthDateConfirm();
     setLoading(true);
     try {
-      const found = await find({ data: { localizer: code } });
+      const found = await find({ data: { localizer: normalized } });
       if (!found) {
         toast.error(t("checkin.search.notFound"));
         return;
       }
       setReservation(found);
-      setLocalizer(code);
-      await loadEstablishmentConfig(found);
+      setLocalizer(normalized);
+      const settings = await loadEstablishmentConfig(found);
       if (isAlreadyCheckedIn(found)) {
         setCheckinAlreadyDone(true);
+        applyReaccessSecurityForLocalizer(normalized, settings);
         setStep(8);
       } else {
         setCheckinAlreadyDone(false);
+        setReaccessSecurityRequired(false);
         setStep(0);
       }
     } catch (error) {
@@ -472,10 +500,11 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
   }
 
   useEffect(() => {
-    if (!autoSearch || autoSearchStarted.current) return;
+    if (!autoSearch) return;
     const code = initialLocalizer.trim().toUpperCase();
     if (code.length < 3) return;
-    autoSearchStarted.current = true;
+    if (autoSearchStarted.current === code) return;
+    autoSearchStarted.current = code;
     void searchByCode(code);
   }, [autoSearch, initialLocalizer]);
 
@@ -490,9 +519,17 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
     setStep(0);
     setReservation(null);
     setCheckinAlreadyDone(false);
+    setReaccessVerifiedFor(null);
+    setReaccessSecurityRequired(false);
+    resetReaccessBirthDateConfirm();
     setLocalizer("");
-    autoSearchStarted.current = false;
+    autoSearchStarted.current = null;
     void navigate({ to: "/" });
+  }
+
+  function resetReaccessBirthDateConfirm() {
+    setReaccessBirthDateInput("");
+    setReaccessBirthDateError("");
   }
 
   function resetBirthDateConfirm() {
@@ -543,6 +580,50 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
     setLookupResult(null);
     clearRegisteredPhotoState();
     setSubStep("lookup");
+  }
+
+  async function handleVerifyReaccessBirthDate() {
+    if (!reaccessBirthDateInput.trim()) {
+      setReaccessBirthDateError(t("checkin.lookup.birthDateRequired"));
+      return;
+    }
+    const establishmentId = String(reservation?.establishmentId ?? "");
+    const code = String(reservation?.localizer ?? localizer).trim().toUpperCase();
+    if (!establishmentId || code.length < 3) {
+      setReaccessBirthDateError(t("checkin.reaccess.verifyFailed"));
+      return;
+    }
+
+    setReaccessVerifying(true);
+    setReaccessBirthDateError("");
+    try {
+      const result = await verifyReaccess({
+        data: {
+          localizer: code,
+          establishmentId,
+          birthDate: reaccessBirthDateInput,
+        },
+      });
+      if (!result.ok) {
+        setReaccessBirthDateError(
+          result.unavailable
+            ? t("checkin.reaccess.unavailable")
+            : t("checkin.lookup.birthDateMismatch"),
+        );
+        return;
+      }
+      setReaccessVerifiedFor(code);
+      resetReaccessBirthDateConfirm();
+    } catch {
+      setReaccessBirthDateError(t("checkin.reaccess.verifyFailed"));
+    } finally {
+      setReaccessVerifying(false);
+    }
+  }
+
+  function backFromReaccessVerify() {
+    resetReaccessBirthDateConfirm();
+    resetToSearch();
   }
 
   async function handleLookup() {
@@ -850,6 +931,8 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
     }
 
     setCheckinAlreadyDone(false);
+    setReaccessSecurityRequired(false);
+    setReaccessVerifiedFor(String(reservation?.localizer ?? localizer).trim().toUpperCase());
     setStep(8);
   }
 
@@ -900,6 +983,9 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
             onClick={() => {
               setReservation(null);
               setLocalizer("");
+              setReaccessVerifiedFor(null);
+              setReaccessSecurityRequired(false);
+              resetReaccessBirthDateConfirm();
             }}
           >
             {t("checkin.search.another")}
@@ -1354,6 +1440,73 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
           {step === 8 && (() => {
             const displayReservation = successReservation();
             if (!displayReservation) return null;
+
+            const activeLocalizer = String(displayReservation.localizer ?? localizer)
+              .trim()
+              .toUpperCase();
+            const needsReaccessVerify =
+              checkinAlreadyDone &&
+              reaccessSecurityRequired &&
+              reaccessVerifiedFor !== activeLocalizer;
+
+            if (needsReaccessVerify) {
+              return (
+                <section className="space-y-5">
+                  <header className="space-y-1">
+                    <h2 className="font-display text-2xl">{t("checkin.reaccess.birthDateVerifyTitle")}</h2>
+                    <p className="text-sm text-muted-foreground">
+                      {t("checkin.reaccess.birthDateVerifyBody")}
+                    </p>
+                  </header>
+
+                  <article className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-card">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="reaccessBirthDateVerify">
+                        {t("checkin.lookup.birthDateConfirmLabel")}
+                      </Label>
+                      <Input
+                        id="reaccessBirthDateVerify"
+                        type="date"
+                        className="tap-safe"
+                        value={reaccessBirthDateInput}
+                        onChange={(event) => {
+                          setReaccessBirthDateInput(event.target.value);
+                          if (reaccessBirthDateError) setReaccessBirthDateError("");
+                        }}
+                        aria-invalid={Boolean(reaccessBirthDateError)}
+                        autoComplete="bday"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        {t("checkin.lookup.birthDateConfirmHint")}
+                      </p>
+                      {reaccessBirthDateError ? (
+                        <p className="text-xs text-destructive">{reaccessBirthDateError}</p>
+                      ) : null}
+                    </div>
+                  </article>
+
+                  <div className="flex gap-3">
+                    <Button
+                      variant="outline"
+                      className="tap-safe"
+                      disabled={reaccessVerifying}
+                      onClick={backFromReaccessVerify}
+                    >
+                      {t("common.back")}
+                    </Button>
+                    <Button
+                      className="tap-safe flex-1"
+                      disabled={!reaccessBirthDateInput.trim() || reaccessVerifying}
+                      onClick={() => void handleVerifyReaccessBirthDate()}
+                    >
+                      {reaccessVerifying && <Loader2 className="size-4 animate-spin" aria-hidden />}{" "}
+                      {t("common.continue")}
+                    </Button>
+                  </div>
+                </section>
+              );
+            }
+
             return (
               <>
                 <SuccessScreen

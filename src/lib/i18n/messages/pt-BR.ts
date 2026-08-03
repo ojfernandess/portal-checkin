@@ -269,6 +269,14 @@ export const ptBR = {
       birthDateRequired: "Informe sua data de nascimento para continuar.",
       birthDateMismatch: "A data de nascimento informada não confere com o cadastro.",
     },
+    reaccess: {
+      birthDateVerifyTitle: "Confirme sua identidade",
+      birthDateVerifyBody:
+        "Este check-in já foi concluído. Informe a data de nascimento do hóspede principal para visualizar os dados.",
+      verifyFailed: "Não foi possível validar a data de nascimento. Tente novamente.",
+      unavailable:
+        "Não encontramos a data de nascimento cadastrada para esta reserva. Entre em contato com a recepção.",
+    },
     photos: {
       title: "Suas fotos",
       body: "Selfie e documento — você pode alterar antes de enviar.",
@@ -569,6 +577,7 @@ export const ptBR = {
       tabTerms: "Termos e políticas",
       tabContact: "Contato",
       tabCheckin: "Check-in",
+      tabSecurity: "Opções de segurança",
       tabFields: "Campos extras",
       contactBody:
         "Telefone exibido ao hóspede após o check-in concluído. Informe ao menos um canal de contato.",
@@ -587,13 +596,20 @@ export const ptBR = {
       contactRequired: "Informe telefone ou WhatsApp de suporte.",
       contactSaved: "Contato salvo.",
       fieldAdded: "Campo adicionado.",
-      checkinBody: "Opções de segurança e comportamento do fluxo de check-in web.",
+      checkinBody: "Comportamento do fluxo de check-in web durante o preenchimento dos dados.",
       requireBirthDateConfirmation: "Exigir confirmação da data de nascimento",
       requireBirthDateConfirmationHint:
         "Quando o hóspede for localizado pelo CPF ou e-mail, será necessário informar a data de nascimento cadastrada antes de continuar.",
       saveCheckinSettings: "Salvar configurações de check-in",
-      settingsSaved: "Configurações de check-in salvas.",
-      settingsSaveFailed: "Erro ao salvar configurações de check-in.",
+      securityBody:
+        "Proteção adicional quando o hóspede consulta novamente um check-in já concluído.",
+      requireBirthDateConfirmationOnReaccess:
+        "Exigir confirmação da data de nascimento ao reabrir check-in concluído",
+      requireBirthDateConfirmationOnReaccessHint:
+        "Ao atualizar a página ou informar o localizador novamente, o hóspede principal deverá confirmar a data de nascimento antes de ver os dados. Não se aplica logo após concluir o check-in.",
+      saveSecuritySettings: "Salvar opções de segurança",
+      settingsSaved: "Configurações salvas.",
+      settingsSaveFailed: "Erro ao salvar configurações.",
     },
     termsEditor: {
       previewTitle: "Políticas do estabelecimento",

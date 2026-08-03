@@ -1,9 +1,11 @@
 export type EstablishmentSettings = {
   requireBirthDateConfirmation: boolean;
+  requireBirthDateConfirmationOnReaccess: boolean;
 };
 
 export const DEFAULT_ESTABLISHMENT_SETTINGS: EstablishmentSettings = {
   requireBirthDateConfirmation: false,
+  requireBirthDateConfirmationOnReaccess: false,
 };
 
 export function parseEstablishmentSettings(raw: unknown): EstablishmentSettings {
@@ -13,6 +15,8 @@ export function parseEstablishmentSettings(raw: unknown): EstablishmentSettings 
   const settings = raw as Record<string, unknown>;
   return {
     requireBirthDateConfirmation: settings.requireBirthDateConfirmation === true,
+    requireBirthDateConfirmationOnReaccess:
+      settings.requireBirthDateConfirmationOnReaccess === true,
   };
 }
 
