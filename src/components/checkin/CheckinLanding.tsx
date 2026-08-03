@@ -307,7 +307,7 @@ export function CheckinLanding({
 
       <aside className="relative hidden flex-col justify-between px-10 py-10 text-white xl:px-14 xl:py-12 lg:flex lg:min-h-screen">
         <div className="space-y-10">
-          <BrandLogo className="max-h-10 xl:max-h-11" />
+          <BrandLogo variant="white" className="max-h-10 xl:max-h-11" />
 
           <div className="max-w-lg space-y-5">
             <h1 className="font-display text-4xl font-semibold leading-[1.15] tracking-tight xl:text-[2.75rem]">
@@ -345,7 +345,7 @@ export function CheckinLanding({
         <div className="relative overflow-hidden px-6 py-8 text-white lg:hidden">
           <HeroBackground />
           <div className="relative space-y-4">
-            <BrandLogo className="max-h-9" />
+            <BrandLogo variant="white" className="max-h-9" />
             <h1 className="font-display text-2xl font-semibold leading-tight">
               {t("checkin.landing.heroTitlePrefix")}{" "}
               <span className="text-[#6CA0FF]">{t("checkin.landing.heroTitleHighlight")}</span>
