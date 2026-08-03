@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import {
   ArrowRight,
   Clock3,
@@ -63,16 +64,31 @@ export function CheckinLanding({
 }: CheckinLandingProps) {
   const { t } = useI18n();
 
+  useEffect(() => {
+    const syncMotion = () => {
+      document.documentElement.classList.toggle("hero-motion-paused", document.hidden);
+    };
+    syncMotion();
+    document.addEventListener("visibilitychange", syncMotion);
+    return () => {
+      document.removeEventListener("visibilitychange", syncMotion);
+      document.documentElement.classList.remove("hero-motion-paused");
+    };
+  }, []);
+
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-2">
       <aside className="relative hidden min-h-[280px] overflow-hidden lg:block lg:min-h-screen">
-        <img
-          src="/bg_portal.png"
-          alt=""
-          className="absolute inset-0 size-full object-cover"
-          loading="eager"
-          decoding="async"
-        />
+        <div className="hero-bg-layer absolute inset-0 overflow-hidden" aria-hidden>
+          <img
+            src="/bg_portal.png"
+            alt=""
+            className="absolute inset-0 size-full object-cover animate-hero-bg-pan"
+            loading="eager"
+            decoding="async"
+            fetchPriority="high"
+          />
+        </div>
         <div className="absolute inset-0 bg-linear-to-br from-primary/90 via-primary/75 to-primary/55" />
         <div className="relative flex h-full flex-col justify-between p-10 text-primary-foreground xl:p-14">
           <div className="space-y-4">

@@ -153,6 +153,37 @@
   animation: seal-pop 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+@keyframes hero-bg-pan {
+  from {
+    transform: scale(1.15) translate3d(0, 0, 0);
+  }
+  to {
+    transform: scale(1.15) translate3d(-2.5%, -2%, 0);
+  }
+}
+
+@utility animate-hero-bg-pan {
+  animation: hero-bg-pan 36s ease-in-out infinite alternate;
+  transform-origin: center center;
+  backface-visibility: hidden;
+}
+
+@utility hero-bg-layer {
+  contain: strict;
+  isolation: isolate;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-hero-bg-pan {
+    animation: none !important;
+    transform: scale(1.08);
+  }
+}
+
+html.hero-motion-paused .animate-hero-bg-pan {
+  animation-play-state: paused;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
