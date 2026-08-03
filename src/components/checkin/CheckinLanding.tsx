@@ -67,7 +67,7 @@ export function CheckinLanding({
     <div className="min-h-screen lg:grid lg:grid-cols-2">
       <aside className="relative hidden min-h-[280px] overflow-hidden lg:block lg:min-h-screen">
         <img
-          src="https://images.unsplash.com/photo-1582719508461-905c673771fd?auto=format&fit=crop&w=1600&q=80"
+          src="/bg_portal.png"
           alt=""
           className="absolute inset-0 size-full object-cover"
           loading="eager"
@@ -84,15 +84,26 @@ export function CheckinLanding({
             </p>
           </div>
 
-          <ul className="grid grid-cols-2 gap-3 xl:grid-cols-5">
-            {FEATURES.map(({ icon: Icon, titleKey, descKey }) => (
-              <li key={titleKey} className="space-y-2 rounded-xl border border-white/15 bg-white/10 p-4 backdrop-blur-sm">
-                <Icon className="size-5 text-accent" aria-hidden />
-                <p className="text-xs font-semibold uppercase tracking-wide">{t(titleKey)}</p>
-                <p className="text-sm text-primary-foreground/80">{t(descKey)}</p>
-              </li>
-            ))}
-          </ul>
+          <div className="w-full rounded-3xl bg-white px-1 py-4 shadow-[0_8px_32px_rgba(15,23,42,0.14)]">
+            <ul className="flex divide-x divide-border/70">
+              {FEATURES.map(({ icon: Icon, titleKey, descKey }) => (
+                <li
+                  key={titleKey}
+                  className="flex min-w-0 flex-1 items-start gap-2.5 px-2.5 first:pl-3 last:pr-3 xl:gap-3 xl:px-3.5 xl:first:pl-4 xl:last:pr-4"
+                >
+                  <Icon className="mt-0.5 size-6 shrink-0 text-primary xl:size-7" strokeWidth={1.75} aria-hidden />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-semibold leading-snug text-foreground xl:text-sm">
+                      {t(titleKey)}
+                    </p>
+                    <p className="mt-0.5 text-[10px] leading-snug text-muted-foreground xl:text-xs">
+                      {t(descKey)}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
       </aside>
 
