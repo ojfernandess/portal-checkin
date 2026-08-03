@@ -902,13 +902,16 @@ export const adminSaveSettings = createServerFn({ method: "POST" })
         establishmentId: z.string().trim().min(1).max(64),
         requireBirthDateConfirmation: z.boolean(),
         requireBirthDateConfirmationOnReaccess: z.boolean(),
+        successPagePhotoUrl: z.string().max(1_200_000).nullable().optional(),
       })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { parseEstablishmentSettings } = await import("@/lib/establishment-settings");
+    const { parseEstablishmentSettings, MAX_SUCCESS_PAGE_PHOTO_BYTES } = await import(
+      "@/lib/establishment-settings"
+    );
     const email = await getStaffEmail(context);
 
     const { data: existing } = await supabaseAdmin
@@ -917,10 +920,26 @@ export const adminSaveSettings = createServerFn({ method: "POST" })
       .eq("establishment_id", data.establishmentId)
       .maybeSingle();
 
+    const parsedExisting = parseEstablishmentSettings(existing?.settings ?? null);
+    let successPagePhotoUrl = parsedExisting.successPagePhotoUrl;
+    if (data.successPagePhotoUrl !== undefined) {
+      successPagePhotoUrl = parseEstablishmentSettings({
+        successPagePhotoUrl: data.successPagePhotoUrl,
+      }).successPagePhotoUrl;
+      if (
+        data.successPagePhotoUrl &&
+        data.successPagePhotoUrl.startsWith("data:") &&
+        data.successPagePhotoUrl.length > MAX_SUCCESS_PAGE_PHOTO_BYTES * 1.4
+      ) {
+        throw new Error("A imagem excede o tamanho máximo permitido (800 KB).");
+      }
+    }
+
     const settings = {
-      ...parseEstablishmentSettings(existing?.settings ?? null),
+      ...parsedExisting,
       requireBirthDateConfirmation: data.requireBirthDateConfirmation,
       requireBirthDateConfirmationOnReaccess: data.requireBirthDateConfirmationOnReaccess,
+      successPagePhotoUrl,
     };
 
     const { error } = await supabaseAdmin.from("establishment_settings").upsert(

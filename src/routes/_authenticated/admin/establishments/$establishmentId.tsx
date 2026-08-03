@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cloneDefaultSections, type TermsSection } from "@/lib/establishment-terms";
+import { MAX_SUCCESS_PAGE_PHOTO_BYTES } from "@/lib/establishment-settings";
 import { useI18n } from "@/lib/i18n/context";
 import { maskPhone } from "@/lib/validators";
 
@@ -76,6 +77,7 @@ function EstablishmentConfigPage() {
   const [requireBirthDateConfirmation, setRequireBirthDateConfirmation] = useState(false);
   const [requireBirthDateConfirmationOnReaccess, setRequireBirthDateConfirmationOnReaccess] =
     useState(false);
+  const [successPagePhotoUrl, setSuccessPagePhotoUrl] = useState<string | null>(null);
   const [savingSettings, setSavingSettings] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -101,6 +103,7 @@ function EstablishmentConfigPage() {
         setRequireBirthDateConfirmationOnReaccess(
           settings.settings.requireBirthDateConfirmationOnReaccess,
         );
+        setSuccessPagePhotoUrl(settings.settings.successPagePhotoUrl);
       })
       .finally(() => setLoading(false));
   }, [establishmentId, getEstablishment, getTerms, getContact, listFields, getSettings]);
@@ -167,6 +170,7 @@ function EstablishmentConfigPage() {
           establishmentId,
           requireBirthDateConfirmation,
           requireBirthDateConfirmationOnReaccess,
+          successPagePhotoUrl,
         },
       });
       toast.success(t("admin.establishmentConfig.settingsSaved"));
@@ -177,6 +181,27 @@ function EstablishmentConfigPage() {
     } finally {
       setSavingSettings(false);
     }
+  }
+
+  function handleSuccessPhotoFile(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error(t("admin.establishmentConfig.successPhotoInvalid"));
+      return;
+    }
+    if (file.size > MAX_SUCCESS_PAGE_PHOTO_BYTES) {
+      toast.error(t("admin.establishmentConfig.successPhotoTooLarge"));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        setSuccessPagePhotoUrl(reader.result);
+      }
+    };
+    reader.readAsDataURL(file);
   }
 
   const pageTitle =
@@ -256,6 +281,47 @@ function EstablishmentConfigPage() {
 
           <TabsContent value="checkin" className="mt-6 space-y-4">
             <p className="text-sm text-muted-foreground">{t("admin.establishmentConfig.checkinBody")}</p>
+
+            <div className="space-y-3 rounded-xl border border-border p-4">
+              <div className="space-y-1">
+                <p className="text-sm font-medium">{t("admin.establishmentConfig.successPhotoTitle")}</p>
+                <p className="text-xs text-muted-foreground">
+                  {t("admin.establishmentConfig.successPhotoHint")}
+                </p>
+              </div>
+              {successPagePhotoUrl ? (
+                <div className="overflow-hidden rounded-xl border border-border">
+                  <img
+                    src={successPagePhotoUrl}
+                    alt=""
+                    className="aspect-[16/9] max-h-48 w-full object-cover"
+                  />
+                </div>
+              ) : (
+                <div className="flex aspect-[16/9] max-h-48 items-center justify-center rounded-xl border border-dashed border-border bg-muted/40 text-xs text-muted-foreground">
+                  {t("admin.establishmentConfig.successPhotoEmpty")}
+                </div>
+              )}
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" size="sm" asChild>
+                  <label className="cursor-pointer">
+                    {t("admin.establishmentConfig.successPhotoUpload")}
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="sr-only"
+                      onChange={handleSuccessPhotoFile}
+                    />
+                  </label>
+                </Button>
+                {successPagePhotoUrl ? (
+                  <Button variant="ghost" size="sm" onClick={() => setSuccessPagePhotoUrl(null)}>
+                    {t("admin.establishmentConfig.successPhotoRemove")}
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+
             <label className="flex items-start gap-3 rounded-xl border border-border p-4">
               <Checkbox
                 checked={requireBirthDateConfirmation}

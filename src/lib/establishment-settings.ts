@@ -1,12 +1,29 @@
 export type EstablishmentSettings = {
   requireBirthDateConfirmation: boolean;
   requireBirthDateConfirmationOnReaccess: boolean;
+  /** Foto exibida no banner e card da página de check-in concluído (URL ou data URL). */
+  successPagePhotoUrl: string | null;
 };
+
+export const MAX_SUCCESS_PAGE_PHOTO_BYTES = 800_000;
 
 export const DEFAULT_ESTABLISHMENT_SETTINGS: EstablishmentSettings = {
   requireBirthDateConfirmation: false,
   requireBirthDateConfirmationOnReaccess: false,
+  successPagePhotoUrl: null,
 };
+
+function parseSuccessPagePhotoUrl(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (trimmed.startsWith("data:")) {
+    if (trimmed.length > MAX_SUCCESS_PAGE_PHOTO_BYTES * 1.4) return null;
+    return trimmed;
+  }
+  if (trimmed.length > 2048) return null;
+  return trimmed;
+}
 
 export function parseEstablishmentSettings(raw: unknown): EstablishmentSettings {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
@@ -17,6 +34,7 @@ export function parseEstablishmentSettings(raw: unknown): EstablishmentSettings 
     requireBirthDateConfirmation: settings.requireBirthDateConfirmation === true,
     requireBirthDateConfirmationOnReaccess:
       settings.requireBirthDateConfirmationOnReaccess === true,
+    successPagePhotoUrl: parseSuccessPagePhotoUrl(settings.successPagePhotoUrl),
   };
 }
 

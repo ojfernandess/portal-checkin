@@ -437,11 +437,38 @@ export const es: MessageTree = {
     success: {
       titleDone: "Check-in completado",
       titleSuccess: "¡Check-in realizado con éxito!",
+      titleCancelled: "Reserva cancelada",
+      subtitleSuccess:
+        "Su llegada ya está autorizada. Siga la información a continuación para acceder a su alojamiento y disfrutar su estadía.",
       doneAt: "Realizado el",
       bannerTitle: "¡Check-in completado!",
       bannerBody:
         "Su check-in digital fue finalizado. Este establecimiento no tiene recepción física — acceda al alojamiento según las instrucciones anteriores.",
+      accessTitle: "Acceso al alojamiento",
+      accessPassword: "Contraseña de acceso",
+      copyPassword: "Copiar contraseña",
+      passwordCopied: "¡Contraseña copiada!",
+      qrTitle: "Abra la puerta con código QR",
+      qrHint: "Aproxime el código QR al lector de la cerradura electrónica.",
+      stayTitle: "Su estadía",
+      paymentTitle: "Pago",
+      paymentStatus: "Estado",
+      reservationStatusLabel: "Estado de la reserva",
+      usefulInfoTitle: "Información útil",
+      localizerInfo: "Localizador de la reserva",
+      companionsInfo: "Acompañantes registrados",
+      helpDuringStay: "¿Necesita ayuda durante su estadía?",
       helpTitle: "¿Necesita ayuda durante la estadía?",
+      call: "Llamar",
+      location: "Ubicación",
+      viewOnMaps: "Ver en Google Maps",
+      downloadReceipt: "Descargar comprobante (PDF)",
+      shareReservation: "Compartir reserva",
+      dataSecure: "Sus datos están seguros",
+      lgpdCompliant: "Conformidad LGPD",
+      oneNight: "1 noche",
+      nightsCount: "{n} noches",
+      unitNumberLabel: "Nº de unidad",
       cancelledAccessNotice:
         "Esta reserva consta como cancelada. Si tiene alguna duda, contacte con nuestra central.",
       shareTitle: "Check-in confirmado",
@@ -621,6 +648,14 @@ export const es: MessageTree = {
       requireBirthDateConfirmationHint:
         "Cuando el huésped sea localizado por CPF o correo, deberá ingresar la fecha de nacimiento registrada antes de continuar.",
       saveCheckinSettings: "Guardar configuración de check-in",
+      successPhotoTitle: "Foto del establecimiento",
+      successPhotoHint:
+        "Se muestra en el banner y la tarjeta de la página de check-in completado. JPG, PNG o WebP, hasta 800 KB.",
+      successPhotoEmpty: "Sin foto configurada — se usará la ilustración predeterminada.",
+      successPhotoUpload: "Subir foto",
+      successPhotoRemove: "Eliminar foto",
+      successPhotoInvalid: "Seleccione un archivo de imagen válido.",
+      successPhotoTooLarge: "La imagen debe tener como máximo 800 KB.",
       securityBody:
         "Protección adicional cuando el huésped consulta nuevamente un check-in ya completado.",
       requireBirthDateConfirmationOnReaccess:

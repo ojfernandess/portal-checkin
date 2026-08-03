@@ -24,6 +24,7 @@ import { RegisteredPhotoTile } from "@/components/checkin/RegisteredPhotoTile";
 import { CheckinFinalizingScreen } from "@/components/checkin/CheckinFinalizingScreen";
 import { SuccessScreen } from "@/components/checkin/SuccessScreen";
 import { ExtraFieldsPanel, validateExtraFields } from "@/components/checkin/ExtraFieldsPanel";
+import { cn } from "@/lib/utils";
 
 import {
   findReservation,
@@ -1006,7 +1007,7 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
   }
 
   return (
-    <div className="min-h-screen bg-background pb-16">
+    <div className={cn("min-h-screen pb-16", step === 8 ? "bg-[#F8F9FA]" : "bg-background")}>
       <header className="border-b border-border bg-primary py-4 text-primary-foreground">
         <div className="page-shell flex items-center justify-between gap-4">
           <BrandLogo className="max-h-12 shrink-0 sm:max-h-14" />
@@ -1023,7 +1024,7 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
 
       {step > 0 && step < 7 && <Stepper current={step} />}
 
-      <main className="page-shell py-7">
+      <main className={cn("py-7", step === 8 ? "success-page-shell" : "page-shell")}>
         <div key={`${step}-${subStep}`} className="animate-step-in">
           {step === 1 && reservation && (
             <section className="space-y-5">
@@ -1516,6 +1517,7 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
                     dependents.length > 0 ? dependents : (reservation?.dependents ?? [])
                   }
                   alreadyCompleted={checkinAlreadyDone}
+                  establishmentPhotoUrl={establishmentSettings.successPagePhotoUrl}
                 />
                 <Button
                   variant="ghost"

@@ -435,11 +435,38 @@ export const ptBR = {
     success: {
       titleDone: "Check-in concluído",
       titleSuccess: "Check-in realizado com sucesso!",
+      titleCancelled: "Reserva cancelada",
+      subtitleSuccess:
+        "Sua chegada já está autorizada. Siga as informações abaixo para acessar sua acomodação e aproveitar sua estadia.",
       doneAt: "Realizado em",
       bannerTitle: "Check-in concluído!",
       bannerBody:
         "Seu check-in digital foi finalizado. Este empreendimento não possui recepção física — você pode acessar a acomodação conforme as instruções acima.",
+      accessTitle: "Acesso à acomodação",
+      accessPassword: "Senha de acesso",
+      copyPassword: "Copiar senha",
+      passwordCopied: "Senha copiada!",
+      qrTitle: "Abra a porta com QR Code",
+      qrHint: "Aproxime o QR Code do leitor da fechadura eletrônica.",
+      stayTitle: "Sua estadia",
+      paymentTitle: "Pagamento",
+      paymentStatus: "Status",
+      reservationStatusLabel: "Situação da reserva",
+      usefulInfoTitle: "Informações úteis",
+      localizerInfo: "Localizador da reserva",
+      companionsInfo: "Acompanhantes registrados",
+      helpDuringStay: "Precisa de ajuda durante sua estadia?",
       helpTitle: "Precisa de ajuda durante a estadia?",
+      call: "Ligar",
+      location: "Localização",
+      viewOnMaps: "Ver no Google Maps",
+      downloadReceipt: "Baixar comprovante (PDF)",
+      shareReservation: "Compartilhar reserva",
+      dataSecure: "Seus dados estão seguros",
+      lgpdCompliant: "Conformidade LGPD",
+      oneNight: "1 noite",
+      nightsCount: "{n} noites",
+      unitNumberLabel: "Nº da unidade",
       cancelledAccessNotice:
         "Essa reserva consta como cancelada. Caso tenha alguma dúvida, entre em contato com nossa central.",
       shareTitle: "Check-in confirmado",
@@ -619,6 +646,14 @@ export const ptBR = {
       requireBirthDateConfirmationHint:
         "Quando o hóspede for localizado pelo CPF ou e-mail, será necessário informar a data de nascimento cadastrada antes de continuar.",
       saveCheckinSettings: "Salvar configurações de check-in",
+      successPhotoTitle: "Foto do estabelecimento",
+      successPhotoHint:
+        "Exibida no banner e no card da página de check-in concluído. Formatos JPG, PNG ou WebP, até 800 KB.",
+      successPhotoEmpty: "Nenhuma foto configurada — será usada a ilustração padrão.",
+      successPhotoUpload: "Enviar foto",
+      successPhotoRemove: "Remover foto",
+      successPhotoInvalid: "Selecione um arquivo de imagem válido.",
+      successPhotoTooLarge: "A imagem deve ter no máximo 800 KB.",
       securityBody:
         "Proteção adicional quando o hóspede consulta novamente um check-in já concluído.",
       requireBirthDateConfirmationOnReaccess:

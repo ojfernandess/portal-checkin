@@ -436,11 +436,38 @@ export const en: MessageTree = {
     success: {
       titleDone: "Check-in completed",
       titleSuccess: "Check-in successful!",
+      titleCancelled: "Reservation cancelled",
+      subtitleSuccess:
+        "Your arrival is authorized. Follow the information below to access your accommodation and enjoy your stay.",
       doneAt: "Completed on",
       bannerTitle: "Check-in completed!",
       bannerBody:
         "Your digital check-in is complete. This property has no physical front desk — access your accommodation as instructed above.",
+      accessTitle: "Accommodation access",
+      accessPassword: "Access password",
+      copyPassword: "Copy password",
+      passwordCopied: "Password copied!",
+      qrTitle: "Open the door with QR Code",
+      qrHint: "Hold the QR Code near the electronic lock reader.",
+      stayTitle: "Your stay",
+      paymentTitle: "Payment",
+      paymentStatus: "Status",
+      reservationStatusLabel: "Reservation status",
+      usefulInfoTitle: "Useful information",
+      localizerInfo: "Reservation locator",
+      companionsInfo: "Registered companions",
+      helpDuringStay: "Need help during your stay?",
       helpTitle: "Need help during your stay?",
+      call: "Call",
+      location: "Location",
+      viewOnMaps: "View on Google Maps",
+      downloadReceipt: "Download receipt (PDF)",
+      shareReservation: "Share reservation",
+      dataSecure: "Your data is secure",
+      lgpdCompliant: "LGPD compliant",
+      oneNight: "1 night",
+      nightsCount: "{n} nights",
+      unitNumberLabel: "Unit no.",
       cancelledAccessNotice:
         "This reservation is marked as cancelled. If you have any questions, please contact our support center.",
       shareTitle: "Check-in confirmed",
@@ -617,6 +644,14 @@ export const en: MessageTree = {
       requireBirthDateConfirmationHint:
         "When a guest is found by CPF or email, they must enter their registered date of birth before continuing.",
       saveCheckinSettings: "Save check-in settings",
+      successPhotoTitle: "Establishment photo",
+      successPhotoHint:
+        "Shown on the check-in completed banner and property card. JPG, PNG or WebP, up to 800 KB.",
+      successPhotoEmpty: "No photo configured — the default illustration will be used.",
+      successPhotoUpload: "Upload photo",
+      successPhotoRemove: "Remove photo",
+      successPhotoInvalid: "Please select a valid image file.",
+      successPhotoTooLarge: "The image must be 800 KB or smaller.",
       securityBody:
         "Additional protection when a guest opens a check-in that is already complete.",
       requireBirthDateConfirmationOnReaccess:
