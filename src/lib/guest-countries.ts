@@ -44,10 +44,10 @@ export function formatPmsCountryForAddressField(country: string | undefined | nu
   return country.trim();
 }
 
-/** Campo `citizenship` no check-in (BRASIL → Brasil; demais países em maiúsculas). */
+/** Campo `citizenship` no check-in — sempre maiúsculas (ex.: BRASIL, ARGENTINA). */
 export function formatCitizenshipForApi(citizenship: string | undefined | null): string {
-  if (!citizenship?.trim()) return "Brasil";
+  if (!citizenship?.trim()) return BRAZIL_PMS_COUNTRY;
   const upper = citizenship.trim().toUpperCase();
-  if (upper === BRAZIL_PMS_COUNTRY || upper === "BRAZIL") return "Brasil";
+  if (upper === "BRAZIL") return BRAZIL_PMS_COUNTRY;
   return upper;
 }

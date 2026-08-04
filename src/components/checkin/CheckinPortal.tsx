@@ -12,7 +12,6 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ScrollArea } from "@/components/ui/scroll-area";
 
 import { Stepper } from "@/components/checkin/Stepper";
 import { ReservationCard } from "@/components/checkin/ReservationCard";
@@ -1089,8 +1088,12 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
                 <h2 className="font-display text-2xl">{t("checkin.terms.title")}</h2>
                 <p className="text-sm text-muted-foreground">{reservation?.establishmentName}</p>
               </header>
-              <ScrollArea className="h-72 rounded-2xl border border-border bg-card p-5 shadow-card">
-                <div className="space-y-3 text-sm leading-relaxed text-muted-foreground">
+              <div
+                className="max-h-[min(65vh,560px)] min-h-56 overflow-y-auto overscroll-contain rounded-2xl border border-border bg-card p-5 shadow-card [-webkit-overflow-scrolling:touch]"
+                role="region"
+                aria-label={t("checkin.terms.title")}
+              >
+                <div className="space-y-3 break-words pr-1 text-sm leading-relaxed text-muted-foreground">
                   {termsSectionsToDisplayBlocks(termsSections).map((block, index) =>
                     block.kind === "heading" ? (
                       <h3 key={`${block.text}-${index}`} className="font-medium text-foreground">
@@ -1101,7 +1104,7 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
                     ),
                   )}
                 </div>
-              </ScrollArea>
+              </div>
               <label className="flex items-start gap-3 rounded-xl border border-border bg-card p-4">
                 <Checkbox
                   checked={termsChecked}

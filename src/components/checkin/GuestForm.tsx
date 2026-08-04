@@ -140,8 +140,16 @@ export function GuestForm({ foreign, initial, onSubmit, onBack }: Props) {
     onSubmit({
       ...guest,
       documentType: foreign ? "PASSPORT" : (guest.documentType ?? "CPF"),
-      citizenship: guest.citizenship ?? (foreign ? "" : BRAZIL_PMS_COUNTRY),
-      country: guest.country ?? guest.citizenship ?? (foreign ? "" : BRAZIL_PMS_COUNTRY),
+      citizenship:
+        matchPmsCountryValue(
+          guest.citizenship ?? (foreign ? "" : BRAZIL_PMS_COUNTRY),
+          countryOptions,
+        ) || (foreign ? "" : BRAZIL_PMS_COUNTRY),
+      country:
+        matchPmsCountryValue(
+          guest.country ?? guest.citizenship ?? (foreign ? "" : BRAZIL_PMS_COUNTRY),
+          countryOptions,
+        ) || (foreign ? "" : BRAZIL_PMS_COUNTRY),
     });
   }
 
