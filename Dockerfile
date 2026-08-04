@@ -2,12 +2,12 @@
 
 FROM node:22-alpine AS base
 WORKDIR /app
-ENV NODE_ENV=production
 
 FROM base AS deps
 RUN apk add --no-cache libc6-compat
 COPY package.json package-lock.json ./
-RUN npm ci
+# --omit=optional evita pacotes wasm32 (@emnapi/*) que quebram npm ci no Linux
+RUN npm ci --omit=optional
 
 FROM base AS build
 COPY --from=deps /app/node_modules ./node_modules
@@ -21,8 +21,10 @@ ENV VITE_SUPABASE_PUBLISHABLE_KEY=$VITE_SUPABASE_PUBLISHABLE_KEY
 ENV NITRO_PRESET=node-server
 RUN npm run build
 
-FROM base AS runner
+FROM node:22-alpine AS runner
+WORKDIR /app
 RUN apk add --no-cache libc6-compat
+ENV NODE_ENV=production
 ENV HOST=0.0.0.0
 ENV PORT=3000
 ENV NITRO_HOST=0.0.0.0
