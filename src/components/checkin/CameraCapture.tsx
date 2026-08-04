@@ -3,6 +3,15 @@ import { Camera, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n/context";
 import { cn } from "@/lib/utils";
+import {
+  acquireCameraStream,
+  attachStreamToVideo,
+  stopMediaStream,
+  unregisterActiveDeviceStream,
+  yieldForCameraHandoff,
+  type ExclusiveCameraProps,
+} from "@/lib/camera-utils";
+import { useExclusiveCamera } from "@/lib/use-exclusive-camera";
 
 type Props = {
   facingMode: "user" | "environment";
@@ -12,7 +21,7 @@ type Props = {
   /** Layout reduzido para exibir duas fotos lado a lado */
   compact?: boolean;
   title?: string;
-};
+} & Partial<ExclusiveCameraProps>;
 
 export function CameraCapture({
   facingMode,
@@ -21,6 +30,10 @@ export function CameraCapture({
   label,
   compact = false,
   title,
+  captureId,
+  activeCaptureId,
+  onRequestCapture,
+  onReleaseCapture,
 }: Props) {
   const { t } = useI18n();
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -29,33 +42,65 @@ export function CameraCapture({
   const [live, setLive] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const stop = useCallback(() => {
-    streamRef.current?.getTracks().forEach((track) => track.stop());
+  const stopCamera = useCallback(() => {
+    unregisterActiveDeviceStream(streamRef.current);
+    stopMediaStream(streamRef.current);
     streamRef.current = null;
+    const video = videoRef.current;
+    if (video) {
+      video.srcObject = null;
+    }
     setLive(false);
   }, []);
 
-  useEffect(() => stop, [stop]);
+  const closeLiveCamera = useCallback(() => {
+    stopCamera();
+    if (captureId && onReleaseCapture) {
+      onReleaseCapture(captureId);
+    }
+  }, [captureId, onReleaseCapture, stopCamera]);
 
-  async function start() {
+  const { requestCapture } = useExclusiveCamera({
+    captureId,
+    activeCaptureId,
+    onRequestCapture,
+    onReleaseCapture,
+    isLive: live,
+    stopLive: closeLiveCamera,
+  });
+
+  useEffect(() => () => stopCamera(), [stopCamera]);
+
+  const start = useCallback(async () => {
     setError(null);
+    stopCamera();
+    requestCapture();
+    await yieldForCameraHandoff();
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setError(t("checkin.camera.accessError"));
+      return;
+    }
+
+    const video = videoRef.current;
+    if (!video) {
+      setError(t("checkin.camera.accessError"));
+      return;
+    }
+
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode },
-        audio: false,
-      });
+      const stream = await acquireCameraStream(facingMode);
       streamRef.current = stream;
+      await attachStreamToVideo(video, stream);
       setLive(true);
-      queueMicrotask(() => {
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          void videoRef.current.play();
-        }
-      });
     } catch {
+      stopCamera();
+      if (captureId && onReleaseCapture) {
+        onReleaseCapture(captureId);
+      }
       setError(t("checkin.camera.accessError"));
     }
-  }
+  }, [captureId, facingMode, onReleaseCapture, requestCapture, stopCamera, t]);
 
   function shoot() {
     const video = videoRef.current;
@@ -65,11 +110,12 @@ export function CameraCapture({
     canvas.height = video.videoHeight || 960;
     canvas.getContext("2d")?.drawImage(video, 0, 0, canvas.width, canvas.height);
     onCapture(canvas.toDataURL("image/jpeg", 0.82));
-    stop();
+    closeLiveCamera();
   }
 
   function pickFile(file: File | undefined) {
     if (!file) return;
+    closeLiveCamera();
     const reader = new FileReader();
     reader.onload = () => onCapture(String(reader.result));
     reader.readAsDataURL(file);
@@ -77,10 +123,11 @@ export function CameraCapture({
 
   function replaceFromCamera() {
     onCapture("");
-    queueMicrotask(() => void start());
+    void start();
   }
 
   function openFilePicker() {
+    closeLiveCamera();
     fileRef.current?.click();
   }
 
@@ -96,24 +143,34 @@ export function CameraCapture({
 
       <div
         className={cn(
-          "relative overflow-hidden rounded-xl border bg-muted",
+          "relative overflow-hidden rounded-xl border bg-black",
           compact ? "aspect-square border-border" : "aspect-[3/4] border-border",
           value && compact && "ring-2 ring-success/40 ring-offset-2 ring-offset-background",
         )}
       >
+        <video
+          ref={videoRef}
+          playsInline
+          muted
+          autoPlay
+          aria-hidden={!live}
+          className={cn(
+            "absolute inset-0 size-full object-cover",
+            live ? "z-0 opacity-100" : "pointer-events-none z-0 opacity-0",
+          )}
+        />
+
         {value ? (
           <>
-            <img src={value} alt={label} className="size-full object-cover" />
+            <img src={value} alt={label} className="relative z-10 size-full object-cover" />
             {!compact ? (
-              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-4 pb-4 pt-10">
+              <div className="absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-black/70 to-transparent px-4 pb-4 pt-10">
                 <p className="text-center text-xs font-medium text-white">{t("checkin.camera.selected")}</p>
               </div>
             ) : null}
           </>
-        ) : live ? (
-          <video ref={videoRef} playsInline muted className="size-full object-cover" />
-        ) : (
-          <div className="flex size-full flex-col items-center justify-center gap-2 p-3 text-muted-foreground">
+        ) : live ? null : (
+          <div className="relative z-10 flex size-full flex-col items-center justify-center gap-2 bg-muted p-3 text-muted-foreground">
             <Camera className={cn(compact ? "size-5" : "size-8")} aria-hidden />
             {!compact ? <p className="px-4 text-center text-sm">{label}</p> : null}
           </div>

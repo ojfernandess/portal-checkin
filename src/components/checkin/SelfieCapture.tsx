@@ -3,6 +3,15 @@ import { Camera, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n/context";
 import { cn } from "@/lib/utils";
+import {
+  acquireCameraStream,
+  attachStreamToVideo,
+  stopMediaStream,
+  unregisterActiveDeviceStream,
+  yieldForCameraHandoff,
+  type ExclusiveCameraProps,
+} from "@/lib/camera-utils";
+import { useExclusiveCamera } from "@/lib/use-exclusive-camera";
 
 export type SelfieCaptureResult = {
   photoBase64: string;
@@ -17,55 +26,21 @@ type Props = {
   title?: string;
   /** Versão reduzida para tile de foto cadastrada */
   compact?: boolean;
-};
+} & Partial<ExclusiveCameraProps>;
 
 const JPEG_QUALITY = 0.85;
 
-async function requestFrontCameraStream(): Promise<MediaStream> {
-  const constraints: MediaStreamConstraints[] = [
-    { video: { facingMode: { ideal: "user" } }, audio: false },
-    { video: { facingMode: "user" }, audio: false },
-    { video: true, audio: false },
-  ];
-
-  let lastError: unknown;
-  for (const constraint of constraints) {
-    try {
-      return await navigator.mediaDevices.getUserMedia(constraint);
-    } catch (error) {
-      lastError = error;
-    }
-  }
-
-  throw lastError;
-}
-
-async function attachStreamToVideo(video: HTMLVideoElement, stream: MediaStream): Promise<void> {
-  video.srcObject = stream;
-  video.setAttribute("playsinline", "true");
-  video.setAttribute("webkit-playsinline", "true");
-  video.muted = true;
-
-  await new Promise<void>((resolve, reject) => {
-    const onReady = () => {
-      video.removeEventListener("loadedmetadata", onReady);
-      resolve();
-    };
-    video.addEventListener("loadedmetadata", onReady);
-    if (video.readyState >= 1) {
-      video.removeEventListener("loadedmetadata", onReady);
-      resolve();
-    }
-    setTimeout(() => {
-      video.removeEventListener("loadedmetadata", onReady);
-      resolve();
-    }, 1500);
-  });
-
-  await video.play();
-}
-
-export function SelfieCapture({ value, onCapture, onConfirm, title, compact = false }: Props) {
+export function SelfieCapture({
+  value,
+  onCapture,
+  onConfirm,
+  title,
+  compact = false,
+  captureId,
+  activeCaptureId,
+  onRequestCapture,
+  onReleaseCapture,
+}: Props) {
   const { t } = useI18n();
   const maskId = useId().replace(/:/g, "");
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -78,13 +53,31 @@ export function SelfieCapture({ value, onCapture, onConfirm, title, compact = fa
   const [error, setError] = useState<string | null>(null);
 
   const stopCamera = useCallback(() => {
-    streamRef.current?.getTracks().forEach((track) => track.stop());
+    unregisterActiveDeviceStream(streamRef.current);
+    stopMediaStream(streamRef.current);
     streamRef.current = null;
     const video = videoRef.current;
     if (video) {
       video.srcObject = null;
     }
   }, []);
+
+  const closeLiveCamera = useCallback(() => {
+    stopCamera();
+    setPhase("idle");
+    if (captureId && onReleaseCapture) {
+      onReleaseCapture(captureId);
+    }
+  }, [captureId, onReleaseCapture, stopCamera]);
+
+  const { requestCapture } = useExclusiveCamera({
+    captureId,
+    activeCaptureId,
+    onRequestCapture,
+    onReleaseCapture,
+    isLive: phase === "live",
+    stopLive: closeLiveCamera,
+  });
 
   useEffect(() => () => stopCamera(), [stopCamera]);
 
@@ -100,6 +93,8 @@ export function SelfieCapture({ value, onCapture, onConfirm, title, compact = fa
     setError(null);
     setPreviewUrl(null);
     stopCamera();
+    requestCapture();
+    await yieldForCameraHandoff();
 
     if (!navigator.mediaDevices?.getUserMedia) {
       setError(t("checkin.camera.accessError"));
@@ -113,21 +108,19 @@ export function SelfieCapture({ value, onCapture, onConfirm, title, compact = fa
     }
 
     try {
-      const stream = await requestFrontCameraStream();
+      const stream = await acquireCameraStream("user");
       streamRef.current = stream;
       await attachStreamToVideo(video, stream);
       setPhase("live");
     } catch {
       stopCamera();
+      if (captureId && onReleaseCapture) {
+        onReleaseCapture(captureId);
+      }
       setError(t("checkin.camera.accessError"));
       setPhase("idle");
     }
-  }, [stopCamera, t]);
-
-  function closeLiveCamera() {
-    stopCamera();
-    setPhase("idle");
-  }
+  }, [captureId, onReleaseCapture, requestCapture, stopCamera, t]);
 
   function captureFrame() {
     const video = videoRef.current;
@@ -154,6 +147,9 @@ export function SelfieCapture({ value, onCapture, onConfirm, title, compact = fa
     setPreviewUrl(dataUrl);
     setPhase("preview");
     stopCamera();
+    if (captureId && onReleaseCapture) {
+      onReleaseCapture(captureId);
+    }
   }
 
   function confirmPhoto() {
@@ -178,12 +174,12 @@ export function SelfieCapture({ value, onCapture, onConfirm, title, compact = fa
 
   function pickFile(file: File | undefined) {
     if (!file) return;
+    closeLiveCamera();
     const reader = new FileReader();
     reader.onload = () => {
       const result = String(reader.result ?? "");
       setPreviewUrl(result);
       setPhase("preview");
-      stopCamera();
     };
     reader.readAsDataURL(file);
   }
@@ -211,111 +207,110 @@ export function SelfieCapture({ value, onCapture, onConfirm, title, compact = fa
         fullscreenLive && "fixed inset-0 z-50 bg-black",
       )}
     >
-        {title && !fullscreenLive ? (
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</p>
-        ) : null}
+      {title && !fullscreenLive ? (
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</p>
+      ) : null}
 
-        <div className={viewportClass}>
-          <canvas ref={canvasRef} className="hidden" aria-hidden />
+      <div className={viewportClass}>
+        <canvas ref={canvasRef} className="hidden" aria-hidden />
 
-          {/* Vídeo sempre montado para o ref existir antes de getUserMedia resolver */}
-          <video
-            ref={videoRef}
-            playsInline
-            muted
-            autoPlay
-            aria-hidden={!showingLive}
-            className={cn(
-              "absolute inset-0 h-full w-full object-cover -scale-x-100",
-              showingLive ? "z-0 opacity-100" : "pointer-events-none z-0 opacity-0",
-            )}
-          />
-
-          {showingLive ? <SelfieOverlay maskId={maskId} compact={compact || fullscreenLive} /> : null}
-
-          {showingConfirmed ? (
-            <img src={value} alt="" className="relative z-10 size-full object-cover" />
-          ) : showingPreview ? (
-            <img src={previewUrl} alt="" className="relative z-10 size-full object-cover" />
-          ) : showingLive ? null : (
-            <div className="relative z-10 flex size-full min-h-48 flex-col items-center justify-center gap-3 bg-muted p-6 text-muted-foreground">
-              <Camera className={cn(compact ? "size-8" : "size-12")} aria-hidden />
-              <p className="max-w-xs text-center text-sm">{t("checkin.selfieCapture.openHint")}</p>
-            </div>
-          )}
-
-          {fullscreenLive ? (
-            <button
-              type="button"
-              className="absolute right-3 top-3 z-20 flex size-10 items-center justify-center rounded-full bg-black/50 text-white"
-              aria-label={t("common.back")}
-              onClick={closeLiveCamera}
-            >
-              <X className="size-5" aria-hidden />
-            </button>
-          ) : null}
-        </div>
-
-        {error ? (
-          <p className={cn("text-destructive", compact ? "text-xs" : "text-sm", fullscreenLive && "px-4")}>
-            {error}
-          </p>
-        ) : null}
-
-        <div
+        <video
+          ref={videoRef}
+          playsInline
+          muted
+          autoPlay
+          aria-hidden={!showingLive}
           className={cn(
-            "flex flex-col gap-2",
-            fullscreenLive && "absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-black/90 via-black/70 to-transparent px-4 pb-6 pt-10",
-            !compact && showingLive && !fullscreenLive && "sticky bottom-0 z-10 bg-background/95 pb-1 pt-2 backdrop-blur-sm",
+            "absolute inset-0 h-full w-full object-cover -scale-x-100",
+            showingLive ? "z-0 opacity-100" : "pointer-events-none z-0 opacity-0",
           )}
-        >
-          {showingConfirmed ? (
-            <>
-              <Button type="button" variant="outline" className="tap-safe w-full" onClick={replaceConfirmed}>
-                <Camera className="size-4 shrink-0" aria-hidden />
-                {t("checkin.selfieCapture.retake")}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                className="tap-safe w-full"
-                onClick={() => fileRef.current?.click()}
-              >
-                <Upload className="size-4 shrink-0" aria-hidden />
-                {t("checkin.camera.uploadPhoto")}
-              </Button>
-            </>
-          ) : showingPreview ? (
-            <>
-              <Button type="button" className="tap-safe w-full" onClick={confirmPhoto}>
-                {t("checkin.selfieCapture.usePhoto")}
-              </Button>
-              <Button type="button" variant="outline" className="tap-safe w-full" onClick={retake}>
-                {t("checkin.selfieCapture.retake")}
-              </Button>
-            </>
-          ) : showingLive ? (
-            <Button type="button" className="tap-safe w-full" onClick={captureFrame}>
-              {t("checkin.selfieCapture.takePhoto")}
+        />
+
+        {showingLive ? <SelfieOverlay maskId={maskId} compact={compact || fullscreenLive} /> : null}
+
+        {showingConfirmed ? (
+          <img src={value} alt="" className="relative z-10 size-full object-cover" />
+        ) : showingPreview ? (
+          <img src={previewUrl} alt="" className="relative z-10 size-full object-cover" />
+        ) : showingLive ? null : (
+          <div className="relative z-10 flex size-full min-h-48 flex-col items-center justify-center gap-3 bg-muted p-6 text-muted-foreground">
+            <Camera className={cn(compact ? "size-8" : "size-12")} aria-hidden />
+            <p className="max-w-xs text-center text-sm">{t("checkin.selfieCapture.openHint")}</p>
+          </div>
+        )}
+
+        {fullscreenLive ? (
+          <button
+            type="button"
+            className="absolute right-3 top-3 z-20 flex size-10 items-center justify-center rounded-full bg-black/50 text-white"
+            aria-label={t("common.back")}
+            onClick={closeLiveCamera}
+          >
+            <X className="size-5" aria-hidden />
+          </button>
+        ) : null}
+      </div>
+
+      {error ? (
+        <p className={cn("text-destructive", compact ? "text-xs" : "text-sm", fullscreenLive && "px-4")}>
+          {error}
+        </p>
+      ) : null}
+
+      <div
+        className={cn(
+          "flex flex-col gap-2",
+          fullscreenLive && "absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-black/90 via-black/70 to-transparent px-4 pb-6 pt-10",
+          !compact && showingLive && !fullscreenLive && "sticky bottom-0 z-10 bg-background/95 pb-1 pt-2 backdrop-blur-sm",
+        )}
+      >
+        {showingConfirmed ? (
+          <>
+            <Button type="button" variant="outline" className="tap-safe w-full" onClick={replaceConfirmed}>
+              <Camera className="size-4 shrink-0" aria-hidden />
+              {t("checkin.selfieCapture.retake")}
             </Button>
-          ) : (
-            <>
-              <Button type="button" className="tap-safe w-full" onClick={() => void startCamera()}>
-                <Camera className="size-4 shrink-0" aria-hidden />
-                {t("checkin.camera.openCamera")}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                className="tap-safe w-full"
-                onClick={() => fileRef.current?.click()}
-              >
-                <Upload className="size-4 shrink-0" aria-hidden />
-                {t("checkin.camera.uploadPhoto")}
-              </Button>
-            </>
-          )}
-        </div>
+            <Button
+              type="button"
+              variant="outline"
+              className="tap-safe w-full"
+              onClick={() => fileRef.current?.click()}
+            >
+              <Upload className="size-4 shrink-0" aria-hidden />
+              {t("checkin.camera.uploadPhoto")}
+            </Button>
+          </>
+        ) : showingPreview ? (
+          <>
+            <Button type="button" className="tap-safe w-full" onClick={confirmPhoto}>
+              {t("checkin.selfieCapture.usePhoto")}
+            </Button>
+            <Button type="button" variant="outline" className="tap-safe w-full" onClick={retake}>
+              {t("checkin.selfieCapture.retake")}
+            </Button>
+          </>
+        ) : showingLive ? (
+          <Button type="button" className="tap-safe w-full" onClick={captureFrame}>
+            {t("checkin.selfieCapture.takePhoto")}
+          </Button>
+        ) : (
+          <>
+            <Button type="button" className="tap-safe w-full" onClick={() => void startCamera()}>
+              <Camera className="size-4 shrink-0" aria-hidden />
+              {t("checkin.camera.openCamera")}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="tap-safe w-full"
+              onClick={() => fileRef.current?.click()}
+            >
+              <Upload className="size-4 shrink-0" aria-hidden />
+              {t("checkin.camera.uploadPhoto")}
+            </Button>
+          </>
+        )}
+      </div>
 
       <input
         ref={fileRef}

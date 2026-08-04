@@ -335,6 +335,7 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
   const [docPhoto, setDocPhoto] = useState<string | null>(null);
   const [editRegisteredSelfie, setEditRegisteredSelfie] = useState(false);
   const [editRegisteredDocPhoto, setEditRegisteredDocPhoto] = useState(false);
+  const [activeCameraId, setActiveCameraId] = useState<string | null>(null);
   const [reference, setReference] = useState<Reference | null>(null);
   const [embratur, setEmbratur] = useState<EmbraturForm>(EMPTY_EMBRATUR);
   const [extraFields, setExtraFields] = useState<CheckinExtraField[]>([]);
@@ -356,6 +357,12 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
   const capacity = Number(reservation?.room?.capacity ?? 1);
   const guestsQuantity = Number(reservation?.guestsQuantity ?? 1);
   const hasCompanions = guestsQuantity > 1 && capacity > 1;
+
+  const exclusiveCameraProps = {
+    activeCaptureId: activeCameraId,
+    onRequestCapture: (id: string) => setActiveCameraId(id),
+    onReleaseCapture: (id: string) => setActiveCameraId((current) => (current === id ? null : current)),
+  } as const;
 
   async function uploadPhotoIfNeeded(
     value: string | null | undefined,
@@ -1236,6 +1243,8 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
                     facingMode="user"
                     editing={editRegisteredSelfie}
                     editValue={selfie}
+                    captureId="registered-selfie"
+                    {...exclusiveCameraProps}
                     onStartEdit={() => {
                       setEditRegisteredSelfie(true);
                       setSelfie(registeredDisplayUrl(lookupResult, "profile"));
@@ -1256,6 +1265,8 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
                     facingMode="environment"
                     editing={editRegisteredDocPhoto}
                     editValue={docPhoto}
+                    captureId="registered-document"
+                    {...exclusiveCameraProps}
                     onStartEdit={() => {
                       setEditRegisteredDocPhoto(true);
                       setDocPhoto(registeredDisplayUrl(lookupResult, "document"));
@@ -1405,6 +1416,8 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
                 <SelfieCapture
                   title={t("checkin.photos.selfie")}
                   value={selfie}
+                  captureId="selfie"
+                  {...exclusiveCameraProps}
                   onCapture={(value) => setSelfie(value || null)}
                 />
                 <CameraCapture
@@ -1412,6 +1425,8 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
                   title={t("checkin.photos.document")}
                   facingMode="environment"
                   value={docPhoto}
+                  captureId="document"
+                  {...exclusiveCameraProps}
                   label={t("checkin.photos.documentHint")}
                   onCapture={(value) => setDocPhoto(value || null)}
                 />

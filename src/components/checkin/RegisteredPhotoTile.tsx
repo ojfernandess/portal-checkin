@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { CameraCapture } from "@/components/checkin/CameraCapture";
 import { SelfieCapture } from "@/components/checkin/SelfieCapture";
 import { getCheckinPhotoDisplay } from "@/lib/api/checkin.functions";
+import type { ExclusiveCameraProps } from "@/lib/camera-utils";
 import { useI18n } from "@/lib/i18n/context";
 import { cn } from "@/lib/utils";
 
@@ -20,7 +21,7 @@ type Props = {
   onStartEdit: () => void;
   onCancelEdit: () => void;
   onCapture: (value: string) => void;
-};
+} & Partial<ExclusiveCameraProps>;
 
 export function RegisteredPhotoTile({
   title,
@@ -34,6 +35,10 @@ export function RegisteredPhotoTile({
   onStartEdit,
   onCancelEdit,
   onCapture,
+  captureId,
+  activeCaptureId,
+  onRequestCapture,
+  onReleaseCapture,
 }: Props) {
   const { t } = useI18n();
   const loadPhoto = useServerFn(getCheckinPhotoDisplay);
@@ -88,6 +93,10 @@ export function RegisteredPhotoTile({
             title={title}
             value={editValue}
             onCapture={onCapture}
+            captureId={captureId}
+            activeCaptureId={activeCaptureId}
+            onRequestCapture={onRequestCapture}
+            onReleaseCapture={onReleaseCapture}
           />
         ) : (
           <CameraCapture
@@ -97,6 +106,10 @@ export function RegisteredPhotoTile({
             value={editValue}
             label={label}
             onCapture={onCapture}
+            captureId={captureId}
+            activeCaptureId={activeCaptureId}
+            onRequestCapture={onRequestCapture}
+            onReleaseCapture={onReleaseCapture}
           />
         )}
         <Button
