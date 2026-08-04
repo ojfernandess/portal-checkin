@@ -239,8 +239,7 @@ export function CameraCapture({
       <input
         ref={fileRef}
         type="file"
-        accept="image/*"
-        capture={facingMode === "user" ? "user" : "environment"}
+        accept="image/jpeg,image/png,image/webp,image/heic,image/*"
         className="sr-only"
         onChange={(event) => {
           pickFile(event.target.files?.[0]);
