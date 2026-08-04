@@ -322,6 +322,13 @@ export const ptBR = {
       openCamera: "Abrir câmera",
       uploadPhoto: "Enviar foto",
     },
+    selfieCapture: {
+      openHint: "Use a câmera frontal para registrar sua selfie.",
+      positionFace: "Posicione seu rosto dentro do círculo",
+      takePhoto: "Tirar Foto",
+      usePhoto: "Usar esta foto",
+      retake: "Tirar novamente",
+    },
     extraFields: {
       title: "Informações adicionais",
       optionalMore: "Mais informações (opcional)",

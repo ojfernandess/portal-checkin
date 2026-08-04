@@ -20,6 +20,7 @@ import { GuestForm } from "@/components/checkin/GuestForm";
 import { CompanionsStep } from "@/components/checkin/CompanionsStep";
 import { EmbraturStep } from "@/components/checkin/EmbraturStep";
 import { CameraCapture } from "@/components/checkin/CameraCapture";
+import { SelfieCapture } from "@/components/checkin/SelfieCapture";
 import { RegisteredPhotoTile } from "@/components/checkin/RegisteredPhotoTile";
 import { CheckinFinalizingScreen } from "@/components/checkin/CheckinFinalizingScreen";
 import { isEstablishmentNotRegisteredError } from "@/lib/checkin-access";
@@ -1400,13 +1401,10 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
                 <p className="text-sm text-muted-foreground">{t("checkin.photos.body")}</p>
               </header>
 
-              <div className="grid grid-cols-2 gap-3 rounded-2xl border border-border bg-card p-4 shadow-card">
-                <CameraCapture
-                  compact
+              <div className="space-y-4 rounded-2xl border border-border bg-card p-4 shadow-card">
+                <SelfieCapture
                   title={t("checkin.photos.selfie")}
-                  facingMode="user"
                   value={selfie}
-                  label={t("checkin.photos.selfieHint")}
                   onCapture={(value) => setSelfie(value || null)}
                 />
                 <CameraCapture

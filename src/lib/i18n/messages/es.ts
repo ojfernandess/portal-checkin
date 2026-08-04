@@ -324,6 +324,13 @@ export const es: MessageTree = {
       openCamera: "Abrir cámara",
       uploadPhoto: "Enviar foto",
     },
+    selfieCapture: {
+      openHint: "Use la cámara frontal para registrar su selfie.",
+      positionFace: "Posicione su rostro dentro del círculo",
+      takePhoto: "Tomar Foto",
+      usePhoto: "Usar esta foto",
+      retake: "Tomar de nuevo",
+    },
     extraFields: {
       title: "Información adicional",
       optionalMore: "Más información (opcional)",

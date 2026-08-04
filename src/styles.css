@@ -127,6 +127,20 @@
   padding-inline: 20px;
 }
 
+@keyframes selfie-oval-pulse {
+  0%,
+  100% {
+    stroke-opacity: 1;
+  }
+  50% {
+    stroke-opacity: 0.45;
+  }
+}
+
+@utility selfie-oval-pulse {
+  animation: selfie-oval-pulse 2s ease-in-out infinite;
+}
+
 @keyframes step-in {
   from {
     opacity: 0;

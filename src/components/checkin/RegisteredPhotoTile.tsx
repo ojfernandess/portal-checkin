@@ -3,6 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { Camera, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CameraCapture } from "@/components/checkin/CameraCapture";
+import { SelfieCapture } from "@/components/checkin/SelfieCapture";
 import { getCheckinPhotoDisplay } from "@/lib/api/checkin.functions";
 import { useI18n } from "@/lib/i18n/context";
 import { cn } from "@/lib/utils";
@@ -81,14 +82,23 @@ export function RegisteredPhotoTile({
   if (editing) {
     return (
       <div className="space-y-2">
-        <CameraCapture
-          compact
-          title={title}
-          facingMode={facingMode}
-          value={editValue}
-          label={label}
-          onCapture={onCapture}
-        />
+        {photoType === "profile" && facingMode === "user" ? (
+          <SelfieCapture
+            compact
+            title={title}
+            value={editValue}
+            onCapture={onCapture}
+          />
+        ) : (
+          <CameraCapture
+            compact
+            title={title}
+            facingMode={facingMode}
+            value={editValue}
+            label={label}
+            onCapture={onCapture}
+          />
+        )}
         <Button
           type="button"
           variant="ghost"
