@@ -259,6 +259,8 @@ export const en: MessageTree = {
       acceptAria: "Accept terms",
       acceptLabel:
         "I have read and accept the terms, property policies, and privacy policy (LGPD).",
+      expand: "Read full policies",
+      collapse: "Collapse policies",
     },
     nationality: {
       title: "What is your nationality?",

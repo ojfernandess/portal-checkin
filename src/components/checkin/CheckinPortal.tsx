@@ -21,6 +21,7 @@ import { EmbraturStep } from "@/components/checkin/EmbraturStep";
 import { CameraCapture } from "@/components/checkin/CameraCapture";
 import { SelfieCapture } from "@/components/checkin/SelfieCapture";
 import { RegisteredPhotoTile } from "@/components/checkin/RegisteredPhotoTile";
+import { EstablishmentTermsPanel } from "@/components/checkin/EstablishmentTermsPanel";
 import { CheckinFinalizingScreen } from "@/components/checkin/CheckinFinalizingScreen";
 import { isEstablishmentNotRegisteredError } from "@/lib/checkin-access";
 import { SuccessScreen } from "@/components/checkin/SuccessScreen";
@@ -45,7 +46,7 @@ import { normalizeEmbratur } from "@/lib/embratur";
 import { mergeCheckinResult, mergeGuests, preserveReservationDetails } from "@/lib/api/reservation-normalizer";
 import { isAlreadyCheckedIn, type Dependent, type EmbraturForm, type GuestLookup, type MainGuest, type Reservation } from "@/lib/api/types";
 import { isValidCpf, isValidEmail, maskCpf } from "@/lib/validators";
-import { termsSectionsToDisplayBlocks, type TermsSection } from "@/lib/establishment-terms";
+import { type TermsSection } from "@/lib/establishment-terms";
 import { buildCheckinErrorLabels, splitCheckinErrorMessage } from "@/lib/checkin-error-labels";
 import {
   formatCheckinIssues,
@@ -1088,23 +1089,7 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
                 <h2 className="font-display text-2xl">{t("checkin.terms.title")}</h2>
                 <p className="text-sm text-muted-foreground">{reservation?.establishmentName}</p>
               </header>
-              <div
-                className="max-h-[min(65vh,560px)] min-h-56 overflow-y-auto overscroll-contain rounded-2xl border border-border bg-card p-5 shadow-card [-webkit-overflow-scrolling:touch]"
-                role="region"
-                aria-label={t("checkin.terms.title")}
-              >
-                <div className="space-y-3 break-words pr-1 text-sm leading-relaxed text-muted-foreground">
-                  {termsSectionsToDisplayBlocks(termsSections).map((block, index) =>
-                    block.kind === "heading" ? (
-                      <h3 key={`${block.text}-${index}`} className="font-medium text-foreground">
-                        {block.text}
-                      </h3>
-                    ) : (
-                      <p key={`${block.text.slice(0, 24)}-${index}`}>{block.text}</p>
-                    ),
-                  )}
-                </div>
-              </div>
+              <EstablishmentTermsPanel sections={termsSections} />
               <label className="flex items-start gap-3 rounded-xl border border-border bg-card p-4">
                 <Checkbox
                   checked={termsChecked}

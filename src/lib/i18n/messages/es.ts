@@ -260,6 +260,8 @@ export const es: MessageTree = {
       acceptAria: "Aceptar los términos",
       acceptLabel:
         "He leído y acepto los términos, las políticas del establecimiento y la política de privacidad (LGPD).",
+      expand: "Leer políticas completas",
+      collapse: "Ocultar políticas",
     },
     nationality: {
       title: "¿Cuál es su nacionalidad?",

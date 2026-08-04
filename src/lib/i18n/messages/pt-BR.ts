@@ -258,6 +258,8 @@ export const ptBR = {
       acceptAria: "Aceitar os termos",
       acceptLabel:
         "Li e aceito os termos, as políticas do estabelecimento e a política de privacidade (LGPD).",
+      expand: "Ler políticas completas",
+      collapse: "Recolher políticas",
     },
     nationality: {
       title: "Qual é a sua nacionalidade?",
