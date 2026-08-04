@@ -5,11 +5,14 @@ WORKDIR /app
 
 FROM base AS deps
 RUN apk add --no-cache libc6-compat
+# Lock file gerado com npm 11; node:22-alpine traz npm 10 e quebra npm ci.
+RUN npm install -g npm@11.6.1
 COPY package.json package-lock.json ./
-# --omit=optional evita pacotes wasm32 (@emnapi/*) que quebram npm ci no Linux
-RUN npm ci --omit=optional
+# npm install (em vez de npm ci) tolera diferenças de plataforma no lock file.
+RUN npm install --no-audit --no-fund
 
 FROM base AS build
+RUN npm install -g npm@11.6.1
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ARG VITE_SUPABASE_PROJECT_ID
