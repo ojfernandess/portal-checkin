@@ -297,6 +297,11 @@ export const es: MessageTree = {
       birthDateVerifyTitle: "Confirme su identidad",
       birthDateVerifyBody:
         "Este check-in ya está completado. Ingrese la fecha de nacimiento del huésped principal para ver los datos.",
+      whyVerifyBody:
+        "Esta verificación protege sus datos personales, credenciales de acceso e información de la reserva.",
+      securityBadge: "Conexión segura",
+      privacyNote:
+        "La fecha ingresada se usa solo para confirmar su identidad y no se mostrará en esta pantalla.",
       verifyFailed: "No se pudo validar la fecha de nacimiento. Inténtelo de nuevo.",
       unavailable:
         "No encontramos la fecha de nacimiento registrada para esta reserva. Contacte con la recepción.",
@@ -457,6 +462,11 @@ export const es: MessageTree = {
         "Su check-in digital fue finalizado. Este establecimiento no tiene recepción física — acceda al alojamiento según las instrucciones anteriores.",
       accessTitle: "Acceso al alojamiento",
       accessPassword: "Contraseña de acceso",
+      inboxFacialAccessTitle: "Entrada facial en la portaria",
+      inboxFacialAccessBody:
+        "Su acceso facial se habilitará automáticamente a partir de las {time} (horario de check-in).",
+      inboxFacialAccessHint:
+        "Para habilitar el acceso, la foto registrada debe ser una selfie nítida, con el rostro visible y buena iluminación.",
       copyPassword: "Copiar contraseña",
       passwordCopied: "¡Contraseña copiada!",
       qrTitle: "Abra la puerta con código QR",

@@ -22,22 +22,26 @@ function Row({ icon, label, value }: { icon: React.ReactNode; label: string; val
 
 export function paymentBadgeClass(reservation: Reservation, status: string): string {
   if (reservation.isCancelled) {
-    return "bg-destructive text-destructive-foreground";
+    return "border-0 bg-destructive text-destructive-foreground";
   }
   const normalized = status.toLowerCase();
   const isPaid =
     reservation.financial?.isPaid === true ||
     reservation.isPaid === true ||
+    normalized.includes("paid") ||
     (normalized.includes("pago") && !normalized.includes("não") && !normalized.includes("nao"));
   const isUnpaid =
     normalized.includes("não pago") ||
     normalized.includes("nao pago") ||
+    normalized.includes("unpaid") ||
+    normalized.includes("pendente") ||
+    normalized.includes("pending") ||
     reservation.financial?.isPaid === false ||
     reservation.isPaid === false;
 
-  if (isPaid) return "bg-success text-success-foreground";
-  if (isUnpaid) return "bg-destructive text-destructive-foreground";
-  return "bg-muted text-muted-foreground";
+  if (isPaid && !isUnpaid) return "border-0 bg-emerald-600 text-white";
+  if (isUnpaid) return "border-0 bg-destructive text-destructive-foreground";
+  return "border-0 bg-muted text-muted-foreground";
 }
 
 export function ReservationCard({ reservation }: { reservation: Reservation }) {

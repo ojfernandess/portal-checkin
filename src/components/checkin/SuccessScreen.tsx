@@ -13,6 +13,7 @@ import {
   MapPin,
   Moon,
   Phone,
+  ScanFace,
   Share2,
   ShieldCheck,
   Users,
@@ -39,6 +40,8 @@ type Props = {
   alreadyCompleted?: boolean;
   /** Foto do estabelecimento configurada no painel admin */
   establishmentPhotoUrl?: string | null;
+  /** Integração Inbox (portaria) ativa no estabelecimento */
+  inboxPortariaEnabled?: boolean;
 };
 
 function formatMoney(value: number | string | undefined, locale: Locale): string | null {
@@ -99,20 +102,29 @@ function formatStayRangeLabel(
 }
 
 function successPaymentBadgeClass(reservation: Reservation, status: string): string {
-  const base = paymentBadgeClass(reservation, status);
   const normalized = status.toLowerCase();
+  const isPaid =
+    reservation.financial?.isPaid === true ||
+    reservation.isPaid === true ||
+    normalized.includes("paid") ||
+    (normalized.includes("pago") && !normalized.includes("não") && !normalized.includes("nao"));
   const isPending =
-    normalized.includes("pendente") ||
-    normalized.includes("pending") ||
-    normalized.includes("não pago") ||
-    normalized.includes("nao pago") ||
-    reservation.financial?.isPaid === false ||
-    reservation.isPaid === false;
+    !isPaid &&
+    (normalized.includes("pendente") ||
+      normalized.includes("pending") ||
+      normalized.includes("não pago") ||
+      normalized.includes("nao pago") ||
+      normalized.includes("unpaid") ||
+      reservation.financial?.isPaid === false ||
+      reservation.isPaid === false);
 
+  if (isPaid && !reservation.isCancelled) {
+    return "border-0 bg-emerald-600 text-white";
+  }
   if (isPending && !reservation.isCancelled) {
     return "border-0 bg-amber-100 text-amber-900";
   }
-  return base;
+  return paymentBadgeClass(reservation, status);
 }
 
 function InfoTile({
@@ -158,6 +170,7 @@ export function SuccessScreen({
   dependents,
   alreadyCompleted,
   establishmentPhotoUrl,
+  inboxPortariaEnabled = false,
 }: Props) {
   const { locale, t } = useI18n();
   const guest = mainGuest ?? reservation.mainGuest ?? reservation.responsible;
@@ -189,7 +202,11 @@ export function SuccessScreen({
   const checkoutPast = isCheckoutPast(checkoutDate, checkoutTime);
   const hideGuestDetails = isCancelled || checkoutPast;
   const showRoomPassword = !isCancelled && !checkoutPast && roomPassword != null && roomPassword !== "";
-  const showAccessBlock = isCancelled || showRoomPassword || (!checkoutPast && !!accessUnit);
+  const checkinTimeLabel = checkinTime?.trim() || "15:00";
+  const showInboxFacialNotice =
+    inboxPortariaEnabled && !isCancelled && !checkoutPast && !hideGuestDetails;
+  const showAccessBlock =
+    isCancelled || showRoomPassword || (!checkoutPast && !!accessUnit) || showInboxFacialNotice;
 
   const checkinWhen = reservation.checkin?.localizedDate
     ? formatDateTime(String(reservation.checkin.localizedDate), locale)
@@ -367,31 +384,61 @@ export function SuccessScreen({
               <KeyRound className="size-5 shrink-0" aria-hidden />
               <h4 className="font-display text-base">{t("checkin.success.accessTitle")}</h4>
             </div>
-            <div className="p-5">
-              <div className="space-y-4">
+            <div className="p-4 sm:p-5">
+              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:gap-x-5 sm:gap-y-3 lg:gap-x-8">
                 {accessUnit ? (
-                  <div>
+                  <div className="min-w-0 sm:max-w-[12rem] sm:flex-none lg:max-w-[14rem]">
                     <p className="text-xs text-muted-foreground">{t("common.unit")}</p>
-                    <p className="mt-1 font-display text-lg wrap-anywhere">{accessUnit}</p>
+                    <p className="mt-0.5 font-display text-base leading-snug wrap-anywhere sm:text-lg">
+                      {accessUnit}
+                    </p>
                   </div>
                 ) : null}
                 {showRoomPassword ? (
-                  <div className="space-y-3">
-                    <div>
-                      <p className="text-xs text-muted-foreground">{t("checkin.success.accessPassword")}</p>
-                      <p className="mt-1 font-code text-2xl font-semibold tracking-wide wrap-anywhere">
-                        {roomPassword}
-                      </p>
-                    </div>
+                  <div className="min-w-0 sm:flex-none sm:max-w-[14rem] lg:max-w-[16rem]">
+                    <p className="text-xs text-muted-foreground">{t("checkin.success.accessPassword")}</p>
+                    <p className="mt-0.5 font-code text-xl font-semibold tracking-wide wrap-anywhere sm:text-2xl">
+                      {roomPassword}
+                    </p>
                     <Button
                       variant="outline"
                       size="sm"
-                      className="gap-2 print:hidden"
+                      className="mt-2 gap-2 print:hidden"
                       onClick={() => void copyPassword()}
                     >
                       <Copy className="size-4" aria-hidden />
                       {t("checkin.success.copyPassword")}
                     </Button>
+                  </div>
+                ) : null}
+                {showInboxFacialNotice ? (
+                  <div
+                    className={cn(
+                      "min-w-0 rounded-lg border border-primary/15 bg-gradient-to-br from-primary/[0.04] to-primary/[0.07] p-3 sm:p-3.5",
+                      accessUnit || showRoomPassword
+                        ? "sm:flex-1 sm:basis-[220px] lg:basis-[280px]"
+                        : "w-full",
+                    )}
+                  >
+                    <div className="flex min-w-0 items-start gap-2.5">
+                      <span
+                        className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary sm:size-9"
+                        aria-hidden
+                      >
+                        <ScanFace className="size-4 sm:size-[1.125rem]" strokeWidth={1.75} />
+                      </span>
+                      <div className="min-w-0 space-y-0.5">
+                        <p className="font-display text-sm font-semibold leading-snug text-foreground">
+                          {t("checkin.success.inboxFacialAccessTitle")}
+                        </p>
+                        <p className="text-xs leading-relaxed text-muted-foreground sm:text-sm">
+                          {t("checkin.success.inboxFacialAccessBody", { time: checkinTimeLabel })}
+                        </p>
+                        <p className="text-[11px] leading-relaxed text-muted-foreground/90 sm:text-xs">
+                          {t("checkin.success.inboxFacialAccessHint")}
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 ) : null}
               </div>

@@ -296,6 +296,11 @@ export const en: MessageTree = {
       birthDateVerifyTitle: "Confirm your identity",
       birthDateVerifyBody:
         "This check-in is already complete. Enter the main guest's date of birth to view the details.",
+      whyVerifyBody:
+        "This step protects your personal data, access credentials, and reservation details from unauthorized viewing.",
+      securityBadge: "Secure connection",
+      privacyNote:
+        "The date you enter is used only to confirm your identity and will not be displayed on this screen.",
       verifyFailed: "Could not validate the date of birth. Please try again.",
       unavailable:
         "We could not find a registered date of birth for this reservation. Please contact the front desk.",
@@ -456,6 +461,11 @@ export const en: MessageTree = {
         "Your digital check-in is complete. This property has no physical front desk — access your accommodation as instructed above.",
       accessTitle: "Accommodation access",
       accessPassword: "Access password",
+      inboxFacialAccessTitle: "Facial entry at the front desk",
+      inboxFacialAccessBody:
+        "Your facial access will be enabled automatically from {time} (check-in time).",
+      inboxFacialAccessHint:
+        "For access to be enabled, your registered photo must be a clear selfie with your face visible and good lighting.",
       copyPassword: "Copy password",
       passwordCopied: "Password copied!",
       qrTitle: "Open the door with QR Code",

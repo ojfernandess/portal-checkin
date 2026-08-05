@@ -295,6 +295,11 @@ export const ptBR = {
       birthDateVerifyTitle: "Confirme sua identidade",
       birthDateVerifyBody:
         "Este check-in já foi concluído. Informe a data de nascimento do hóspede principal para visualizar os dados.",
+      whyVerifyBody:
+        "Esta verificação protege seus dados pessoais, senha de acesso e informações da reserva contra visualização indevida.",
+      securityBadge: "Conexão segura",
+      privacyNote:
+        "A data informada é usada apenas para confirmar sua identidade e não será exibida nesta tela.",
       verifyFailed: "Não foi possível validar a data de nascimento. Tente novamente.",
       unavailable:
         "Não encontramos a data de nascimento cadastrada para esta reserva. Entre em contato com a recepção.",
@@ -455,6 +460,11 @@ export const ptBR = {
         "Seu check-in digital foi finalizado. Este empreendimento não possui recepção física — você pode acessar a acomodação conforme as instruções acima.",
       accessTitle: "Acesso à acomodação",
       accessPassword: "Senha de acesso",
+      inboxFacialAccessTitle: "Entrada facial na portaria",
+      inboxFacialAccessBody:
+        "Seu acesso facial será liberado automaticamente a partir das {time} (horário de check-in).",
+      inboxFacialAccessHint:
+        "Para liberar a entrada, a foto cadastrada deve ser uma selfie nítida, com o rosto visível e boa iluminação.",
       copyPassword: "Copiar senha",
       passwordCopied: "Senha copiada!",
       qrTitle: "Abra a porta com QR Code",

@@ -23,6 +23,7 @@ import { SelfieCapture } from "@/components/checkin/SelfieCapture";
 import { RegisteredPhotoTile } from "@/components/checkin/RegisteredPhotoTile";
 import { EstablishmentTermsPanel } from "@/components/checkin/EstablishmentTermsPanel";
 import { CheckinFinalizingScreen } from "@/components/checkin/CheckinFinalizingScreen";
+import { ReaccessIdentityGate } from "@/components/checkin/ReaccessIdentityGate";
 import { isEstablishmentNotRegisteredError } from "@/lib/checkin-access";
 import { SuccessScreen } from "@/components/checkin/SuccessScreen";
 import { ExtraFieldsPanel, validateExtraFields } from "@/components/checkin/ExtraFieldsPanel";
@@ -1470,59 +1471,17 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
 
             if (needsReaccessVerify) {
               return (
-                <section className="space-y-5">
-                  <header className="space-y-1">
-                    <h2 className="font-display text-2xl">{t("checkin.reaccess.birthDateVerifyTitle")}</h2>
-                    <p className="text-sm text-muted-foreground">
-                      {t("checkin.reaccess.birthDateVerifyBody")}
-                    </p>
-                  </header>
-
-                  <article className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-card">
-                    <div className="space-y-1.5">
-                      <Label htmlFor="reaccessBirthDateVerify">
-                        {t("checkin.lookup.birthDateConfirmLabel")}
-                      </Label>
-                      <Input
-                        id="reaccessBirthDateVerify"
-                        type="date"
-                        className="tap-safe"
-                        value={reaccessBirthDateInput}
-                        onChange={(event) => {
-                          setReaccessBirthDateInput(event.target.value);
-                          if (reaccessBirthDateError) setReaccessBirthDateError("");
-                        }}
-                        aria-invalid={Boolean(reaccessBirthDateError)}
-                        autoComplete="bday"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        {t("checkin.lookup.birthDateConfirmHint")}
-                      </p>
-                      {reaccessBirthDateError ? (
-                        <p className="text-xs text-destructive">{reaccessBirthDateError}</p>
-                      ) : null}
-                    </div>
-                  </article>
-
-                  <div className="flex gap-3">
-                    <Button
-                      variant="outline"
-                      className="tap-safe"
-                      disabled={reaccessVerifying}
-                      onClick={backFromReaccessVerify}
-                    >
-                      {t("common.back")}
-                    </Button>
-                    <Button
-                      className="tap-safe flex-1"
-                      disabled={!reaccessBirthDateInput.trim() || reaccessVerifying}
-                      onClick={() => void handleVerifyReaccessBirthDate()}
-                    >
-                      {reaccessVerifying && <Loader2 className="size-4 animate-spin" aria-hidden />}{" "}
-                      {t("common.continue")}
-                    </Button>
-                  </div>
-                </section>
+                <ReaccessIdentityGate
+                  birthDateInput={reaccessBirthDateInput}
+                  birthDateError={reaccessBirthDateError}
+                  verifying={reaccessVerifying}
+                  onBirthDateChange={(value) => {
+                    setReaccessBirthDateInput(value);
+                    if (reaccessBirthDateError) setReaccessBirthDateError("");
+                  }}
+                  onBack={backFromReaccessVerify}
+                  onContinue={() => void handleVerifyReaccessBirthDate()}
+                />
               );
             }
 
@@ -1536,6 +1495,7 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
                   }
                   alreadyCompleted={checkinAlreadyDone}
                   establishmentPhotoUrl={establishmentSettings.successPagePhotoUrl}
+                  inboxPortariaEnabled={establishmentSettings.inboxEnabled}
                 />
                 <Button
                   variant="ghost"
