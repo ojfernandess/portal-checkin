@@ -903,6 +903,16 @@ export const adminSaveSettings = createServerFn({ method: "POST" })
         requireBirthDateConfirmation: z.boolean(),
         requireBirthDateConfirmationOnReaccess: z.boolean(),
         successPagePhotoUrl: z.string().max(1_200_000).nullable().optional(),
+        inboxEnabled: z.boolean().optional(),
+        inboxManagedUnitId: z.number().int().positive().nullable().optional(),
+        inboxUnitMappings: z
+          .array(
+            z.object({
+              match: z.string().trim().min(1).max(64),
+              managedUnitId: z.number().int().positive(),
+            }),
+          )
+          .optional(),
       })
       .parse(input),
   )
@@ -940,6 +950,13 @@ export const adminSaveSettings = createServerFn({ method: "POST" })
       requireBirthDateConfirmation: data.requireBirthDateConfirmation,
       requireBirthDateConfirmationOnReaccess: data.requireBirthDateConfirmationOnReaccess,
       successPagePhotoUrl,
+      ...(data.inboxEnabled !== undefined ? { inboxEnabled: data.inboxEnabled } : {}),
+      ...(data.inboxManagedUnitId !== undefined
+        ? { inboxManagedUnitId: data.inboxManagedUnitId }
+        : {}),
+      ...(data.inboxUnitMappings !== undefined
+        ? { inboxUnitMappings: data.inboxUnitMappings }
+        : {}),
     };
 
     const { error } = await supabaseAdmin.from("establishment_settings").upsert(
@@ -964,6 +981,18 @@ export const adminSaveSettings = createServerFn({ method: "POST" })
     });
 
     return { ok: true as const };
+  });
+
+export const adminListInboxManagedUnits = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context);
+    const { isInboxConfigured, listInboxManagedUnits } = await import("@/lib/inbox.server");
+    if (!isInboxConfigured()) {
+      return { configured: false as const, units: [] as const };
+    }
+    const units = await listInboxManagedUnits();
+    return { configured: true as const, units };
   });
 
 export const adminGetAppSettings = createServerFn({ method: "POST" })

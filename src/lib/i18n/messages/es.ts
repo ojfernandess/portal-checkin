@@ -677,6 +677,27 @@ export const es: MessageTree = {
       saveSecuritySettings: "Guardar opciones de seguridad",
       settingsSaved: "Configuración guardada.",
       settingsSaveFailed: "Error al guardar la configuración.",
+      tabInbox: "Inbox (portería)",
+      inboxBody:
+        "Envía automáticamente cada check-in completado a Inbox. Vincule la unidad gestionada correspondiente a este establecimiento.",
+      inboxNotConfigured:
+        "Credenciales Inbox no configuradas en el servidor (INBOX_CLIENT_ID / INBOX_CLIENT_SECRET).",
+      inboxEnabled: "Activar integración Inbox",
+      inboxEnabledHint:
+        "Cuando está activa, al finalizar el check-in se registran el huésped principal y acompañantes en Inbox con la selfie.",
+      inboxDefaultUnit: "Unidad Inbox predeterminada",
+      inboxDefaultUnitHint:
+        "Se usa cuando no hay mapeo específico por número/nombre de habitación.",
+      inboxSelectUnit: "Seleccione la unidad gestionada",
+      inboxRefreshUnits: "Actualizar unidades",
+      inboxUnitMappings: "Mapeo por habitación (opcional)",
+      inboxUnitMappingsHint:
+        "Si el hotel tiene varias unidades en Inbox, asocie fragmentos del número/nombre (ej.: 01, Habitación 101).",
+      inboxUnitMappingsEmpty: "Sin mapeos — solo se usará la unidad predeterminada.",
+      inboxMappingMatchPlaceholder: "Ej.: 01 o Habitación 101",
+      inboxAddMapping: "Agregar mapeo",
+      saveInboxSettings: "Guardar integración Inbox",
+      inboxUnitsLoadFailed: "No se pudieron cargar las unidades de Inbox.",
     },
     securityPage: {
       title: "Seguridad global",

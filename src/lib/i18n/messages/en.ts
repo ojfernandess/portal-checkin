@@ -673,6 +673,27 @@ export const en: MessageTree = {
       saveSecuritySettings: "Save security options",
       settingsSaved: "Settings saved.",
       settingsSaveFailed: "Failed to save settings.",
+      tabInbox: "Inbox (concierge)",
+      inboxBody:
+        "Automatically sends each completed check-in to Inbox. Link the managed unit that corresponds to this property.",
+      inboxNotConfigured:
+        "Inbox credentials are not configured on the server (INBOX_CLIENT_ID / INBOX_CLIENT_SECRET).",
+      inboxEnabled: "Enable Inbox integration",
+      inboxEnabledHint:
+        "When enabled, completing check-in registers the main guest and companions in Inbox with the selfie photo.",
+      inboxDefaultUnit: "Default Inbox unit",
+      inboxDefaultUnitHint:
+        "Used when there is no room-number/name mapping for the reservation unit.",
+      inboxSelectUnit: "Select managed unit",
+      inboxRefreshUnits: "Refresh units",
+      inboxUnitMappings: "Room mapping (optional)",
+      inboxUnitMappingsHint:
+        "For properties with multiple Inbox units, map room number/name fragments (e.g. 01, Room 101) to the correct unit.",
+      inboxUnitMappingsEmpty: "No mappings — only the default unit will be used.",
+      inboxMappingMatchPlaceholder: "e.g. 01 or Room 101",
+      inboxAddMapping: "Add mapping",
+      saveInboxSettings: "Save Inbox integration",
+      inboxUnitsLoadFailed: "Could not load Inbox units.",
     },
     securityPage: {
       title: "Global security",

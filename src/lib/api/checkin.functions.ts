@@ -787,7 +787,7 @@ export const submitCheckin = createServerFn({ method: "POST" })
     const result = unwrap<Record<string, unknown>>(payload);
 
     const localizer = (data.localizer ?? data.reservationId).trim().toUpperCase();
-    await saveCheckinRecord({
+    const checkinRecordId = await saveCheckinRecord({
       localizer,
       reservationId: data.reservationId,
       ...(data.establishmentId ? { establishmentId: data.establishmentId } : {}),
@@ -800,6 +800,25 @@ export const submitCheckin = createServerFn({ method: "POST" })
       termsAcceptedAt: data.termsAcceptedAt ?? null,
       termsVersion: data.termsVersion ?? null,
     });
+
+    const resolvedEstablishmentId =
+      data.establishmentId ??
+      resolveReservationEstablishmentId(
+        (data.reservationSnapshot as Reservation | undefined) ?? null,
+      );
+
+    if (resolvedEstablishmentId) {
+      const { syncCheckinToInbox } = await import("@/lib/inbox-sync.server");
+      await syncCheckinToInbox({
+        establishmentId: String(resolvedEstablishmentId),
+        localizer,
+        reservationId: data.reservationId,
+        mainGuest,
+        dependents: data.dependents as Dependent[],
+        reservationSnapshot: (data.reservationSnapshot as Reservation | undefined) ?? null,
+        checkinRecordId,
+      });
+    }
 
     if (data.extraFields && Object.keys(data.extraFields).length > 0) {
       await writeAuditLog({

@@ -675,6 +675,27 @@ export const ptBR = {
       saveSecuritySettings: "Salvar opções de segurança",
       settingsSaved: "Configurações salvas.",
       settingsSaveFailed: "Erro ao salvar configurações.",
+      tabInbox: "Inbox (portaria)",
+      inboxBody:
+        "Envia automaticamente cada check-in concluído para a Inbox. Vincule a unidade gerenciada do condomínio correspondente a este estabelecimento.",
+      inboxNotConfigured:
+        "Credenciais Inbox não configuradas no servidor (INBOX_CLIENT_ID / INBOX_CLIENT_SECRET).",
+      inboxEnabled: "Ativar integração Inbox",
+      inboxEnabledHint:
+        "Quando ativa, ao finalizar o check-in o hóspede principal e acompanhantes são registrados na portaria Inbox com foto selfie.",
+      inboxDefaultUnit: "Unidade Inbox padrão",
+      inboxDefaultUnitHint:
+        "Usada quando não houver mapeamento específico pelo número/nome do quarto da reserva.",
+      inboxSelectUnit: "Selecione a unidade gerenciada",
+      inboxRefreshUnits: "Atualizar unidades",
+      inboxUnitMappings: "Mapeamento por quarto (opcional)",
+      inboxUnitMappingsHint:
+        "Se o hotel tem várias unidades na Inbox, associe trechos do número/nome do quarto (ex.: 01, 101) à unidade correta.",
+      inboxUnitMappingsEmpty: "Nenhum mapeamento — será usada apenas a unidade padrão.",
+      inboxMappingMatchPlaceholder: "Ex.: 01 ou Quarto 101",
+      inboxAddMapping: "Adicionar mapeamento",
+      saveInboxSettings: "Salvar integração Inbox",
+      inboxUnitsLoadFailed: "Não foi possível carregar unidades da Inbox.",
     },
     securityPage: {
       title: "Segurança global",

@@ -1,17 +1,87 @@
+export type InboxUnitMapping = {
+  /** Fragmento do número/nome da unidade (ex.: "01", "Quarto 101") */
+  match: string;
+  managedUnitId: number;
+};
+
 export type EstablishmentSettings = {
   requireBirthDateConfirmation: boolean;
   requireBirthDateConfirmationOnReaccess: boolean;
   /** Foto exibida no banner e card da página de check-in concluído (URL ou data URL). */
   successPagePhotoUrl: string | null;
+  /** Envia check-ins concluídos para a Inbox (portaria). */
+  inboxEnabled: boolean;
+  /** Unidade gerenciada padrão na Inbox para este estabelecimento. */
+  inboxManagedUnitId: number | null;
+  /** Mapeamento opcional unidade PMS → unidade Inbox (por número/nome do quarto). */
+  inboxUnitMappings: InboxUnitMapping[];
 };
-
-export const MAX_SUCCESS_PAGE_PHOTO_BYTES = 800_000;
 
 export const DEFAULT_ESTABLISHMENT_SETTINGS: EstablishmentSettings = {
   requireBirthDateConfirmation: false,
   requireBirthDateConfirmationOnReaccess: false,
   successPagePhotoUrl: null,
+  inboxEnabled: false,
+  inboxManagedUnitId: null,
+  inboxUnitMappings: [],
 };
+
+export const MAX_SUCCESS_PAGE_PHOTO_BYTES = 800_000;
+
+function parseInboxUnitMappings(value: unknown): InboxUnitMapping[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const row = item as Record<string, unknown>;
+      const match = String(row.match ?? "").trim();
+      const managedUnitId = Number(row.managedUnitId);
+      if (!match || !Number.isInteger(managedUnitId) || managedUnitId <= 0) return null;
+      return { match, managedUnitId };
+    })
+    .filter((item): item is InboxUnitMapping => item !== null);
+}
+
+function parseInboxManagedUnitId(value: unknown): number | null {
+  if (value == null || value === "") return null;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) return null;
+  return parsed;
+}
+
+export function resolveInboxManagedUnitId(
+  settings: EstablishmentSettings,
+  reservation: {
+    unitNumber?: string | number;
+    unitName?: string;
+    roomName?: string;
+    room?: { unitName?: string };
+  } | null,
+): number | null {
+  if (!settings.inboxEnabled) return null;
+
+  const roomLabel = [
+    reservation?.unitNumber != null ? String(reservation.unitNumber) : "",
+    reservation?.unitName ?? "",
+    reservation?.roomName ?? "",
+    reservation?.room?.unitName ?? "",
+  ]
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join(" ");
+
+  if (roomLabel && settings.inboxUnitMappings.length > 0) {
+    const normalizedRoom = roomLabel.toLowerCase();
+    for (const mapping of settings.inboxUnitMappings) {
+      const needle = mapping.match.trim().toLowerCase();
+      if (needle && normalizedRoom.includes(needle)) {
+        return mapping.managedUnitId;
+      }
+    }
+  }
+
+  return settings.inboxManagedUnitId;
+}
 
 function parseSuccessPagePhotoUrl(value: unknown): string | null {
   if (typeof value !== "string") return null;
@@ -35,6 +105,9 @@ export function parseEstablishmentSettings(raw: unknown): EstablishmentSettings 
     requireBirthDateConfirmationOnReaccess:
       settings.requireBirthDateConfirmationOnReaccess === true,
     successPagePhotoUrl: parseSuccessPagePhotoUrl(settings.successPagePhotoUrl),
+    inboxEnabled: settings.inboxEnabled === true,
+    inboxManagedUnitId: parseInboxManagedUnitId(settings.inboxManagedUnitId),
+    inboxUnitMappings: parseInboxUnitMappings(settings.inboxUnitMappings),
   };
 }
 

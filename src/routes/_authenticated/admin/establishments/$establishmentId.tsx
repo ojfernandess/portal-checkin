@@ -14,9 +14,14 @@ import {
   adminSaveExtraField,
   adminSaveSettings,
   adminSaveTerms,
+  adminListInboxManagedUnits,
   type ExtraField,
 } from "@/lib/api/admin.functions";
 import { EstablishmentTermsEditor } from "@/components/admin/EstablishmentTermsEditor";
+import {
+  EstablishmentInboxPanel,
+  type InboxManagedUnitOption,
+} from "@/components/admin/EstablishmentInboxPanel";
 import { AdminShell, useAdminAccount } from "@/components/admin/AdminShell";
 import { PhoneDisplay } from "@/components/checkin/PhoneDisplay";
 import { Button } from "@/components/ui/button";
@@ -32,7 +37,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cloneDefaultSections, type TermsSection } from "@/lib/establishment-terms";
-import { MAX_SUCCESS_PAGE_PHOTO_BYTES } from "@/lib/establishment-settings";
+import { MAX_SUCCESS_PAGE_PHOTO_BYTES, type InboxUnitMapping } from "@/lib/establishment-settings";
 import { useI18n } from "@/lib/i18n/context";
 import { maskPhone } from "@/lib/validators";
 
@@ -56,6 +61,7 @@ function EstablishmentConfigPage() {
   const deleteField = useServerFn(adminDeleteExtraField);
   const getSettings = useServerFn(adminGetSettings);
   const saveSettings = useServerFn(adminSaveSettings);
+  const listInboxUnits = useServerFn(adminListInboxManagedUnits);
 
   const [termsSections, setTermsSections] = useState<TermsSection[]>(cloneDefaultSections());
   const [termsVersion, setTermsVersion] = useState(0);
@@ -78,6 +84,12 @@ function EstablishmentConfigPage() {
   const [requireBirthDateConfirmationOnReaccess, setRequireBirthDateConfirmationOnReaccess] =
     useState(false);
   const [successPagePhotoUrl, setSuccessPagePhotoUrl] = useState<string | null>(null);
+  const [inboxEnabled, setInboxEnabled] = useState(false);
+  const [inboxManagedUnitId, setInboxManagedUnitId] = useState<number | null>(null);
+  const [inboxUnitMappings, setInboxUnitMappings] = useState<InboxUnitMapping[]>([]);
+  const [inboxUnits, setInboxUnits] = useState<InboxManagedUnitOption[]>([]);
+  const [inboxConfigured, setInboxConfigured] = useState(false);
+  const [inboxUnitsLoading, setInboxUnitsLoading] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -104,9 +116,31 @@ function EstablishmentConfigPage() {
           settings.settings.requireBirthDateConfirmationOnReaccess,
         );
         setSuccessPagePhotoUrl(settings.settings.successPagePhotoUrl);
+        setInboxEnabled(settings.settings.inboxEnabled);
+        setInboxManagedUnitId(settings.settings.inboxManagedUnitId);
+        setInboxUnitMappings(settings.settings.inboxUnitMappings);
       })
       .finally(() => setLoading(false));
   }, [establishmentId, getEstablishment, getTerms, getContact, listFields, getSettings]);
+
+  async function refreshInboxUnits() {
+    setInboxUnitsLoading(true);
+    try {
+      const result = await listInboxUnits();
+      setInboxConfigured(result.configured);
+      setInboxUnits(result.units as InboxManagedUnitOption[]);
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : t("admin.establishmentConfig.inboxUnitsLoadFailed"),
+      );
+    } finally {
+      setInboxUnitsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void refreshInboxUnits();
+  }, [establishmentId]);
 
   if (account && account.role !== "admin") {
     return (
@@ -171,6 +205,9 @@ function EstablishmentConfigPage() {
           requireBirthDateConfirmation,
           requireBirthDateConfirmationOnReaccess,
           successPagePhotoUrl,
+          inboxEnabled,
+          inboxManagedUnitId,
+          inboxUnitMappings,
         },
       });
       toast.success(t("admin.establishmentConfig.settingsSaved"));
@@ -228,6 +265,7 @@ function EstablishmentConfigPage() {
             <TabsTrigger value="contact">{t("admin.establishmentConfig.tabContact")}</TabsTrigger>
             <TabsTrigger value="checkin">{t("admin.establishmentConfig.tabCheckin")}</TabsTrigger>
             <TabsTrigger value="security">{t("admin.establishmentConfig.tabSecurity")}</TabsTrigger>
+            <TabsTrigger value="inbox">{t("admin.establishmentConfig.tabInbox")}</TabsTrigger>
             <TabsTrigger value="fields">{t("admin.establishmentConfig.tabFields")}</TabsTrigger>
           </TabsList>
 
@@ -364,6 +402,23 @@ function EstablishmentConfigPage() {
             <Button disabled={savingSettings} onClick={() => void handleSaveSettings()}>
               {t("admin.establishmentConfig.saveSecuritySettings")}
             </Button>
+          </TabsContent>
+
+          <TabsContent value="inbox" className="mt-6">
+            <EstablishmentInboxPanel
+              inboxEnabled={inboxEnabled}
+              inboxManagedUnitId={inboxManagedUnitId}
+              inboxUnitMappings={inboxUnitMappings}
+              units={inboxUnits}
+              unitsLoading={inboxUnitsLoading}
+              inboxConfigured={inboxConfigured}
+              saving={savingSettings}
+              onChangeEnabled={setInboxEnabled}
+              onChangeManagedUnitId={setInboxManagedUnitId}
+              onChangeMappings={setInboxUnitMappings}
+              onSave={() => void handleSaveSettings()}
+              onRefreshUnits={() => void refreshInboxUnits()}
+            />
           </TabsContent>
 
           <TabsContent value="fields" className="mt-6 space-y-4">
