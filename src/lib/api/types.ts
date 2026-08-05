@@ -172,3 +172,17 @@ export function isAlreadyCheckedIn(r: Reservation | null): boolean {
   if (!c) return false;
   return Number(c.checkin_mobile) === 1 || Number(c.checkinApi) === 1 || Number(c.checkinManual) === 1;
 }
+
+/** Check-in aprovado/confirmado no PMS (approveCheckin → hasCheckinApproved = 1). */
+export function isCheckinApproved(r: Reservation | null): boolean {
+  return Number(r?.checkin?.hasCheckinApproved) === 1;
+}
+
+/** Pronto para sincronizar com a Inbox: aprovado ou check-in digital concluído + validado. */
+export function isCheckinConfirmedForInbox(r: Reservation | null): boolean {
+  if (!r) return false;
+  if (isCheckinApproved(r)) return true;
+  const c = r.checkin;
+  if (!c) return false;
+  return Number(c.validatedCheckin) === 1 && isAlreadyCheckedIn(r);
+}

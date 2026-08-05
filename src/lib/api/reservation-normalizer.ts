@@ -19,6 +19,12 @@ function str(value: unknown): string | undefined {
   return String(value);
 }
 
+function extractMediaIdFromUrl(url?: string): string | undefined {
+  if (!url) return undefined;
+  const match = /\/api\/media\/(\d+)/i.exec(url);
+  return match?.[1];
+}
+
 function num(value: unknown): number | undefined {
   if (value == null || value === "") return undefined;
   const n = Number(value);
@@ -65,8 +71,12 @@ function parseMainGuest(raw: unknown): GuestLookup | undefined {
     neighborhood: str(row.neighborhood),
     profilePhotoUrl: str(row.profilePhotoUrl),
     documentPhotoUrl: str(row.documentPhotoUrl),
-    profilePhotoId: row.profilePhotoId as string | number | undefined,
-    documentPhotoId: row.documentPhotoId as string | number | undefined,
+    profilePhotoId:
+      (row.profilePhotoId as string | number | undefined) ??
+      extractMediaIdFromUrl(str(row.profilePhotoUrl)),
+    documentPhotoId:
+      (row.documentPhotoId as string | number | undefined) ??
+      extractMediaIdFromUrl(str(row.documentPhotoUrl)),
   };
 
   return guest.name || guest.email || guest.documentNumber ? guest : undefined;

@@ -200,3 +200,21 @@ export async function createInboxStayGuest(
 ): Promise<unknown> {
   return inboxFetch<unknown>(`/stays/${stayId}/guests`, { method: "POST", body: input });
 }
+
+export async function uploadInboxStayGuestPhoto(
+  stayId: number,
+  stayGuestId: number,
+  photoBase64: string,
+): Promise<unknown> {
+  return inboxFetch<unknown>(`/stays/${stayId}/guests/${stayGuestId}/photo`, {
+    method: "POST",
+    body: { photo_base64: photoBase64 },
+  });
+}
+
+export async function updateInboxStay(
+  stayId: number,
+  input: { status?: string; guest_count?: number; notes?: string },
+): Promise<InboxStay> {
+  return inboxFetch<InboxStay>(`/stays/${stayId}`, { method: "PATCH", body: input });
+}

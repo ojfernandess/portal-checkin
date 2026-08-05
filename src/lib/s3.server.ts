@@ -228,15 +228,24 @@ export async function getObjectAsDataUrl(key: string): Promise<string | undefine
 
 async function fetchHubMediaDataUrl(mediaId: string | number): Promise<string | undefined> {
   const base = readEnv("TECHOSPITALITY_BASE_URL") ?? "https://backend.techospitality.com";
-  const token = readEnv("TECHOSPITALITY_HUB_TOKEN") ?? readEnv("TECHOSPITALITY_API_TOKEN");
+  const token =
+    readEnv("TECHOSPITALITY_HUB_TOKEN") ??
+    readEnv("TECHOSPITALITY_RESERVATIONS_TOKEN") ??
+    readEnv("TECHOSPITALITY_API_TOKEN");
   if (!token) return undefined;
+
+  const headers: Record<string, string> = {
+    Accept: "image/*, application/json",
+  };
+  if (token.startsWith("vkr_")) {
+    headers["x-api-key"] = token;
+  } else {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
 
   try {
     const response = await fetch(`${base}/api/media/${encodeURIComponent(String(mediaId))}`, {
-      headers: {
-        Accept: "image/*, application/json",
-        "x-api-key": token,
-      },
+      headers,
     });
 
     if (response.ok) {
@@ -368,4 +377,44 @@ export async function getCheckinPhotoDisplayUrl(
   }
 
   return resolved;
+}
+
+function stripDataUrlPrefix(value: string): string {
+  const match = /^data:[^;]+;base64,(.+)$/i.exec(value.trim());
+  return match?.[1] ?? value.trim();
+}
+
+function extractMediaIdFromUrl(url?: string | null): string | number | undefined {
+  if (!url?.trim()) return undefined;
+  const match = /\/api\/media\/(\d+)/i.exec(url.trim());
+  return match?.[1];
+}
+
+/** Baixa selfie/documento e retorna base64 puro (sem prefixo data:) para APIs externas. */
+export async function resolvePhotoBase64(
+  type: "profile" | "document",
+  options: { url?: string | null; id?: string | number | null },
+): Promise<string | undefined> {
+  const mediaId = options.id ?? extractMediaIdFromUrl(options.url);
+  const resolved = await getCheckinPhotoDisplayUrl(type, {
+    url: options.url,
+    id: mediaId,
+  });
+  if (!resolved) return undefined;
+
+  if (resolved.startsWith("data:")) {
+    const raw = stripDataUrlPrefix(resolved);
+    return raw || undefined;
+  }
+
+  try {
+    const response = await fetch(resolved, { signal: AbortSignal.timeout(20_000) });
+    if (!response.ok) return undefined;
+    const buffer = await response.arrayBuffer();
+    if (!buffer.byteLength) return undefined;
+    return Buffer.from(buffer).toString("base64");
+  } catch (error) {
+    console.warn("[S3] failed to fetch photo URL for base64:", error);
+    return undefined;
+  }
 }
