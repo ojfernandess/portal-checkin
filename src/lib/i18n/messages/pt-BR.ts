@@ -521,6 +521,7 @@ export const ptBR = {
       "E-mail ou senha incorretos. Se criou o usuário no painel Supabase, use exatamente a senha definida lá ou redefina em Authentication → Users.",
     emailNotConfirmed:
       "E-mail ainda não confirmado. No Supabase, abra o usuário e marque como confirmado ou reenvie o convite.",
+    turnstileRequired: "Complete a verificação de segurança antes de continuar.",
   },
   admin: {
     panel: "Painel administrativo",
@@ -716,6 +717,11 @@ export const ptBR = {
       save: "Salvar configurações",
       saved: "Configurações de segurança salvas.",
       saveFailed: "Erro ao salvar configurações de segurança.",
+      turnstileTitle: "Cloudflare Turnstile",
+      turnstileBody:
+        "Protege o login da equipe e a criação de usuários no painel contra acessos automatizados.",
+      turnstileActive: "Ativo",
+      turnstileInactive: "Não configurado",
     },
     termsEditor: {
       previewTitle: "Políticas do estabelecimento",

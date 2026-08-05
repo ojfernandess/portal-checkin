@@ -1,10 +1,12 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Lock, ShieldCheck } from "lucide-react";
 import { BrandLogo } from "@/components/BrandLogo";
+import { TurnstileWidget, type TurnstileWidgetRef } from "@/components/TurnstileWidget";
 import { supabase } from "@/integrations/supabase/client";
 import { adminBootstrapStatus } from "@/lib/api/admin.functions";
+import { getTurnstileConfig, verifyAuthTurnstile } from "@/lib/api/turnstile.functions";
 import { useI18n } from "@/lib/i18n/context";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { Button } from "@/components/ui/button";
@@ -35,12 +37,22 @@ function AuthPage() {
   const navigate = useNavigate();
   const { t } = useI18n();
   const checkBootstrap = useServerFn(adminBootstrapStatus);
+  const fetchTurnstileConfig = useServerFn(getTurnstileConfig);
+  const verifyTurnstile = useServerFn(verifyAuthTurnstile);
+  const turnstileRef = useRef<TurnstileWidgetRef>(null);
   const [needsBootstrap, setNeedsBootstrap] = useState<boolean | null>(null);
+  const [turnstileEnabled, setTurnstileEnabled] = useState(false);
+  const [turnstileSiteKey, setTurnstileSiteKey] = useState<string | null>(null);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const handleTurnstileToken = useCallback((token: string | null) => {
+    setTurnstileToken(token);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -51,8 +63,15 @@ function AuthPage() {
         return;
       }
       try {
-        const status = await checkBootstrap();
-        if (active) setNeedsBootstrap(status.needsBootstrap);
+        const [status, turnstile] = await Promise.all([
+          checkBootstrap(),
+          fetchTurnstileConfig(),
+        ]);
+        if (active) {
+          setNeedsBootstrap(status.needsBootstrap);
+          setTurnstileEnabled(turnstile.enabled);
+          setTurnstileSiteKey(turnstile.siteKey ?? null);
+        }
       } catch {
         if (active) setNeedsBootstrap(false);
       }
@@ -60,13 +79,20 @@ function AuthPage() {
     return () => {
       active = false;
     };
-  }, [checkBootstrap, navigate]);
+  }, [checkBootstrap, fetchTurnstileConfig, navigate]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError(null);
     try {
+      if (turnstileEnabled && !turnstileToken) {
+        throw new Error(t("auth.turnstileRequired"));
+      }
+      if (turnstileEnabled) {
+        await verifyTurnstile({ data: { token: turnstileToken ?? undefined } });
+      }
+
       if (needsBootstrap) {
         const { error: signUpError } = await supabase.auth.signUp({
           email,
@@ -85,6 +111,7 @@ function AuthPage() {
       }
       navigate({ to: "/admin/dashboard", replace: true });
     } catch (err) {
+      turnstileRef.current?.reset();
       setError(formatAuthError(err, t));
     } finally {
       setLoading(false);
@@ -152,12 +179,28 @@ function AuthPage() {
           </div>
         </div>
 
+        {turnstileEnabled && turnstileSiteKey ? (
+          <div className="mt-4 flex justify-center">
+            <TurnstileWidget
+              ref={turnstileRef}
+              siteKey={turnstileSiteKey}
+              onToken={handleTurnstileToken}
+            />
+          </div>
+        ) : null}
+
         {error ? <p className="mt-3 text-sm text-destructive">{error}</p> : null}
 
         <Button
           type="submit"
           className="mt-6 w-full"
-          disabled={loading || !email || password.length < 8 || (needsBootstrap === true && !fullName)}
+          disabled={
+            loading ||
+            !email ||
+            password.length < 8 ||
+            (needsBootstrap === true && !fullName) ||
+            (turnstileEnabled && !turnstileToken)
+          }
         >
           {loading ? t("common.wait") : needsBootstrap ? t("auth.createAdmin") : t("auth.signIn")}
         </Button>

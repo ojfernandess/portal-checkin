@@ -522,6 +522,7 @@ export const en: MessageTree = {
       "Incorrect email or password. If you created the user in Supabase, use the exact password set there or reset it under Authentication → Users.",
     emailNotConfirmed:
       "Email not confirmed yet. In Supabase, open the user and mark as confirmed or resend the invite.",
+    turnstileRequired: "Complete the security verification before continuing.",
   },
   admin: {
     panel: "Admin panel",
@@ -714,6 +715,11 @@ export const en: MessageTree = {
       save: "Save settings",
       saved: "Security settings saved.",
       saveFailed: "Failed to save security settings.",
+      turnstileTitle: "Cloudflare Turnstile",
+      turnstileBody:
+        "Protects staff login and user creation in the admin panel against automated access.",
+      turnstileActive: "Active",
+      turnstileInactive: "Not configured",
     },
     termsEditor: {
       previewTitle: "Property policies",

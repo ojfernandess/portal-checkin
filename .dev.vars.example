@@ -3,3 +3,7 @@
 TECHOSPITALITY_BASE_URL=https://backend.techospitality.com
 TECHOSPITALITY_RESERVATIONS_TOKEN=vkr_loc_
 TECHOSPITALITY_HUB_TOKEN=vkr_chk_
+
+# Cloudflare Turnstile (obrigatório no servidor em dev local)
+VITE_TURNSTILE_SITE_KEY=
+TURNSTILE_SECRET_KEY=

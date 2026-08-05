@@ -523,6 +523,7 @@ export const es: MessageTree = {
       "Correo o contraseña incorrectos. Si creó el usuario en Supabase, use exactamente la contraseña definida allí o restablézcala en Authentication → Users.",
     emailNotConfirmed:
       "Correo aún no confirmado. En Supabase, abra el usuario y márquelo como confirmado o reenvíe la invitación.",
+    turnstileRequired: "Complete la verificación de seguridad antes de continuar.",
   },
   admin: {
     panel: "Panel administrativo",
@@ -718,6 +719,11 @@ export const es: MessageTree = {
       save: "Guardar configuración",
       saved: "Configuración de seguridad guardada.",
       saveFailed: "Error al guardar la configuración de seguridad.",
+      turnstileTitle: "Cloudflare Turnstile",
+      turnstileBody:
+        "Protege el inicio de sesión del equipo y la creación de usuarios en el panel contra accesos automatizados.",
+      turnstileActive: "Activo",
+      turnstileInactive: "No configurado",
     },
     termsEditor: {
       previewTitle: "Políticas del establecimiento",

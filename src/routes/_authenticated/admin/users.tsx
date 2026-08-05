@@ -1,7 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { AdminShell, useAdminAccount } from "@/components/admin/AdminShell";
+import { TurnstileWidget, type TurnstileWidgetRef } from "@/components/TurnstileWidget";
 import { useServerFn } from "@tanstack/react-start";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Trash2, UserPlus } from "lucide-react";
 import {
   adminCreateStaff,
@@ -9,6 +10,7 @@ import {
   adminListStaff,
   type StaffMember,
 } from "@/lib/api/admin.functions";
+import { getTurnstileConfig } from "@/lib/api/turnstile.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -42,14 +44,23 @@ function AdminUsersPage() {
   const listStaff = useServerFn(adminListStaff);
   const createStaff = useServerFn(adminCreateStaff);
   const deleteStaff = useServerFn(adminDeleteStaff);
+  const fetchTurnstileConfig = useServerFn(getTurnstileConfig);
+  const turnstileRef = useRef<TurnstileWidgetRef>(null);
 
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [turnstileEnabled, setTurnstileEnabled] = useState(false);
+  const [turnstileSiteKey, setTurnstileSiteKey] = useState<string | null>(null);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<"admin" | "reception">("reception");
+
+  const handleTurnstileToken = useCallback((token: string | null) => {
+    setTurnstileToken(token);
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -66,21 +77,40 @@ function AdminUsersPage() {
 
   useEffect(() => {
     if (account && account.role !== "admin") navigate({ to: "/admin/dashboard", replace: true });
-    else if (account) void load();
-  }, [account, load, navigate]);
+    else if (account) {
+      void load();
+      void fetchTurnstileConfig().then((config) => {
+        setTurnstileEnabled(config.enabled);
+        setTurnstileSiteKey(config.siteKey ?? null);
+      });
+    }
+  }, [account, fetchTurnstileConfig, load, navigate]);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setLoading(true);
     try {
-      await createStaff({ data: { fullName, email, password, role } });
+      if (turnstileEnabled && !turnstileToken) {
+        throw new Error(t("auth.turnstileRequired"));
+      }
+      await createStaff({
+        data: {
+          fullName,
+          email,
+          password,
+          role,
+          turnstileToken: turnstileToken ?? undefined,
+        },
+      });
       setFullName("");
       setEmail("");
       setPassword("");
       setRole("reception");
+      turnstileRef.current?.reset();
       await load();
     } catch (err) {
+      turnstileRef.current?.reset();
       setError(err instanceof Error ? err.message : t("admin.usersPage.createError"));
       setLoading(false);
     }
@@ -145,10 +175,26 @@ function AdminUsersPage() {
           </div>
         </div>
 
+        {turnstileEnabled && turnstileSiteKey ? (
+          <div className="mt-4 flex justify-start">
+            <TurnstileWidget
+              ref={turnstileRef}
+              siteKey={turnstileSiteKey}
+              onToken={handleTurnstileToken}
+            />
+          </div>
+        ) : null}
+
         <Button
           type="submit"
           className="mt-5"
-          disabled={loading || !fullName || !email || password.length < 12}
+          disabled={
+            loading ||
+            !fullName ||
+            !email ||
+            password.length < 12 ||
+            (turnstileEnabled && !turnstileToken)
+          }
         >
           <UserPlus className="size-4" /> {t("admin.usersPage.createUser")}
         </Button>
