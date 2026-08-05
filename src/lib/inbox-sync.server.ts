@@ -1,5 +1,5 @@
 import type { Dependent, GuestLookup, MainGuest, Reservation } from "@/lib/api/types";
-import { isCheckinConfirmedForInbox } from "@/lib/api/types";
+import { isCheckinApproved, isCheckinConfirmedForInbox } from "@/lib/api/types";
 import {
   parseEstablishmentSettings,
   resolveInboxManagedUnitId,
@@ -7,12 +7,15 @@ import {
 import {
   createInboxStay,
   createInboxStayGuest,
+  createInboxStayWithPhotoMultipart,
+  getInboxStay,
   isInboxConfigured,
-  updateInboxStay,
   uploadInboxStayGuestPhoto,
+  uploadInboxStayGuestPhotoMultipart,
+  type InboxStay,
 } from "@/lib/inbox.server";
 import { writeAuditLog } from "@/lib/audit";
-import { resolvePhotoBase64 } from "@/lib/s3.server";
+import { resolvePhotoForUpload, type ResolvedPhotoUpload } from "@/lib/s3.server";
 
 export type SyncCheckinToInboxInput = {
   establishmentId: string;
@@ -24,8 +27,8 @@ export type SyncCheckinToInboxInput = {
   checkinRecordId?: string | null;
 };
 
-const CONFIRMATION_POLL_ATTEMPTS = 4;
-const CONFIRMATION_POLL_DELAY_MS = 1500;
+const CONFIRMATION_POLL_ATTEMPTS = 6;
+const CONFIRMATION_POLL_DELAY_MS = 2000;
 
 function toInboxDateTime(date: string | undefined, time: string | undefined, fallbackTime: string): string {
   const day = (date ?? new Date().toISOString().slice(0, 10)).slice(0, 10);
@@ -50,19 +53,28 @@ function guestCount(mainGuest: MainGuest, dependents: Dependent[]): number {
 function pickGuestLookup(
   inputGuest: MainGuest,
   reservation: Reservation | null,
+  storedGuest?: MainGuest | null,
 ): GuestLookup {
   const reservationGuest = reservation?.mainGuest;
   return {
+    ...storedGuest,
     ...reservationGuest,
     ...inputGuest,
-    name: inputGuest.name ?? reservationGuest?.name,
-    email: inputGuest.email ?? reservationGuest?.email,
+    name: inputGuest.name ?? reservationGuest?.name ?? storedGuest?.name,
+    email: inputGuest.email ?? reservationGuest?.email ?? storedGuest?.email,
     mobilePhoneNumber:
       inputGuest.mobilePhoneNumber ??
       reservationGuest?.mobilePhoneNumber ??
+      storedGuest?.mobilePhoneNumber ??
       (reservationGuest as { phone?: string } | undefined)?.phone,
-    profilePhotoUrl: reservationGuest?.profilePhotoUrl ?? inputGuest.profilePhotoUrl,
-    profilePhotoId: reservationGuest?.profilePhotoId ?? inputGuest.profilePhotoId,
+    documentNumber:
+      inputGuest.documentNumber ?? reservationGuest?.documentNumber ?? storedGuest?.documentNumber,
+    profilePhotoUrl:
+      inputGuest.profilePhotoUrl ??
+      storedGuest?.profilePhotoUrl ??
+      reservationGuest?.profilePhotoUrl,
+    profilePhotoId:
+      inputGuest.profilePhotoId ?? storedGuest?.profilePhotoId ?? reservationGuest?.profilePhotoId,
   };
 }
 
@@ -74,6 +86,17 @@ async function loadEstablishmentSettings(establishmentId: string) {
     .eq("establishment_id", establishmentId)
     .maybeSingle();
   return parseEstablishmentSettings(data?.settings ?? null);
+}
+
+async function loadCheckinRecordGuest(checkinRecordId?: string | null): Promise<MainGuest | null> {
+  if (!checkinRecordId) return null;
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data } = await supabaseAdmin
+    .from("checkin_records")
+    .select("main_guest")
+    .eq("id", checkinRecordId)
+    .maybeSingle();
+  return (data?.main_guest as MainGuest | null) ?? null;
 }
 
 async function fetchReservationByLocalizer(localizer: string): Promise<Reservation | null> {
@@ -105,24 +128,72 @@ async function waitForConfirmedReservation(localizer: string): Promise<Reservati
   return null;
 }
 
-async function resolveGuestProfilePhotoBase64(guest: GuestLookup): Promise<string | undefined> {
-  return resolvePhotoBase64("profile", {
+async function resolveGuestProfilePhoto(guest: GuestLookup): Promise<ResolvedPhotoUpload | undefined> {
+  return resolvePhotoForUpload("profile", {
     url: guest.profilePhotoUrl,
     id: guest.profilePhotoId,
   });
 }
 
-function findPrimaryStayGuestId(
-  stay: Awaited<ReturnType<typeof createInboxStay>>,
-): number | undefined {
+function findPrimaryStayGuest(stay: InboxStay) {
   const guests = stay.guests ?? [];
-  const primary = guests.find((item) => item.is_primary) ?? guests[0];
-  return primary?.id;
+  return guests.find((item) => item.is_primary) ?? guests[0];
+}
+
+function isInboxGuestCheckinCompleted(guest: { check_in_completed?: boolean; status?: string } | undefined): boolean {
+  if (!guest) return false;
+  if (guest.check_in_completed === true) return true;
+  const status = String(guest.status ?? "").toLowerCase();
+  return status === "checked_in" || status === "completed" || status === "confirmed";
+}
+
+/** Conclui check-in na Inbox enviando foto (multipart → JSON → endpoint dedicado). */
+async function completeInboxGuestCheckin(
+  stayId: number,
+  stayGuestId: number,
+  photo: ResolvedPhotoUpload,
+): Promise<void> {
+  try {
+    await uploadInboxStayGuestPhotoMultipart(stayId, stayGuestId, photo);
+    return;
+  } catch (multipartError) {
+    console.warn("[inbox-sync] guest photo multipart failed, trying JSON:", multipartError);
+  }
+
+  await uploadInboxStayGuestPhoto(stayId, stayGuestId, photo.base64);
+}
+
+async function createInboxStayWithGuestPhoto(
+  stayInput: Parameters<typeof createInboxStay>[0],
+  photo: ResolvedPhotoUpload,
+): Promise<InboxStay> {
+  try {
+    return await createInboxStayWithPhotoMultipart(stayInput, photo);
+  } catch (multipartError) {
+    console.warn("[inbox-sync] stay multipart failed, trying JSON photo_base64:", multipartError);
+  }
+
+  try {
+    return await createInboxStay({
+      ...stayInput,
+      photo_base64: photo.base64,
+    });
+  } catch (jsonError) {
+    console.warn("[inbox-sync] stay JSON photo failed, creating stay then uploading photo:", jsonError);
+  }
+
+  const createdStay = await createInboxStay(stayInput);
+  const primaryGuest = findPrimaryStayGuest(createdStay);
+  if (!primaryGuest?.id) {
+    throw new Error("Reserva Inbox criada sem hóspede principal para envio de foto.");
+  }
+  await completeInboxGuestCheckin(createdStay.id, primaryGuest.id, photo);
+  return getInboxStay(createdStay.id);
 }
 
 /**
  * Envia check-in confirmado no PMS para a Inbox (portaria).
- * Falhas são registradas em audit log e não interrompem o fluxo do hóspede.
+ * Na Inbox, check-in concluído = foto enviada (POST /stays ou POST .../guests/{id}/photo).
  */
 export async function syncCheckinToInbox(input: SyncCheckinToInboxInput): Promise<void> {
   if (!isInboxConfigured()) return;
@@ -147,14 +218,33 @@ export async function syncCheckinToInbox(input: SyncCheckinToInboxInput): Promis
       newData: {
         establishmentId: input.establishmentId,
         managedUnitId,
-        reason: "checkin_not_confirmed",
+        reason: "pms_checkin_not_confirmed",
       },
     });
     return;
   }
 
-  const guest = pickGuestLookup(input.mainGuest, reservation);
-  const photoBase64 = await resolveGuestProfilePhotoBase64(guest);
+  const storedGuest = await loadCheckinRecordGuest(input.checkinRecordId);
+  const guest = pickGuestLookup(input.mainGuest, reservation, storedGuest);
+  const photo = await resolveGuestProfilePhoto(guest);
+
+  if (!photo) {
+    console.error("[inbox-sync] guest photo unavailable, cannot complete Inbox check-in", localizer);
+    await writeAuditLog({
+      action: "inbox.sync.failed",
+      entityType: "reservation",
+      entityId: localizer,
+      newData: {
+        establishmentId: input.establishmentId,
+        managedUnitId,
+        error: "Foto do hóspede indisponível para concluir check-in na Inbox.",
+        profilePhotoUrl: guest.profilePhotoUrl ?? null,
+        profilePhotoId: guest.profilePhotoId ?? null,
+        pmsCheckinApproved: isCheckinApproved(reservation),
+      },
+    });
+    return;
+  }
 
   const stayInfo = reservation.stay;
   const checkInAt = toInboxDateTime(
@@ -176,39 +266,33 @@ export async function syncCheckinToInbox(input: SyncCheckinToInboxInput): Promis
     .filter(Boolean)
     .join(" | ");
 
-  try {
-    const createdStay = await createInboxStay({
-      managed_unit_id: managedUnitId,
-      check_in_at: checkInAt,
-      check_out_at: checkOutAt,
-      guest_name: String(guest.name ?? "Hóspede"),
-      guest_email: guest.email,
-      guest_phone: guest.mobilePhoneNumber,
-      external_id: localizer,
-      external_uid: externalUid,
-      guest_count: guestCount(input.mainGuest, input.dependents),
-      notes: notes || undefined,
-      ...(photoBase64 ? { photo_base64: photoBase64 } : {}),
-    });
+  const stayInput = {
+    managed_unit_id: managedUnitId,
+    check_in_at: checkInAt,
+    check_out_at: checkOutAt,
+    guest_name: String(guest.name ?? "Hóspede"),
+    guest_email: guest.email,
+    guest_phone: guest.mobilePhoneNumber,
+    external_id: localizer,
+    external_uid: externalUid,
+    guest_count: guestCount(input.mainGuest, input.dependents),
+    notes: notes || undefined,
+  };
 
+  try {
+    let createdStay = await createInboxStayWithGuestPhoto(stayInput, photo);
     const stayId = createdStay.id;
 
-    if (createdStay.status !== "confirmed") {
-      await updateInboxStay(stayId, { status: "confirmed" });
-    }
-
-    const primaryGuestId = findPrimaryStayGuestId(createdStay);
-    if (photoBase64 && primaryGuestId) {
-      try {
-        await uploadInboxStayGuestPhoto(stayId, primaryGuestId, photoBase64);
-      } catch (photoError) {
-        console.warn("[inbox-sync] primary guest photo upload fallback failed:", photoError);
-      }
+    let primaryGuest = findPrimaryStayGuest(createdStay);
+    if (primaryGuest?.id && !isInboxGuestCheckinCompleted(primaryGuest)) {
+      await completeInboxGuestCheckin(stayId, primaryGuest.id, photo);
+      createdStay = await getInboxStay(stayId);
+      primaryGuest = findPrimaryStayGuest(createdStay);
     }
 
     for (const dependent of input.dependents) {
       if (!dependent.name?.trim()) continue;
-      const dependentPhoto = await resolvePhotoBase64("profile", {
+      const dependentPhoto = await resolvePhotoForUpload("profile", {
         url: dependent.profilePhotoUrl,
         id: (dependent as { profilePhotoId?: string | number }).profilePhotoId,
       });
@@ -216,12 +300,17 @@ export async function syncCheckinToInbox(input: SyncCheckinToInboxInput): Promis
         name: dependent.name.trim(),
         email: dependent.email?.trim() || undefined,
         phone: dependent.mobilePhoneNumber?.trim() || undefined,
-        ...(dependentPhoto ? { photo_base64: dependentPhoto } : {}),
+        document: dependent.documentNumber?.trim() || undefined,
+        ...(dependentPhoto ? { photo_base64: dependentPhoto.base64 } : {}),
       });
     }
 
+    const refreshedStay = await getInboxStay(stayId);
+    const refreshedPrimary = findPrimaryStayGuest(refreshedStay);
+    const inboxCheckinCompleted = isInboxGuestCheckinCompleted(refreshedPrimary);
+
     await writeAuditLog({
-      action: "inbox.sync.success",
+      action: inboxCheckinCompleted ? "inbox.sync.success" : "inbox.sync.partial",
       entityType: "reservation",
       entityId: localizer,
       newData: {
@@ -229,10 +318,16 @@ export async function syncCheckinToInbox(input: SyncCheckinToInboxInput): Promis
         managedUnitId,
         inboxStayId: stayId,
         guestCount: guestCount(input.mainGuest, input.dependents),
-        hadPhoto: !!photoBase64,
-        checkinApproved: isCheckinConfirmedForInbox(reservation),
+        hadPhoto: true,
+        pmsCheckinApproved: isCheckinApproved(reservation),
+        inboxCheckinCompleted,
+        primaryGuestId: refreshedPrimary?.id ?? null,
       },
     });
+
+    if (!inboxCheckinCompleted) {
+      throw new Error("Foto enviada, mas check-in do hóspede principal não foi concluído na Inbox.");
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error("[inbox-sync]", message);
@@ -244,7 +339,8 @@ export async function syncCheckinToInbox(input: SyncCheckinToInboxInput): Promis
         establishmentId: input.establishmentId,
         managedUnitId,
         error: message,
-        hadPhoto: !!photoBase64,
+        hadPhoto: true,
+        pmsCheckinApproved: isCheckinApproved(reservation),
       },
     });
   }

@@ -80,12 +80,18 @@ function isUsableMediaUrl(url?: string | null): boolean {
     return (
       host.includes("amazonaws.com") ||
       host.includes("s3") ||
+      host.includes("techospitality.com") ||
+      parsed.pathname.includes("/api/media/") ||
       (bucket ? url.toLowerCase().includes(bucket) : false) ||
       parsed.pathname.includes("profile-photos/") ||
       parsed.pathname.includes("document-photos/")
     );
   } catch {
-    return url.includes("profile-photos/") || url.includes("document-photos/");
+    return (
+      url.includes("profile-photos/") ||
+      url.includes("document-photos/") ||
+      url.includes("/api/media/")
+    );
   }
 }
 
@@ -228,20 +234,13 @@ export async function getObjectAsDataUrl(key: string): Promise<string | undefine
 
 async function fetchHubMediaDataUrl(mediaId: string | number): Promise<string | undefined> {
   const base = readEnv("TECHOSPITALITY_BASE_URL") ?? "https://backend.techospitality.com";
-  const token =
-    readEnv("TECHOSPITALITY_HUB_TOKEN") ??
-    readEnv("TECHOSPITALITY_RESERVATIONS_TOKEN") ??
-    readEnv("TECHOSPITALITY_API_TOKEN");
+  const token = readTechospitalityToken();
   if (!token) return undefined;
 
   const headers: Record<string, string> = {
     Accept: "image/*, application/json",
   };
-  if (token.startsWith("vkr_")) {
-    headers["x-api-key"] = token;
-  } else {
-    headers["Authorization"] = `Bearer ${token}`;
-  }
+  applyTechospitalityAuthHeaders(headers, token);
 
   try {
     const response = await fetch(`${base}/api/media/${encodeURIComponent(String(mediaId))}`, {
@@ -390,12 +389,105 @@ function extractMediaIdFromUrl(url?: string | null): string | number | undefined
   return match?.[1];
 }
 
+function readTechospitalityToken(): string | undefined {
+  return (
+    readEnv("TECHOSPITALITY_HUB_TOKEN") ??
+    readEnv("TECHOSPITALITY_RESERVATIONS_TOKEN") ??
+    readEnv("TECHOSPITALITY_API_TOKEN")
+  );
+}
+
+function applyTechospitalityAuthHeaders(headers: Record<string, string>, token: string): void {
+  if (token.startsWith("vkr_")) {
+    headers["x-api-key"] = token;
+  } else {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+}
+
+async function fetchUrlAsBase64(url: string): Promise<string | undefined> {
+  const token = readTechospitalityToken();
+  const headers: Record<string, string> = { Accept: "image/*, application/octet-stream, */*" };
+  if (token && /techospitality\.com/i.test(url)) {
+    applyTechospitalityAuthHeaders(headers, token);
+  }
+
+  try {
+    const response = await fetch(url, { headers, signal: AbortSignal.timeout(25_000) });
+    if (!response.ok) return undefined;
+    const contentType = response.headers.get("content-type") ?? "";
+    if (contentType.includes("json")) return undefined;
+    const buffer = await response.arrayBuffer();
+    if (!buffer.byteLength) return undefined;
+    return Buffer.from(buffer).toString("base64");
+  } catch (error) {
+    console.warn("[S3] failed to fetch media URL:", error);
+    return undefined;
+  }
+}
+
+export type ResolvedPhotoUpload = {
+  base64: string;
+  buffer: Buffer;
+  mimeType: string;
+};
+
+function parseDataUrl(value: string): ResolvedPhotoUpload | undefined {
+  const match = /^data:([^;]+);base64,(.+)$/i.exec(value.trim());
+  if (!match?.[2]) return undefined;
+  const mimeType = match[1] || "image/jpeg";
+  const base64 = match[2];
+  if (!base64) return undefined;
+  const buffer = Buffer.from(base64, "base64");
+  if (!buffer.byteLength) return undefined;
+  return { base64, buffer, mimeType };
+}
+
+function parseBase64ToUpload(base64: string, mimeType = "image/jpeg"): ResolvedPhotoUpload | undefined {
+  const trimmed = base64.trim();
+  if (!trimmed) return undefined;
+  const buffer = Buffer.from(trimmed, "base64");
+  if (!buffer.byteLength) return undefined;
+  return { base64: trimmed, buffer, mimeType };
+}
+
 /** Baixa selfie/documento e retorna base64 puro (sem prefixo data:) para APIs externas. */
 export async function resolvePhotoBase64(
   type: "profile" | "document",
   options: { url?: string | null; id?: string | number | null },
 ): Promise<string | undefined> {
+  const resolved = await resolvePhotoForUpload(type, options);
+  return resolved?.base64;
+}
+
+/** Resolve foto para envio multipart ou photo_base64 (Inbox, etc.). */
+export async function resolvePhotoForUpload(
+  type: "profile" | "document",
+  options: { url?: string | null; id?: string | number | null },
+): Promise<ResolvedPhotoUpload | undefined> {
   const mediaId = options.id ?? extractMediaIdFromUrl(options.url);
+  const rawUrl = options.url?.trim();
+
+  if (rawUrl?.startsWith("data:")) {
+    return parseDataUrl(rawUrl);
+  }
+
+  if (rawUrl && /techospitality\.com\/api\/media\//i.test(rawUrl)) {
+    const fromSignedUrl = await fetchUrlAsBase64(rawUrl);
+    if (fromSignedUrl) return parseBase64ToUpload(fromSignedUrl);
+  }
+
+  if (mediaId != null && isNumericMediaId(mediaId)) {
+    const hubDataUrl = await fetchHubMediaDataUrl(mediaId);
+    if (hubDataUrl?.startsWith("data:")) {
+      return parseDataUrl(hubDataUrl);
+    }
+    if (hubDataUrl && !hubDataUrl.startsWith("data:")) {
+      const fromHubRedirect = await fetchUrlAsBase64(hubDataUrl);
+      if (fromHubRedirect) return parseBase64ToUpload(fromHubRedirect);
+    }
+  }
+
   const resolved = await getCheckinPhotoDisplayUrl(type, {
     url: options.url,
     id: mediaId,
@@ -403,18 +495,11 @@ export async function resolvePhotoBase64(
   if (!resolved) return undefined;
 
   if (resolved.startsWith("data:")) {
-    const raw = stripDataUrlPrefix(resolved);
-    return raw || undefined;
+    return parseDataUrl(resolved);
   }
 
-  try {
-    const response = await fetch(resolved, { signal: AbortSignal.timeout(20_000) });
-    if (!response.ok) return undefined;
-    const buffer = await response.arrayBuffer();
-    if (!buffer.byteLength) return undefined;
-    return Buffer.from(buffer).toString("base64");
-  } catch (error) {
-    console.warn("[S3] failed to fetch photo URL for base64:", error);
-    return undefined;
-  }
+  const fromUrl = await fetchUrlAsBase64(resolved);
+  if (fromUrl) return parseBase64ToUpload(fromUrl);
+
+  return undefined;
 }

@@ -107,6 +107,16 @@ export type InboxManagedUnit = {
   };
 };
 
+export type InboxStayGuest = {
+  id: number;
+  name: string;
+  email?: string;
+  phone?: string;
+  is_primary?: boolean;
+  check_in_completed?: boolean;
+  status?: string;
+};
+
 export type InboxStay = {
   id: number;
   managed_unit_id: number;
@@ -114,18 +124,17 @@ export type InboxStay = {
   check_in_at?: string;
   check_out_at?: string;
   guest_count?: number;
-  guests?: Array<{
-    id: number;
-    name: string;
-    email?: string;
-    phone?: string;
-    is_primary?: boolean;
-  }>;
+  guests?: InboxStayGuest[];
 };
 
 async function inboxFetch<T>(
   path: string,
-  options: { method?: string; body?: unknown; query?: Record<string, string | undefined> } = {},
+  options: {
+    method?: string;
+    body?: unknown;
+    query?: Record<string, string | undefined>;
+    headers?: Record<string, string>;
+  } = {},
 ): Promise<T> {
   const token = await fetchInboxToken();
   const url = new URL(`${getInboxBaseUrl()}${path.startsWith("/") ? path : `/${path}`}`);
@@ -135,14 +144,22 @@ async function inboxFetch<T>(
     }
   }
 
+  const isFormData =
+    typeof FormData !== "undefined" && options.body instanceof FormData;
+
   const response = await fetch(url.toString(), {
     method: options.method ?? "GET",
     headers: {
       Authorization: `Bearer ${token}`,
       Accept: "application/json",
-      ...(options.body ? { "Content-Type": "application/json" } : {}),
+      ...(options.body && !isFormData ? { "Content-Type": "application/json" } : {}),
+      ...(options.headers ?? {}),
     },
-    body: options.body ? JSON.stringify(options.body) : undefined,
+    body: isFormData
+      ? (options.body as FormData)
+      : options.body
+        ? JSON.stringify(options.body)
+        : undefined,
   });
 
   const payload = await response.json().catch(() => null);
@@ -158,6 +175,19 @@ async function inboxFetch<T>(
   }
 
   return payload as T;
+}
+
+function appendStayFormFields(form: FormData, input: CreateInboxStayInput): void {
+  form.append("managed_unit_id", String(input.managed_unit_id));
+  form.append("check_in_at", input.check_in_at);
+  form.append("check_out_at", input.check_out_at);
+  form.append("guest_name", input.guest_name);
+  if (input.guest_email) form.append("guest_email", input.guest_email);
+  if (input.guest_phone) form.append("guest_phone", input.guest_phone);
+  if (input.external_id) form.append("external_id", input.external_id);
+  if (input.external_uid) form.append("external_uid", input.external_uid);
+  if (input.notes) form.append("notes", input.notes);
+  if (input.guest_count != null) form.append("guest_count", String(input.guest_count));
 }
 
 export async function listInboxManagedUnits(): Promise<InboxManagedUnit[]> {
@@ -187,20 +217,40 @@ export async function createInboxStay(input: CreateInboxStayInput): Promise<Inbo
   return inboxFetch<InboxStay>("/stays", { method: "POST", body: input });
 }
 
+/** Cria reserva com foto multipart — conclui check-in do hóspede principal (OpenAPI Inbox). */
+export async function createInboxStayWithPhotoMultipart(
+  input: CreateInboxStayInput,
+  photo: { buffer: Buffer; mimeType?: string },
+): Promise<InboxStay> {
+  const form = new FormData();
+  appendStayFormFields(form, input);
+  const mimeType = photo.mimeType ?? "image/jpeg";
+  const blob = new Blob([new Uint8Array(photo.buffer)], { type: mimeType });
+  form.append("photo", blob, mimeType.includes("png") ? "guest.png" : "guest.jpg");
+  return inboxFetch<InboxStay>("/stays", { method: "POST", body: form });
+}
+
+export async function getInboxStay(stayId: number): Promise<InboxStay> {
+  return inboxFetch<InboxStay>(`/stays/${stayId}`);
+}
+
 export type CreateInboxStayGuestInput = {
   name: string;
   email?: string;
   phone?: string;
+  document?: string;
+  is_primary?: boolean;
   photo_base64?: string;
 };
 
 export async function createInboxStayGuest(
   stayId: number,
   input: CreateInboxStayGuestInput,
-): Promise<unknown> {
-  return inboxFetch<unknown>(`/stays/${stayId}/guests`, { method: "POST", body: input });
+): Promise<InboxStayGuest> {
+  return inboxFetch<InboxStayGuest>(`/stays/${stayId}/guests`, { method: "POST", body: input });
 }
 
+/** Conclui check-in do hóspede (JSON photo_base64). */
 export async function uploadInboxStayGuestPhoto(
   stayId: number,
   stayGuestId: number,
@@ -209,6 +259,22 @@ export async function uploadInboxStayGuestPhoto(
   return inboxFetch<unknown>(`/stays/${stayId}/guests/${stayGuestId}/photo`, {
     method: "POST",
     body: { photo_base64: photoBase64 },
+  });
+}
+
+/** Conclui check-in do hóspede (multipart photo). */
+export async function uploadInboxStayGuestPhotoMultipart(
+  stayId: number,
+  stayGuestId: number,
+  photo: { buffer: Buffer; mimeType?: string },
+): Promise<unknown> {
+  const form = new FormData();
+  const mimeType = photo.mimeType ?? "image/jpeg";
+  const blob = new Blob([new Uint8Array(photo.buffer)], { type: mimeType });
+  form.append("photo", blob, mimeType.includes("png") ? "guest.png" : "guest.jpg");
+  return inboxFetch<unknown>(`/stays/${stayId}/guests/${stayGuestId}/photo`, {
+    method: "POST",
+    body: form,
   });
 }
 
