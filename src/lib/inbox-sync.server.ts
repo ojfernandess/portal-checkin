@@ -50,6 +50,59 @@ function guestCount(mainGuest: MainGuest, dependents: Dependent[]): number {
   return 1 + dependents.filter((dep) => dep.name?.trim()).length;
 }
 
+function pickReservationRoomDetails(reservation: Reservation): {
+  roomNumber?: string;
+  roomName?: string;
+  categoryId?: number;
+  categoryName?: string;
+} {
+  const room = reservation.room;
+  const roomNumber =
+    reservation.unitNumber != null && String(reservation.unitNumber).trim() !== ""
+      ? String(reservation.unitNumber).trim()
+      : undefined;
+  const roomName =
+    reservation.roomName?.trim() ||
+    reservation.unitName?.trim() ||
+    room?.unitName?.trim() ||
+    undefined;
+  const categoryName =
+    reservation.categoryName?.trim() || room?.categoryName?.trim() || undefined;
+  const categoryId = reservation.categoryId;
+
+  return {
+    ...(roomNumber ? { roomNumber } : {}),
+    ...(roomName ? { roomName } : {}),
+    ...(categoryId != null ? { categoryId } : {}),
+    ...(categoryName ? { categoryName } : {}),
+  };
+}
+
+function buildInboxStayNotes(
+  reservation: Reservation,
+  parts: { reservationId?: string; checkinRecordId?: string | null },
+): string | undefined {
+  const room = pickReservationRoomDetails(reservation);
+  const segments: string[] = [];
+
+  if (room.roomNumber) segments.push(`Suite: ${room.roomNumber}`);
+  if (room.roomName) segments.push(`Quarto: ${room.roomName}`);
+  if (room.categoryName) {
+    segments.push(
+      room.categoryId != null
+        ? `Categoria: ${room.categoryName} (${room.categoryId})`
+        : `Categoria: ${room.categoryName}`,
+    );
+  } else if (room.categoryId != null) {
+    segments.push(`Categoria ID: ${room.categoryId}`);
+  }
+
+  if (parts.reservationId) segments.push(`PMS reservationId: ${parts.reservationId}`);
+  if (parts.checkinRecordId) segments.push(`checkinRecordId: ${parts.checkinRecordId}`);
+
+  return segments.length > 0 ? segments.join(" | ") : undefined;
+}
+
 function pickGuestLookup(
   inputGuest: MainGuest,
   reservation: Reservation | null,
@@ -259,12 +312,11 @@ export async function syncCheckinToInbox(input: SyncCheckinToInboxInput): Promis
   );
 
   const externalUid = pickReservationUid(reservation);
-  const notes = [
-    input.reservationId ? `PMS reservationId: ${input.reservationId}` : null,
-    input.checkinRecordId ? `checkinRecordId: ${input.checkinRecordId}` : null,
-  ]
-    .filter(Boolean)
-    .join(" | ");
+  const roomDetails = pickReservationRoomDetails(reservation);
+  const notes = buildInboxStayNotes(reservation, {
+    reservationId: input.reservationId,
+    checkinRecordId: input.checkinRecordId,
+  });
 
   const stayInput = {
     managed_unit_id: managedUnitId,
@@ -322,6 +374,10 @@ export async function syncCheckinToInbox(input: SyncCheckinToInboxInput): Promis
         pmsCheckinApproved: isCheckinApproved(reservation),
         inboxCheckinCompleted,
         primaryGuestId: refreshedPrimary?.id ?? null,
+        roomNumber: roomDetails.roomNumber ?? null,
+        roomName: roomDetails.roomName ?? null,
+        categoryId: roomDetails.categoryId ?? null,
+        categoryName: roomDetails.categoryName ?? null,
       },
     });
 
