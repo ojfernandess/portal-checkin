@@ -157,6 +157,30 @@
   }
 }
 
+/* Landing: 80% em laptops (lg) para caber na viewport sem scroll */
+@media (min-width: 1024px) and (max-width: 1279px) {
+  .checkin-landing-shell {
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  .checkin-landing-root {
+    zoom: 0.8;
+  }
+}
+
+@supports not (zoom: 1) {
+  @media (min-width: 1024px) and (max-width: 1279px) {
+    .checkin-landing-root {
+      transform: scale(0.8);
+      transform-origin: top center;
+      width: 125%;
+      margin-inline: -12.5%;
+      min-height: 125vh;
+    }
+  }
+}
+
 @keyframes selfie-oval-pulse {
   0%,
   100% {

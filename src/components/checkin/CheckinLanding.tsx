@@ -340,7 +340,8 @@ export function CheckinLanding({
   );
 
   return (
-    <div className="relative min-h-screen lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(380px,1fr)] xl:grid-cols-2">
+    <div className="checkin-landing-shell">
+      <div className="checkin-landing-root relative min-h-screen lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(380px,1fr)] xl:grid-cols-2">
       <HeroBackground className="fixed inset-0 -z-10" />
 
       <aside className="relative hidden flex-col justify-between px-10 py-10 text-white xl:px-14 xl:py-12 lg:flex lg:min-h-screen">
@@ -420,6 +421,7 @@ export function CheckinLanding({
           </p>
         </div>
       </div>
+    </div>
     </div>
   );
 }
