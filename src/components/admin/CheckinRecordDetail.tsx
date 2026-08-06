@@ -1,3 +1,4 @@
+import { CheckinRecordFnrhSection } from "@/components/admin/CheckinRecordFnrhSection";
 import { PhoneDisplay } from "@/components/checkin/PhoneDisplay";
 import { Badge } from "@/components/ui/badge";
 import { formatDateTime, formatDateWithTime } from "@/lib/format-dates";
@@ -121,6 +122,8 @@ export function CheckinRecordDetail({ record }: { record: CheckinRecordRow }) {
           </ul>
         </section>
       ) : null}
+
+      <CheckinRecordFnrhSection form={record.embratur} />
 
       {record.extra_fields && Object.keys(record.extra_fields).length > 0 ? (
         <section className="space-y-2">

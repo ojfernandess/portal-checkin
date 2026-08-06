@@ -600,6 +600,10 @@ export const es: MessageTree = {
       termsAcceptedAt: "Términos aceptados el:",
       reservation: "Reserva",
       extraFields: "Campos extra",
+      fnrhCol: "FNRH",
+      fnrhFilled: "Completada",
+      fnrhMissing: "No completada",
+      fnrhEmpty: "FNRH no registrada en este check-in.",
     },
     usersPage: {
       title: "Equipo del panel",

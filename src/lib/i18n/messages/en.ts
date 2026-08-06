@@ -597,6 +597,10 @@ export const en: MessageTree = {
       termsAcceptedAt: "Terms accepted on:",
       reservation: "Reservation",
       extraFields: "Extra fields",
+      fnrhCol: "FNRH",
+      fnrhFilled: "Completed",
+      fnrhMissing: "Not completed",
+      fnrhEmpty: "FNRH was not recorded for this check-in.",
     },
     usersPage: {
       title: "Staff",

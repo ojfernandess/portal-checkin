@@ -598,6 +598,10 @@ export const ptBR = {
       termsAcceptedAt: "Termos aceitos em:",
       reservation: "Reserva",
       extraFields: "Campos extras",
+      fnrhCol: "FNRH",
+      fnrhFilled: "Preenchida",
+      fnrhMissing: "Não preenchida",
+      fnrhEmpty: "FNRH não registrada neste check-in.",
     },
     usersPage: {
       title: "Equipe do painel",

@@ -19,6 +19,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { formatDateTime } from "@/lib/format-dates";
+import { hasEmbraturData } from "@/lib/embratur-display";
 import { useI18n } from "@/lib/i18n/context";
 
 export const Route = createFileRoute("/_authenticated/admin/checkins")({
@@ -114,6 +115,7 @@ function AdminCheckinsPage() {
               <th className="px-4 py-3">{t("common.guest")}</th>
               <th className="px-4 py-3">{t("common.establishment")}</th>
               <th className="px-4 py-3">{t("admin.checkinsPage.termsCol")}</th>
+              <th className="px-4 py-3">{t("admin.checkinsPage.fnrhCol")}</th>
               <th className="px-4 py-3">{t("common.actions")}</th>
             </tr>
           </thead>
@@ -129,6 +131,13 @@ function AdminCheckinsPage() {
                 <td className="px-4 py-3">
                   <Badge variant={record.terms_accepted ? "default" : "secondary"}>
                     {record.terms_accepted ? t("common.termsAccepted") : t("common.termsNotAccepted")}
+                  </Badge>
+                </td>
+                <td className="px-4 py-3">
+                  <Badge variant={hasEmbraturData(record.embratur) ? "default" : "secondary"}>
+                    {hasEmbraturData(record.embratur)
+                      ? t("admin.checkinsPage.fnrhFilled")
+                      : t("admin.checkinsPage.fnrhMissing")}
                   </Badge>
                 </td>
                 <td className="px-4 py-3">
