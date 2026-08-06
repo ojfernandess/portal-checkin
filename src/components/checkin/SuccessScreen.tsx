@@ -299,6 +299,13 @@ export function SuccessScreen({
   const { locale, t } = useI18n();
   const guest = mainGuest ?? reservation.mainGuest ?? reservation.responsible;
   const guestName = guest?.name ?? "";
+  const registeredCompanions = useMemo(
+    () =>
+      (dependents.length > 0 ? dependents : reservation.dependents ?? []).filter((dependent) =>
+        dependent.name?.trim(),
+      ),
+    [dependents, reservation.dependents],
+  );
   const stay = reservation.stay ?? reservation;
   const checkinDate = stay.checkinDate ?? reservation.checkinDate;
   const checkoutDate = stay.checkoutDate ?? reservation.checkoutDate;
@@ -345,9 +352,7 @@ export function SuccessScreen({
       ? `${guestsQuantity} ${guestsQuantity === 1 ? t("common.guest") : t("common.guests")}`
       : null;
 
-  const showUsefulInfo = Boolean(
-    reservation.localizer || dependents.length > 0 || usefulInfoItems.length > 0,
-  );
+  const showUsefulInfo = Boolean(reservation.localizer || usefulInfoItems.length > 0);
   const variableContext = useMemo(
     () => buildUsefulInfoVariableContext(reservation, guest, locale),
     [reservation, guest, locale],
@@ -628,6 +633,49 @@ export function SuccessScreen({
             </div>
           </CardShell>
 
+          {registeredCompanions.length > 0 ? (
+            <CardShell className="p-5">
+              <h4 className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                {t("common.companions")}
+              </h4>
+              <ul className="space-y-4">
+                {registeredCompanions.map((companion, index) => (
+                  <li
+                    key={`${companion.documentNumber}-${index}`}
+                    className={cn(index > 0 && "border-t border-border pt-4")}
+                  >
+                    <div className="space-y-3">
+                      <div>
+                        <p className="text-xs text-muted-foreground">{t("common.name")}</p>
+                        <p className="font-medium wrap-anywhere">{companion.name}</p>
+                      </div>
+                      {!hideGuestDetails && companion.mobilePhoneNumber ? (
+                        <div>
+                          <p className="text-xs text-muted-foreground">{t("common.phone")}</p>
+                          <PhoneDisplay phone={companion.mobilePhoneNumber} className="font-medium" />
+                        </div>
+                      ) : null}
+                      {!hideGuestDetails ? (
+                        <div>
+                          <p className="text-xs text-muted-foreground">{t("common.document")}</p>
+                          <p className="font-medium wrap-anywhere">
+                            {formatDocumentLine(
+                              {
+                                documentNumber: companion.documentNumber,
+                                documentType: companion.documentType,
+                              },
+                              locale,
+                            ) || "—"}
+                          </p>
+                        </div>
+                      ) : null}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </CardShell>
+          ) : null}
+
           {showUsefulInfo ? (
             <CardShell className="p-5">
               <div className="mb-4 flex items-center gap-2">
@@ -651,22 +699,12 @@ export function SuccessScreen({
                     ))}
                   </ul>
                 ) : null}
-                {reservation.localizer || dependents.length > 0 ? (
+                {reservation.localizer ? (
                   <ul className="space-y-3 border-t border-border/60 pt-4 text-sm">
-                    {reservation.localizer ? (
-                      <li>
-                        <p className="text-xs text-muted-foreground">{t("checkin.success.localizerInfo")}</p>
-                        <p className="font-code font-medium">{reservation.localizer}</p>
-                      </li>
-                    ) : null}
-                    {dependents.length > 0 ? (
-                      <li>
-                        <p className="text-xs text-muted-foreground">{t("checkin.success.companionsInfo")}</p>
-                        <p className="font-medium">
-                          {dependents.length} {t("common.companions").toLowerCase()}
-                        </p>
-                      </li>
-                    ) : null}
+                    <li>
+                      <p className="text-xs text-muted-foreground">{t("checkin.success.localizerInfo")}</p>
+                      <p className="font-code font-medium">{reservation.localizer}</p>
+                    </li>
                   </ul>
                 ) : null}
               </div>
