@@ -20,6 +20,7 @@ import {
   matchPmsCountryValue,
   toPmsCountryOptions,
 } from "@/lib/guest-countries";
+import { buildGenderSelectOptions, hasGenderSelection } from "@/lib/guest-gender";
 import { useI18n } from "@/lib/i18n/context";
 import {
   defaultCallingCodeForGuest,
@@ -45,10 +46,7 @@ export function GuestForm({ foreign, initial, onSubmit, onBack }: Props) {
   >([]);
   const [countriesLoading, setCountriesLoading] = useState(true);
 
-  const genderOptions = [
-    { value: "MALE", label: t("guest.male") },
-    { value: "FEMALE", label: t("guest.female") },
-  ];
+  const genderOptions = buildGenderSelectOptions(t);
 
   useEffect(() => {
     let active = true;
@@ -114,7 +112,7 @@ export function GuestForm({ foreign, initial, onSubmit, onBack }: Props) {
     if (!guest.name?.trim()) next["name"] = t("guest.validation.fullName");
     if (!guest.email || !isValidEmail(guest.email)) next["email"] = t("guest.validation.email");
     if (!guest.birthDate) next["birthDate"] = t("guest.validation.birthDate");
-    if (!guest.gender) next["gender"] = t("guest.validation.gender");
+    if (!hasGenderSelection(guest.gender)) next["gender"] = t("guest.validation.gender");
     if (!guest.documentNumber?.trim()) next["documentNumber"] = t("guest.validation.document");
     if (!guest.citizenship?.trim()) {
       next["citizenship"] = foreign

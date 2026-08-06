@@ -110,6 +110,7 @@ export const es: MessageTree = {
   guest: {
     male: "Masculino",
     female: "Femenino",
+    preferNotToSay: "Prefiero no informar",
     other: "Otro",
     cpf: "CPF",
     rg: "RG",
@@ -366,6 +367,10 @@ export const es: MessageTree = {
       apiGeneric: "No fue posible completar el check-in.",
       apiReviewGuest: "Revise los datos del huésped principal (paso Datos).",
       apiReviewCompanions: "Revise los datos de los acompañantes (paso Acompañantes).",
+      apiIncompleteMainGuest:
+        "Revise los datos del huésped principal. Campo(s) pendiente(s): {fields}.",
+      apiIncompleteCompanions:
+        "Revise los datos de los acompañantes. Campo(s) pendiente(s): {fields}.",
       steps: {
         guest: "Datos del huésped",
         companions: "Acompañantes",

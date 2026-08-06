@@ -25,6 +25,7 @@ import {
 import { useI18n } from "@/lib/i18n/context";
 import { buildCheckinErrorLabels, splitCheckinErrorMessage } from "@/lib/checkin-error-labels";
 import { formatCheckinIssues, validateDependent } from "@/lib/checkin-validation";
+import { buildGenderSelectOptions } from "@/lib/guest-gender";
 import { defaultCallingCodeForGuest } from "@/lib/phone-display";
 import { fetchViaCep, maskCep, maskCpf, onlyDigits } from "@/lib/validators";
 import { toast } from "sonner";
@@ -399,8 +400,11 @@ export function CompanionsStep({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="MALE">{t("guest.male")}</SelectItem>
-                    <SelectItem value="FEMALE">{t("guest.female")}</SelectItem>
+                    {buildGenderSelectOptions(t).map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 {errors["gender"] && (

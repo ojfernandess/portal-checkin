@@ -108,6 +108,7 @@ export const ptBR = {
   guest: {
     male: "Masculino",
     female: "Feminino",
+    preferNotToSay: "Prefiro não informar",
     other: "Outro",
     cpf: "CPF",
     rg: "RG",
@@ -364,6 +365,10 @@ export const ptBR = {
       apiGeneric: "Não foi possível concluir o check-in.",
       apiReviewGuest: "Revise os dados do hóspede principal (etapa Dados).",
       apiReviewCompanions: "Revise os dados dos acompanhantes (etapa Acompanhantes).",
+      apiIncompleteMainGuest:
+        "Revise os dados do hóspede principal. Campo(s) pendente(s): {fields}.",
+      apiIncompleteCompanions:
+        "Revise os dados dos acompanhantes. Campo(s) pendente(s): {fields}.",
       steps: {
         guest: "Dados do hóspede",
         companions: "Acompanhantes",

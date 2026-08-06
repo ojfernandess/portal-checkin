@@ -109,6 +109,7 @@ export const en: MessageTree = {
   guest: {
     male: "Male",
     female: "Female",
+    preferNotToSay: "Prefer not to say",
     other: "Other",
     cpf: "CPF",
     rg: "ID card",
@@ -365,6 +366,8 @@ export const en: MessageTree = {
       apiGeneric: "We couldn't complete your check-in.",
       apiReviewGuest: "Review the main guest details (Details step).",
       apiReviewCompanions: "Review companion details (Companions step).",
+      apiIncompleteMainGuest: "Review the main guest details. Pending field(s): {fields}.",
+      apiIncompleteCompanions: "Review companion details. Pending field(s): {fields}.",
       steps: {
         guest: "Guest details",
         companions: "Companions",

@@ -1,4 +1,5 @@
 import type { GuestLookup } from "@/lib/api/types";
+import { isGenderPreferNotToSay } from "@/lib/guest-gender";
 import { translate } from "@/lib/i18n";
 import type { Locale } from "@/lib/i18n/types";
 import { formatDate } from "@/lib/format-dates";
@@ -8,6 +9,7 @@ export function formatGender(
   locale: Locale = "pt-BR",
 ): string | undefined {
   if (value == null || value === "") return undefined;
+  if (isGenderPreferNotToSay(value)) return translate(locale, "guest.preferNotToSay");
   const normalized = String(value).toUpperCase();
   if (normalized === "MALE" || normalized === "0") return translate(locale, "guest.male");
   if (normalized === "FEMALE" || normalized === "1") return translate(locale, "guest.female");

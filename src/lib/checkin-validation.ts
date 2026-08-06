@@ -1,4 +1,5 @@
 import type { Dependent, EmbraturForm, MainGuest } from "@/lib/api/types";
+import { hasGenderSelection } from "@/lib/guest-gender";
 import { isValidPhoneWithDialCode, splitPhoneInput } from "@/lib/phone-display";
 import { isValidEmail, onlyDigits } from "@/lib/validators";
 
@@ -57,6 +58,8 @@ export type CheckinErrorLabels = {
   apiGeneric: string;
   apiReviewGuest: string;
   apiReviewCompanions: string;
+  apiIncompleteMainGuest: string;
+  apiIncompleteCompanions: string;
 };
 
 function normalizeDoc(value: string, documentType: string): string {
@@ -93,7 +96,9 @@ export function validateMainGuest(
     issues.push({ step: "guest", field: "email" });
   }
   pushIfMissing(issues, "guest", "birthDate", guest.birthDate);
-  pushIfMissing(issues, "guest", "gender", guest.gender);
+  if (!hasGenderSelection(guest.gender)) {
+    issues.push({ step: "guest", field: "gender" });
+  }
   pushIfMissing(issues, "guest", "documentNumber", guest.documentNumber);
   pushIfMissing(issues, "guest", "citizenship", guest.citizenship);
   pushIfMissing(issues, "guest", "profession", guest.profession);
@@ -144,7 +149,9 @@ export function validateDependent(
     issues.push({ step: "companions", field: "email", ...ctx });
   }
   pushIfMissing(issues, "companions", "birthDate", dependent.birthDate, ctx);
-  pushIfMissing(issues, "companions", "gender", dependent.gender, ctx);
+  if (!hasGenderSelection(dependent.gender)) {
+    issues.push({ step: "companions", field: "gender", ...ctx });
+  }
   pushIfMissing(issues, "companions", "documentNumber", dependent.documentNumber, ctx);
   if (!isValidGuestPhone(dependent.mobilePhoneNumber, dependent.documentType === "PASSPORT")) {
     issues.push({ step: "companions", field: "mobilePhoneNumber", ...ctx });
@@ -264,6 +271,7 @@ const API_FIELD_HINTS: Array<{ pattern: RegExp; step: CheckinStepId; field: Chec
   { pattern: /mainguest.*document|documentnumber/i, step: "guest", field: "documentNumber" },
   { pattern: /mainguest.*phone|mobilephone/i, step: "guest", field: "mobilePhoneNumber" },
   { pattern: /mainguest.*birth/i, step: "guest", field: "birthDate" },
+  { pattern: /mainguest.*gender/i, step: "guest", field: "gender" },
   { pattern: /mainguest.*profession/i, step: "guest", field: "profession" },
   { pattern: /mainguest.*zip|cep/i, step: "guest", field: "zipCode" },
   { pattern: /mainguest.*neighborhood|bairro/i, step: "guest", field: "neighborhood" },
@@ -271,6 +279,7 @@ const API_FIELD_HINTS: Array<{ pattern: RegExp; step: CheckinStepId; field: Chec
   { pattern: /mainguest.*documentphoto/i, step: "photos", field: "documentPhoto" },
   { pattern: /dependent.*email|dependents.*email/i, step: "companions", field: "email" },
   { pattern: /dependent.*document|dependents.*document/i, step: "companions", field: "documentNumber" },
+  { pattern: /dependent.*gender|dependents.*gender/i, step: "companions", field: "gender" },
   { pattern: /dependent.*birth/i, step: "companions", field: "birthDate" },
   { pattern: /dependent.*phone/i, step: "companions", field: "mobilePhoneNumber" },
   { pattern: /dependent.*rg/i, step: "companions", field: "rg" },
@@ -278,9 +287,82 @@ const API_FIELD_HINTS: Array<{ pattern: RegExp; step: CheckinStepId; field: Chec
   { pattern: /embratur|snmotvia|sntiptran|ibge/i, step: "embratur", field: "snmotvia" },
 ];
 
+const API_FIELD_PATH_ALIASES: Record<string, CheckinFieldKey> = {
+  gender: "gender",
+  email: "email",
+  birthdate: "birthDate",
+  mobilephonenumber: "mobilePhoneNumber",
+  documentnumber: "documentNumber",
+  documenttype: "documentType",
+  rg: "rg",
+  expeditor: "expeditor",
+  profession: "profession",
+  citizenship: "citizenship",
+  zipcode: "zipCode",
+  street: "street",
+  number: "number",
+  neighborhood: "neighborhood",
+  city: "city",
+  state: "state",
+  country: "country",
+  profilephotourl: "profilePhoto",
+  documentphotourl: "documentPhoto",
+  name: "name",
+};
+
+function stripApiErrorCodes(message: string): string {
+  return message
+    .replace(/\s*\(c[oó]digo:\s*[A-Z0-9_]+\)/gi, "")
+    .replace(/\s*\(code:\s*[A-Z0-9_]+\)/gi, "")
+    .replace(/\s*—\s*c[oó]digo:\s*[A-Z0-9_]+/gi, "")
+    .trim();
+}
+
+function mapApiFieldPath(path: string): CheckinFieldKey | null {
+  const normalized = path.trim().replace(/\[\d+\]/g, "").split(".").pop()?.toLowerCase() ?? "";
+  return API_FIELD_PATH_ALIASES[normalized] ?? null;
+}
+
+function parseApiMissingFields(message: string): {
+  scope: "guest" | "companions";
+  fields: CheckinFieldKey[];
+} | null {
+  const match = message.match(/campos faltantes:\s*([^(\n]+)/i);
+  if (!match) return null;
+
+  const fields = match[1]
+    .split(",")
+    .map((part) => mapApiFieldPath(part.trim()))
+    .filter((field): field is CheckinFieldKey => field != null);
+
+  if (fields.length === 0) return null;
+
+  const lower = message.toLowerCase();
+  const scope =
+    lower.includes("dependent") || lower.includes("acompanhante") ? "companions" : "guest";
+
+  return { scope, fields: [...new Set(fields)] };
+}
+
 export function humanizeCheckinApiError(message: string, labels: CheckinErrorLabels): string {
-  const raw = message.trim();
+  const raw = stripApiErrorCodes(message.trim());
   const lower = raw.toLowerCase();
+
+  const missing = parseApiMissingFields(raw);
+  if (missing) {
+    const fieldLabels = missing.fields.map((field) => labels.fields[field]).join(", ");
+    if (missing.scope === "companions") {
+      return `${labels.apiGeneric}\n${labels.apiIncompleteCompanions.replace("{fields}", fieldLabels)}`;
+    }
+    return `${labels.apiGeneric}\n${labels.apiIncompleteMainGuest.replace("{fields}", fieldLabels)}`;
+  }
+
+  if (
+    lower.includes("main_guest_incomplete") ||
+    (lower.includes("mainguest") && lower.includes("incompleto"))
+  ) {
+    return `${labels.apiGeneric}\n${labels.apiReviewGuest}`;
+  }
 
   if (
     lower.includes("failed to perform reservation checkin") ||
@@ -291,18 +373,18 @@ export function humanizeCheckinApiError(message: string, labels: CheckinErrorLab
 
   for (const hint of API_FIELD_HINTS) {
     if (hint.pattern.test(raw) || hint.pattern.test(lower)) {
-      return labels.stepLine
+      return `${labels.apiGeneric}\n${labels.stepLine
         .replace("{step}", labels.steps[hint.step])
-        .replace("{fields}", labels.fields[hint.field]);
+        .replace("{fields}", labels.fields[hint.field])}`;
     }
   }
 
   if (lower.includes("dependent") || lower.includes("acompanhante")) {
-    return `${raw}\n${labels.apiReviewCompanions}`;
+    return `${labels.apiGeneric}\n${labels.apiReviewCompanions}`;
   }
 
   if (lower.includes("mainguest") || lower.includes("hóspede") || lower.includes("hospede")) {
-    return `${raw}\n${labels.apiReviewGuest}`;
+    return `${labels.apiGeneric}\n${labels.apiReviewGuest}`;
   }
 
   return raw || labels.apiGeneric;

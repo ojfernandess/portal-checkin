@@ -58,6 +58,8 @@ export function buildCheckinErrorLabels(t: TranslateFn): CheckinErrorLabels {
     apiGeneric: t("checkin.errors.apiGeneric"),
     apiReviewGuest: t("checkin.errors.apiReviewGuest"),
     apiReviewCompanions: t("checkin.errors.apiReviewCompanions"),
+    apiIncompleteMainGuest: t("checkin.errors.apiIncompleteMainGuest"),
+    apiIncompleteCompanions: t("checkin.errors.apiIncompleteCompanions"),
   };
 }
 
@@ -109,5 +111,7 @@ export function buildCheckinErrorLabelsPt(): CheckinErrorLabels {
     apiGeneric: "Não foi possível concluir o check-in.",
     apiReviewGuest: "Revise os dados do hóspede principal (etapa Dados).",
     apiReviewCompanions: "Revise os dados dos acompanhantes (etapa Acompanhantes).",
+    apiIncompleteMainGuest: "Revise os dados do hóspede principal. Campo(s) pendente(s): {fields}.",
+    apiIncompleteCompanions: "Revise os dados dos acompanhantes. Campo(s) pendente(s): {fields}.",
   };
 }

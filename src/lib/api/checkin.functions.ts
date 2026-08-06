@@ -7,6 +7,7 @@ import { assertRateLimitAllowed, enforceRateLimit, getClientIp, recordRateLimitH
 import { cloneDefaultSections, parseTermsContent, flattenTermsSections } from "@/lib/establishment-terms";
 import { onlyDigits } from "@/lib/validators";
 import { BRAZIL_PMS_COUNTRY, formatCitizenshipForApi, formatPmsCountryForAddressField } from "@/lib/guest-countries";
+import { formatGenderForApi, hasGenderSelection } from "@/lib/guest-gender";
 import { buildCheckinErrorLabelsPt } from "@/lib/checkin-error-labels";
 import {
   formatCheckinIssues,
@@ -159,7 +160,6 @@ function pickMainGuestForApi(guest: MainGuest): Record<string, unknown> {
     documentType,
     mobilePhoneNumber: normalizePhoneForApi(guest.mobilePhoneNumber),
     birthDate: guest.birthDate,
-    gender: guest.gender,
     profession: guest.profession,
     citizenship: formatCitizenshipForApi(guest.citizenship),
     zipCode: formatZipCodeForApi(guest.zipCode),
@@ -172,6 +172,8 @@ function pickMainGuestForApi(guest: MainGuest): Record<string, unknown> {
     profilePhotoUrl: guest.profilePhotoUrl,
     documentPhotoUrl: guest.documentPhotoUrl,
   };
+
+  row["gender"] = formatGenderForApi(guest.gender);
 
   if (documentType === "CPF" || documentType === "RG") {
     if (guest.rg?.trim()) row["rg"] = guest.rg.trim();
@@ -202,12 +204,20 @@ export function prepareDependentsForCheckin(
         dependent.documentNumber ?? "",
         documentType,
       );
-      const gender = stripOptionalString(dependent.gender);
+      const gender = formatGenderForApi(dependent.gender);
       const birthDate = stripOptionalString(dependent.birthDate);
       const phone = normalizePhoneForApi(dependent.mobilePhoneNumber);
       const zipCode = formatZipCodeForApi(dependent.zipCode);
 
-      if (!name || !email || !documentNumber || !gender || !birthDate || !phone || !zipCode) {
+      if (
+        !name ||
+        !email ||
+        !documentNumber ||
+        !hasGenderSelection(dependent.gender) ||
+        !birthDate ||
+        !phone ||
+        !zipCode
+      ) {
         return null;
       }
       if (
