@@ -243,7 +243,7 @@ export function prepareDependentsForCheckin(
       row["profession"] = stripOptionalString(dependent.profession) ?? "N/A";
       row["citizenship"] = formatCitizenshipForApi(dependent.citizenship);
       row["zipCode"] = zipCode;
-      row["country"] = formatPmsCountryForAddressField(dependent.country);
+      row["country"] = formatPmsCountryForAddressField(dependent.country ?? dependent.citizenship);
       row["state"] = stripOptionalString(dependent.state)!;
       row["city"] = stripOptionalString(dependent.city)!;
       row["street"] = stripOptionalString(dependent.street)!;

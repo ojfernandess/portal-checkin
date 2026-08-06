@@ -37,11 +37,9 @@ export function matchPmsCountryValue(
   return fuzzy?.value ?? normalized;
 }
 
-/** Campo `country` do endereço no check-in (ex.: BRASIL → Brasil). */
+/** Campo `country` do endereço no check-in — sempre maiúsculas (ex.: BRASIL, ARGENTINA), como citizenship. */
 export function formatPmsCountryForAddressField(country: string | undefined | null): string {
-  if (!country?.trim()) return "Brasil";
-  if (country.trim().toUpperCase() === BRAZIL_PMS_COUNTRY) return "Brasil";
-  return country.trim();
+  return formatCitizenshipForApi(country);
 }
 
 /** Campo `citizenship` no check-in — sempre maiúsculas (ex.: BRASIL, ARGENTINA). */
