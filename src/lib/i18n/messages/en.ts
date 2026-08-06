@@ -475,6 +475,13 @@ export const en: MessageTree = {
       paymentStatus: "Status",
       reservationStatusLabel: "Reservation status",
       usefulInfoTitle: "Useful information",
+      checkoutCompleteTitle: "Check-out completed successfully!",
+      checkoutCompleteDate: "Check-out on {date}",
+      checkoutCompleteSubtitle:
+        "We hope your stay at {establishment} was wonderful and that you take great memories with you.",
+      checkoutCompleteBody:
+        "Thank you so much for choosing us and for your trust. It was a pleasure to host you!",
+      checkoutCompleteFarewell: "Come back anytime — we would love to welcome you again!",
       localizerInfo: "Reservation locator",
       companionsInfo: "Registered companions",
       networkLabel: "Network",

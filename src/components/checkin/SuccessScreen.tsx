@@ -8,6 +8,7 @@ import {
   DoorOpen,
   Download,
   ExternalLink,
+  Heart,
   Info,
   KeyRound,
   Lock,
@@ -352,7 +353,9 @@ export function SuccessScreen({
       ? `${guestsQuantity} ${guestsQuantity === 1 ? t("common.guest") : t("common.guests")}`
       : null;
 
-  const showUsefulInfo = Boolean(reservation.localizer || usefulInfoItems.length > 0);
+  const showCheckoutFarewell = checkoutPast && !isCancelled;
+  const showUsefulInfo =
+    !showCheckoutFarewell && Boolean(reservation.localizer || usefulInfoItems.length > 0);
   const variableContext = useMemo(
     () => buildUsefulInfoVariableContext(reservation, guest, locale),
     [reservation, guest, locale],
@@ -371,6 +374,8 @@ export function SuccessScreen({
     [usefulInfoItems, variableContext],
   );
   const heroImageUrl = establishmentPhotoUrl?.trim() || "/bg_portal.png";
+
+  const checkoutWhenLabel = formatTimelineDate(checkoutDate, checkoutTime, locale);
 
   async function share() {
     const text = t("checkin.success.shareText", {
@@ -430,13 +435,19 @@ export function SuccessScreen({
             </div>
             <div className="min-w-0 space-y-2 text-left">
               <h2 className="font-display text-2xl leading-tight text-primary sm:text-[1.65rem]">
-                {alreadyCompleted && !isCancelled
-                  ? t("checkin.success.titleDone")
-                  : isCancelled
-                    ? t("checkin.success.titleCancelled")
-                    : t("checkin.success.titleSuccess")}
+                {showCheckoutFarewell
+                  ? t("checkin.success.checkoutCompleteTitle")
+                  : alreadyCompleted && !isCancelled
+                    ? t("checkin.success.titleDone")
+                    : isCancelled
+                      ? t("checkin.success.titleCancelled")
+                      : t("checkin.success.titleSuccess")}
               </h2>
-              {alreadyCompleted && checkinWhen ? (
+              {showCheckoutFarewell ? (
+                <p className="text-sm leading-relaxed text-muted-foreground">
+                  {t("checkin.success.checkoutCompleteFarewell")}
+                </p>
+              ) : alreadyCompleted && checkinWhen ? (
                 <p className="text-sm text-muted-foreground">
                   {t("checkin.success.doneAt")} {checkinWhen}
                 </p>
@@ -676,6 +687,42 @@ export function SuccessScreen({
             </CardShell>
           ) : null}
 
+          {showCheckoutFarewell ? (
+            <CardShell className="overflow-hidden border-primary/15">
+              <div className="bg-gradient-to-br from-primary/[0.06] via-primary/[0.04] to-emerald-50/80 px-5 py-6 sm:p-7">
+                <div className="flex items-start gap-4">
+                  <span
+                    className="flex size-12 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary sm:size-14"
+                    aria-hidden
+                  >
+                    <Heart className="size-6 sm:size-7" strokeWidth={1.75} />
+                  </span>
+                  <div className="min-w-0 space-y-3">
+                    <h4 className="font-display text-xl leading-snug text-primary sm:text-2xl">
+                      {t("checkin.success.checkoutCompleteTitle")}
+                    </h4>
+                    {checkoutWhenLabel ? (
+                      <p className="text-sm text-muted-foreground">
+                        {t("checkin.success.checkoutCompleteDate", { date: checkoutWhenLabel })}
+                      </p>
+                    ) : null}
+                    <p className="text-sm leading-relaxed text-muted-foreground">
+                      {t("checkin.success.checkoutCompleteSubtitle", {
+                        establishment: establishmentName,
+                      })}
+                    </p>
+                    <p className="text-sm leading-relaxed text-foreground">
+                      {t("checkin.success.checkoutCompleteBody")}
+                    </p>
+                    <p className="font-display text-base text-primary">
+                      {t("checkin.success.checkoutCompleteFarewell")}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </CardShell>
+          ) : null}
+
           {showUsefulInfo ? (
             <CardShell className="p-5">
               <div className="mb-4 flex items-center gap-2">
@@ -786,7 +833,7 @@ export function SuccessScreen({
       </div>
 
       {/* Banner informativo */}
-      {!isCancelled ? (
+      {!isCancelled && !checkoutPast ? (
         <div className="rounded-2xl border border-border bg-primary px-5 py-4 text-primary-foreground">
           <p className="font-display text-lg">{t("checkin.success.bannerTitle")}</p>
           <p className="mt-2 text-sm text-primary-foreground/80">{t("checkin.success.bannerBody")}</p>
@@ -794,7 +841,7 @@ export function SuccessScreen({
       ) : null}
 
       {/* Ajuda durante a estadia */}
-      {whatsapp || phone || mapsUrl ? (
+      {!checkoutPast && (whatsapp || phone || mapsUrl) ? (
         <CardShell className="p-5">
           <p className="text-sm font-medium">{t("checkin.success.helpDuringStay")}</p>
           <div className="mt-4 flex flex-wrap gap-2 print:hidden">

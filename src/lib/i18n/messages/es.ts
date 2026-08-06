@@ -476,6 +476,13 @@ export const es: MessageTree = {
       paymentStatus: "Estado",
       reservationStatusLabel: "Estado de la reserva",
       usefulInfoTitle: "Información útil",
+      checkoutCompleteTitle: "¡Check-out realizado con éxito!",
+      checkoutCompleteDate: "Check-out el {date}",
+      checkoutCompleteSubtitle:
+        "Esperamos que su estadía en {establishment} haya sido maravillosa y que se lleve excelentes recuerdos.",
+      checkoutCompleteBody:
+        "Muchas gracias por elegirnos y por su confianza. ¡Fue un placer recibirle!",
+      checkoutCompleteFarewell: "Vuelva siempre — ¡será un placer recibirle de nuevo!",
       localizerInfo: "Localizador de la reserva",
       companionsInfo: "Acompañantes registrados",
       networkLabel: "Red",

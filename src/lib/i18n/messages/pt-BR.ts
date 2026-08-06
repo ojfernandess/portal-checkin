@@ -474,6 +474,13 @@ export const ptBR = {
       paymentStatus: "Status",
       reservationStatusLabel: "Situação da reserva",
       usefulInfoTitle: "Informações úteis",
+      checkoutCompleteTitle: "Check-out realizado com sucesso!",
+      checkoutCompleteDate: "Check-out em {date}",
+      checkoutCompleteSubtitle:
+        "Esperamos que sua estadia em {establishment} tenha sido maravilhosa e que você leve ótimas lembranças conosco.",
+      checkoutCompleteBody:
+        "Agradecemos imensamente pela preferência e pela confiança em escolher nosso empreendimento. Foi um prazer recebê-lo(a)!",
+      checkoutCompleteFarewell: "Volte sempre — será um enorme prazer recebê-lo(a) novamente!",
       localizerInfo: "Localizador da reserva",
       companionsInfo: "Acompanhantes registrados",
       networkLabel: "Rede",
