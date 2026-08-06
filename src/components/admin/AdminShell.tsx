@@ -152,8 +152,8 @@ export function AdminShell({ title, subtitle, account, breadcrumbs, children }: 
 
   return (
     <div className="min-h-screen bg-muted/20">
-      <div className="mx-auto flex min-h-screen max-w-7xl">
-        <aside className="hidden w-64 shrink-0 border-r border-border bg-card lg:block">{sidebar}</aside>
+      <div className="mx-auto flex min-h-screen max-w-7xl 2xl:max-w-[1600px]">
+        <aside className="hidden w-64 shrink-0 border-r border-border bg-card lg:block xl:w-72">{sidebar}</aside>
 
         <div className="flex min-w-0 flex-1 flex-col">
           <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">

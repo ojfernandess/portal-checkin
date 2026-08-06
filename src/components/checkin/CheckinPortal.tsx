@@ -1034,7 +1034,12 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
 
   return (
     <div className={cn("min-h-screen pb-16", step === 8 ? "bg-[#F8F9FA]" : "bg-background")}>
-      <header className="border-b border-border bg-primary py-4 text-primary-foreground">
+      <header
+        className={cn(
+          "border-b border-border bg-primary text-primary-foreground",
+          step === 8 ? "py-4 lg:py-2.5 xl:py-4" : "py-4",
+        )}
+      >
         <div className="page-shell flex items-center justify-between gap-4">
           <BrandLogo className="max-h-12 shrink-0 sm:max-h-14" />
           <div className="hidden min-w-0 flex-1 text-center sm:block">
@@ -1042,7 +1047,8 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
             <p className="truncate text-xs text-primary-foreground/70">{t("checkin.header.subtitle")}</p>
           </div>
           <LanguageSwitcher
-            className="shrink-0 text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground"
+            showLabelOnMobile
+            className="shrink-0 gap-1.5 text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground"
             variant="ghost"
           />
         </div>
@@ -1050,7 +1056,11 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
 
       {step > 0 && step < 7 && <Stepper current={step} />}
 
-      <main className={cn("py-7", step === 8 ? "success-page-shell" : "page-shell")}>
+      <main
+        className={cn(
+          step === 8 ? "success-page-shell py-7 lg:py-4 xl:py-7" : "page-shell py-7",
+        )}
+      >
         <div key={`${step}-${subStep}`} className="animate-step-in">
           {step === 1 && reservation && (
             <section className="space-y-5">

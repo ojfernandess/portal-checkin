@@ -264,7 +264,7 @@ function EstablishmentConfigPage() {
         <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
       ) : (
         <Tabs defaultValue="terms">
-          <TabsList>
+          <TabsList className="lg:h-auto lg:max-w-full lg:flex-wrap lg:justify-start lg:gap-1">
             <TabsTrigger value="terms">{t("admin.establishmentConfig.tabTerms")}</TabsTrigger>
             <TabsTrigger value="contact">{t("admin.establishmentConfig.tabContact")}</TabsTrigger>
             <TabsTrigger value="checkin">{t("admin.establishmentConfig.tabCheckin")}</TabsTrigger>

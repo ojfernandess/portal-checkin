@@ -155,7 +155,7 @@ function ProcessStepper() {
               </div>
               <span
                 className={cn(
-                  "max-w-[4.5rem] text-center text-[11px] leading-tight transition-colors duration-500 xl:max-w-none xl:text-xs",
+                  "max-w-[4.5rem] text-center text-[11px] leading-tight transition-colors duration-500 lg:max-w-none lg:text-xs",
                   (active || completed) && "font-medium text-white",
                   !active && !completed && "text-white/55",
                 )}
@@ -340,7 +340,7 @@ export function CheckinLanding({
   );
 
   return (
-    <div className="relative min-h-screen lg:grid lg:grid-cols-2">
+    <div className="relative min-h-screen lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(380px,1fr)] xl:grid-cols-2">
       <HeroBackground className="fixed inset-0 -z-10" />
 
       <aside className="relative hidden flex-col justify-between px-10 py-10 text-white xl:px-14 xl:py-12 lg:flex lg:min-h-screen">
@@ -361,7 +361,7 @@ export function CheckinLanding({
         </div>
 
         <div className="mt-10 rounded-2xl border border-white/10 bg-black/35 px-3 py-4 backdrop-blur-md xl:px-4">
-          <ul className="grid grid-cols-2 gap-3 xl:grid-cols-4 xl:gap-2">
+          <ul className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-2">
             {FEATURES.map(({ icon: Icon, titleKey, descKey }) => (
               <li key={titleKey} className="flex min-w-0 items-start gap-2.5 px-1 py-1">
                 <Icon className="mt-0.5 size-5 shrink-0 text-[#6CA0FF]" strokeWidth={1.75} aria-hidden />
@@ -397,12 +397,13 @@ export function CheckinLanding({
           <LanguageSwitcher
             variant="outline"
             size="sm"
+            showLabelOnMobile
             className="border-white/20 bg-white/90 text-slate-700 backdrop-blur-sm hover:bg-white lg:border-slate-200"
           />
         </div>
 
-        <div className="relative flex flex-1 flex-col items-center justify-center px-4 py-8 sm:px-6 lg:px-10 lg:py-12">
-          <div className="w-full max-w-[440px] rounded-3xl bg-white p-6 shadow-[0_24px_64px_rgba(15,23,42,0.18)] sm:p-8">
+        <div className="relative flex flex-1 flex-col items-center justify-center px-4 py-8 sm:px-6 lg:px-10 lg:py-12 xl:px-12">
+          <div className="w-full max-w-[440px] lg:max-w-[480px] xl:max-w-[520px] rounded-3xl bg-white p-6 shadow-[0_24px_64px_rgba(15,23,42,0.18)] sm:p-8">
             {formCard}
           </div>
 

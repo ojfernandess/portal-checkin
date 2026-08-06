@@ -251,7 +251,7 @@ function UsefulInfoCard({
     <li
       className={cn(
         "rounded-xl border border-border/80 bg-muted/20 p-3.5 sm:p-4",
-        isAccessSteps && "sm:col-span-2",
+        isAccessSteps && "lg:col-span-2 xl:col-span-2",
       )}
     >
       <div className="flex items-start gap-3">
@@ -401,30 +401,30 @@ export function SuccessScreen({
   }
 
   return (
-    <div className="space-y-5 print:space-y-3">
+    <div className="space-y-5 lg:space-y-3 xl:space-y-5 print:space-y-3">
       {/* Hero de sucesso */}
       <section className="relative overflow-hidden rounded-2xl border border-emerald-100 bg-[#f3faf6] shadow-sm">
         <div className="flex flex-col sm:flex-row sm:items-stretch">
-          <div className="flex min-w-0 flex-1 items-center gap-4 p-5 sm:gap-5 sm:p-6">
+          <div className="flex min-w-0 flex-1 items-center gap-4 p-5 sm:gap-5 sm:p-6 lg:gap-3 lg:p-4 xl:gap-5 xl:p-6">
             <div className="relative shrink-0" aria-hidden>
               <span className="absolute -left-1 top-0 size-2 rounded-full bg-success/40" />
               <span className="absolute -right-0.5 bottom-1 size-1.5 rounded-full bg-success/30" />
               <span className="absolute right-0 top-2 size-1 rounded-full bg-success/50" />
               <div
                 className={cn(
-                  "relative flex size-16 items-center justify-center rounded-full shadow-sm",
+                  "relative flex size-16 items-center justify-center rounded-full shadow-sm lg:size-12 xl:size-16",
                   isCancelled ? "bg-destructive text-white" : "bg-success text-white",
                 )}
               >
                 {isCancelled ? (
-                  <AlertTriangle className="size-8" strokeWidth={2.5} />
+                  <AlertTriangle className="size-8 lg:size-6 xl:size-8" strokeWidth={2.5} />
                 ) : (
-                  <Check className="size-8" strokeWidth={3} />
+                  <Check className="size-8 lg:size-6 xl:size-8" strokeWidth={3} />
                 )}
               </div>
             </div>
-            <div className="min-w-0 space-y-2 text-left">
-              <h2 className="font-display text-2xl leading-tight text-primary sm:text-[1.65rem]">
+            <div className="min-w-0 space-y-2 text-left lg:space-y-1 xl:space-y-2">
+              <h2 className="font-display text-2xl leading-tight text-primary sm:text-[1.65rem] lg:text-xl xl:text-[1.65rem]">
                 {alreadyCompleted && !isCancelled
                   ? t("checkin.success.titleDone")
                   : isCancelled
@@ -436,7 +436,7 @@ export function SuccessScreen({
                   {t("checkin.success.doneAt")} {checkinWhen}
                 </p>
               ) : !isCancelled ? (
-                <p className="text-sm leading-relaxed text-muted-foreground">
+                <p className="text-sm leading-relaxed text-muted-foreground lg:text-xs xl:text-sm">
                   {t("checkin.success.subtitleSuccess")}
                 </p>
               ) : (
@@ -444,7 +444,7 @@ export function SuccessScreen({
               )}
             </div>
           </div>
-          <div className="relative min-h-36 w-full sm:min-h-0 sm:w-[42%] lg:w-[36%]">
+          <div className="relative min-h-36 w-full sm:min-h-0 sm:w-[42%] lg:hidden xl:block xl:w-[36%]">
             <img
               src={heroImageUrl}
               alt=""
@@ -461,7 +461,7 @@ export function SuccessScreen({
       {/* Card da propriedade */}
       <CardShell>
         <div className="flex flex-col sm:flex-row">
-          <div className="relative min-h-40 w-full shrink-0 overflow-hidden sm:max-w-[220px]">
+          <div className="relative min-h-40 w-full shrink-0 overflow-hidden sm:max-w-[220px] lg:max-h-28 lg:max-w-[140px] xl:max-h-none xl:max-w-[280px]">
             <img
               src={heroImageUrl}
               alt=""
@@ -471,9 +471,9 @@ export function SuccessScreen({
               <p className="font-display text-lg text-white">{establishmentName}</p>
             </div>
           </div>
-          <div className="min-w-0 flex-1 space-y-4 p-5">
-            <div className="space-y-2">
-              <h3 className="hidden font-display text-xl sm:block">{establishmentName}</h3>
+          <div className="min-w-0 flex-1 space-y-4 p-5 lg:space-y-3 lg:p-4 xl:space-y-4 xl:p-5">
+            <div className="space-y-2 lg:space-y-1">
+              <h3 className="hidden font-display text-xl sm:block lg:text-lg xl:text-xl">{establishmentName}</h3>
               {country ? (
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="text-sm text-muted-foreground">{country}</p>
@@ -495,7 +495,7 @@ export function SuccessScreen({
                 </Button>
               ) : null}
             </div>
-            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <div className="grid grid-cols-2 gap-4 lg:gap-3 xl:grid-cols-4 xl:gap-4">
               <InfoTile
                 icon={<BedDouble className="size-3.5" />}
                 label={t("common.unit")}
@@ -532,14 +532,14 @@ export function SuccessScreen({
           </CardShell>
         ) : (
           <CardShell>
-            <div className="flex items-center gap-2 bg-primary px-5 py-3.5 text-primary-foreground">
+            <div className="flex items-center gap-2 bg-primary px-5 py-3.5 text-primary-foreground lg:px-4 lg:py-2.5 xl:px-5 xl:py-3.5">
               <KeyRound className="size-5 shrink-0" aria-hidden />
               <h4 className="font-display text-base">{t("checkin.success.accessTitle")}</h4>
             </div>
-            <div className="p-4 sm:p-5">
+            <div className="p-4 sm:p-5 lg:p-4 xl:p-5">
               <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:gap-x-5 sm:gap-y-3 lg:gap-x-8">
                 {accessUnit ? (
-                  <div className="min-w-0 sm:max-w-[12rem] sm:flex-none lg:max-w-[14rem]">
+                  <div className="min-w-0 lg:max-w-none xl:max-w-[14rem]">
                     <p className="text-xs text-muted-foreground">{t("common.unit")}</p>
                     <p className="mt-0.5 font-display text-base leading-snug wrap-anywhere sm:text-lg">
                       {accessUnit}
@@ -547,7 +547,7 @@ export function SuccessScreen({
                   </div>
                 ) : null}
                 {showRoomPassword ? (
-                  <div className="min-w-0 sm:flex-none sm:max-w-[14rem] lg:max-w-[16rem]">
+                  <div className="min-w-0 lg:max-w-none xl:max-w-[16rem]">
                     <p className="text-xs text-muted-foreground">{t("checkin.success.accessPassword")}</p>
                     <p className="mt-0.5 font-code text-xl font-semibold tracking-wide wrap-anywhere sm:text-2xl">
                       {roomPassword}
@@ -568,7 +568,7 @@ export function SuccessScreen({
                     className={cn(
                       "min-w-0 rounded-lg border border-primary/15 bg-gradient-to-br from-primary/[0.04] to-primary/[0.07] p-3 sm:p-3.5",
                       accessUnit || showRoomPassword
-                        ? "sm:flex-1 sm:basis-[220px] lg:basis-[280px]"
+                        ? "sm:flex-1 xl:basis-[280px]"
                         : "w-full",
                     )}
                   >
@@ -600,10 +600,11 @@ export function SuccessScreen({
       ) : null}
 
       {/* Hóspede, pagamento e timeline */}
-      <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
-        <div className="space-y-5">
-          <CardShell className="p-5">
-            <h4 className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_220px] lg:gap-4 xl:grid-cols-[1fr_minmax(260px,320px)] xl:gap-5">
+        <div className="space-y-5 lg:space-y-3 xl:space-y-5">
+          <div className="grid gap-5 lg:grid-cols-2 lg:gap-3 lg:space-y-0 xl:grid-cols-1 xl:gap-5">
+          <CardShell className="p-5 lg:p-4 xl:p-5">
+            <h4 className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted-foreground lg:mb-3 xl:mb-4">
               {t("common.mainGuest")}
             </h4>
             <div className="space-y-3">
@@ -629,16 +630,16 @@ export function SuccessScreen({
           </CardShell>
 
           {showUsefulInfo ? (
-            <CardShell className="p-5">
-              <div className="mb-4 flex items-center gap-2">
+            <CardShell className="p-5 lg:col-span-2 lg:p-4 xl:col-span-1 xl:p-5">
+              <div className="mb-4 flex items-center gap-2 lg:mb-3 xl:mb-4">
                 <Info className="size-4 text-muted-foreground" aria-hidden />
                 <h4 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                   {t("checkin.success.usefulInfoTitle")}
                 </h4>
               </div>
-              <div className="space-y-4">
+              <div className="space-y-4 lg:space-y-3">
                 {resolvedUsefulInfoItems.length > 0 ? (
-                  <ul className="grid gap-3 sm:grid-cols-2">
+                  <ul className="grid gap-3 lg:grid-cols-2 xl:grid-cols-2">
                     {resolvedUsefulInfoItems.map((item) => (
                       <UsefulInfoCard
                         key={item.id}
@@ -674,8 +675,8 @@ export function SuccessScreen({
           ) : null}
 
           {price || reservation.label ? (
-            <CardShell className="p-5">
-              <h4 className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            <CardShell className="p-5 lg:p-4 xl:p-5">
+              <h4 className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted-foreground lg:mb-3 xl:mb-4">
                 {t("checkin.success.paymentTitle")}
               </h4>
               <div className="space-y-3">
@@ -696,14 +697,15 @@ export function SuccessScreen({
               </div>
             </CardShell>
           ) : null}
+          </div>
         </div>
 
-        <CardShell className="p-5 lg:self-start">
-          <h4 className="mb-5 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+        <CardShell className="p-5 lg:self-start lg:p-4 xl:p-5">
+          <h4 className="mb-5 text-sm font-semibold uppercase tracking-wide text-muted-foreground lg:mb-3 xl:mb-5">
             {t("checkin.success.stayTitle")}
           </h4>
           <ol className="relative space-y-0 pl-1">
-            <li className="relative flex gap-4 pb-6">
+            <li className="relative flex gap-4 pb-6 lg:gap-3 lg:pb-4 xl:gap-4 xl:pb-6">
               <div className="flex flex-col items-center">
                 <span className="flex size-9 items-center justify-center rounded-full bg-success/15 text-success">
                   <CalendarDays className="size-4" aria-hidden />
@@ -716,7 +718,7 @@ export function SuccessScreen({
               </div>
             </li>
             {nights != null ? (
-              <li className="relative flex gap-4 pb-6">
+              <li className="relative flex gap-4 pb-6 lg:gap-3 lg:pb-4 xl:gap-4 xl:pb-6">
                 <div className="flex flex-col items-center">
                   <span className="flex size-9 items-center justify-center rounded-full bg-muted text-muted-foreground">
                     <Moon className="size-4" aria-hidden />
@@ -747,19 +749,22 @@ export function SuccessScreen({
         </CardShell>
       </div>
 
-      {/* Banner informativo */}
-      {!isCancelled ? (
-        <div className="rounded-2xl border border-border bg-primary px-5 py-4 text-primary-foreground">
-          <p className="font-display text-lg">{t("checkin.success.bannerTitle")}</p>
-          <p className="mt-2 text-sm text-primary-foreground/80">{t("checkin.success.bannerBody")}</p>
-        </div>
-      ) : null}
+      {/* Rodapé compacto em laptops */}
+      <div className="space-y-5 lg:space-y-3 xl:space-y-5">
+        <div className="grid gap-5 lg:grid-cols-2 lg:gap-3 xl:grid-cols-1 xl:gap-5">
+          {!isCancelled ? (
+            <div className="rounded-2xl border border-border bg-primary px-5 py-4 text-primary-foreground lg:px-4 lg:py-3 xl:px-5 xl:py-4">
+              <p className="font-display text-lg lg:text-base xl:text-lg">{t("checkin.success.bannerTitle")}</p>
+              <p className="mt-2 text-sm text-primary-foreground/80 lg:mt-1 lg:text-xs xl:mt-2 xl:text-sm">
+                {t("checkin.success.bannerBody")}
+              </p>
+            </div>
+          ) : null}
 
-      {/* Ajuda durante a estadia */}
-      {whatsapp || phone || mapsUrl ? (
-        <CardShell className="p-5">
-          <p className="text-sm font-medium">{t("checkin.success.helpDuringStay")}</p>
-          <div className="mt-4 flex flex-wrap gap-2 print:hidden">
+          {whatsapp || phone || mapsUrl ? (
+            <CardShell className="p-5 lg:p-4 xl:p-5">
+              <p className="text-sm font-medium lg:text-xs xl:text-sm">{t("checkin.success.helpDuringStay")}</p>
+              <div className="mt-4 flex flex-wrap gap-2 print:hidden lg:mt-3 xl:mt-4">
             {whatsapp ? (
               <Button variant="outline" size="sm" className="gap-2" asChild>
                 <a
@@ -788,24 +793,25 @@ export function SuccessScreen({
                 </a>
               </Button>
             ) : null}
-          </div>
-        </CardShell>
-      ) : null}
+              </div>
+            </CardShell>
+          ) : null}
+        </div>
 
       {/* Ações principais */}
-      <div className="flex flex-col gap-3 sm:flex-row print:hidden">
-        <Button variant="outline" className="tap-safe flex-1 gap-2 border-foreground/20" onClick={() => window.print()}>
+      <div className="flex flex-col gap-3 sm:flex-row print:hidden lg:gap-2 xl:gap-3">
+        <Button variant="outline" className="tap-safe flex-1 gap-2 border-foreground/20 lg:h-10 xl:h-auto" onClick={() => window.print()}>
           <Download className="size-4" aria-hidden />
           {t("checkin.success.downloadReceipt")}
         </Button>
-        <Button className="tap-safe flex-1 gap-2" onClick={() => void share()}>
+        <Button className="tap-safe flex-1 gap-2 lg:h-10 xl:h-auto" onClick={() => void share()}>
           <Share2 className="size-4" aria-hidden />
           {t("checkin.success.shareReservation")}
         </Button>
       </div>
 
       {/* Selos de confiança */}
-      <div className="flex flex-wrap items-center justify-center gap-6 py-2 text-xs text-muted-foreground print:hidden">
+      <div className="flex flex-wrap items-center justify-center gap-6 py-2 text-xs text-muted-foreground print:hidden lg:gap-4 lg:py-1 xl:gap-6 xl:py-2">
         <span className="inline-flex items-center gap-2">
           <Lock className="size-3.5" aria-hidden />
           {t("checkin.success.dataSecure")}
@@ -814,6 +820,7 @@ export function SuccessScreen({
           <ShieldCheck className="size-3.5" aria-hidden />
           {t("checkin.success.lgpdCompliant")}
         </span>
+      </div>
       </div>
     </div>
   );

@@ -127,6 +127,36 @@
   padding-inline: 20px;
 }
 
+@media (min-width: 1024px) {
+  .page-shell {
+    max-width: 42rem;
+  }
+
+  .success-page-shell {
+    max-width: 72rem;
+  }
+}
+
+@media (min-width: 1280px) {
+  .page-shell {
+    max-width: 48rem;
+  }
+
+  .success-page-shell {
+    max-width: 80rem;
+  }
+}
+
+@media (min-width: 1536px) {
+  .page-shell {
+    max-width: 56rem;
+  }
+
+  .success-page-shell {
+    max-width: 88rem;
+  }
+}
+
 @keyframes selfie-oval-pulse {
   0%,
   100% {

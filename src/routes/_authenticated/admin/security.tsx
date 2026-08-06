@@ -64,7 +64,7 @@ function AdminSecurityPage() {
       {loading ? (
         <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
       ) : (
-        <div className="mx-auto max-w-2xl space-y-6">
+        <div className="mx-auto max-w-2xl space-y-6 lg:max-w-4xl xl:max-w-5xl">
           <p className="text-sm text-muted-foreground">{t("admin.securityPage.body")}</p>
 
           <section className="rounded-xl border border-border bg-card p-5 shadow-sm">

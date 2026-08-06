@@ -76,7 +76,7 @@ function AdminCheckinsPage() {
       <p className="mb-4 text-sm text-muted-foreground">{t("admin.checkinsPage.body")}</p>
 
       <form
-        className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
+        className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3"
         onSubmit={(e) => {
           e.preventDefault();
           setApplied({ localizer: localizer.trim().toUpperCase(), date });

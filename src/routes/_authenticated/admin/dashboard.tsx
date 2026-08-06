@@ -159,7 +159,7 @@ function AdminDashboardPage() {
                 <Link to="/admin/checkins">{t("admin.dashboardPage.viewAll")}</Link>
               </Button>
             </div>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4">
               <Kpi label={t("admin.dashboardPage.portalTotal")} value={portal.total} />
               <Kpi label={t("admin.dashboardPage.portalToday")} value={portal.today} />
               <Kpi label={t("admin.dashboardPage.portalWeek")} value={portal.week} />
