@@ -519,6 +519,17 @@ export const en: MessageTree = {
     },
   },
   auth: {
+    heroTitlePrefix: "Manage",
+    heroTitleHighlight: "digital check-ins",
+    heroSubtitle: "Track reservations, guests, and FNRH in a secure panel for your hotel team.",
+    featureDashboardTitle: "Real-time overview",
+    featureDashboardDesc: "Completed and pending check-ins at the front desk.",
+    featureGuestsTitle: "Complete guest data",
+    featureGuestsDesc: "Guests, companions, and FNRH forms.",
+    featureSecureTitle: "Protected access",
+    featureSecureDesc: "Secure login for administrators and front desk.",
+    featureTeamTitle: "Organized team",
+    featureTeamDesc: "Roles and permissions per user.",
     bootstrapTitle: "Create administrator account",
     loginTitle: "Front desk panel",
     bootstrapBody: "This is the first access: create the main hotel account.",
@@ -537,6 +548,10 @@ export const en: MessageTree = {
     emailNotConfirmed:
       "Email not confirmed yet. In Supabase, open the user and mark as confirmed or resend the invite.",
     turnstileRequired: "Complete the security verification before continuing.",
+    suspiciousInput: "Disallowed characters or patterns in the fields. Please review and try again.",
+    invalidEmail: "Enter a valid email address.",
+    invalidName: "Enter a valid name (letters, spaces, and hyphens only).",
+    passwordTooLong: "Password must be at most 128 characters.",
   },
   admin: {
     panel: "Admin panel",

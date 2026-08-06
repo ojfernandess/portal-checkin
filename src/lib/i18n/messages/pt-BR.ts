@@ -520,6 +520,17 @@ export const ptBR = {
     },
   },
   auth: {
+    heroTitlePrefix: "Gerencie os",
+    heroTitleHighlight: "check-ins digitais",
+    heroSubtitle: "Acompanhe reservas, hóspedes e FNRH em um painel seguro para a equipe do hotel.",
+    featureDashboardTitle: "Visão em tempo real",
+    featureDashboardDesc: "Check-ins concluídos e pendentes na recepção.",
+    featureGuestsTitle: "Dados completos",
+    featureGuestsDesc: "Hóspedes, acompanhantes e ficha FNRH.",
+    featureSecureTitle: "Acesso protegido",
+    featureSecureDesc: "Login seguro para administradores e recepção.",
+    featureTeamTitle: "Equipe organizada",
+    featureTeamDesc: "Papéis e permissões por usuário.",
     bootstrapTitle: "Criar conta de administrador",
     loginTitle: "Painel da recepção",
     bootstrapBody: "Este é o primeiro acesso: crie a conta principal do hotel.",
@@ -538,6 +549,10 @@ export const ptBR = {
     emailNotConfirmed:
       "E-mail ainda não confirmado. No Supabase, abra o usuário e marque como confirmado ou reenvie o convite.",
     turnstileRequired: "Complete a verificação de segurança antes de continuar.",
+    suspiciousInput: "Caracteres ou padrões não permitidos nos campos. Revise e tente novamente.",
+    invalidEmail: "Informe um e-mail válido.",
+    invalidName: "Informe um nome válido (apenas letras, espaços e hífens).",
+    passwordTooLong: "A senha deve ter no máximo 128 caracteres.",
   },
   admin: {
     panel: "Painel administrativo",

@@ -522,6 +522,17 @@ export const es: MessageTree = {
     },
   },
   auth: {
+    heroTitlePrefix: "Gestione los",
+    heroTitleHighlight: "check-ins digitales",
+    heroSubtitle: "Siga reservas, huéspedes y FNRH en un panel seguro para el equipo del hotel.",
+    featureDashboardTitle: "Vista en tiempo real",
+    featureDashboardDesc: "Check-ins completados y pendientes en recepción.",
+    featureGuestsTitle: "Datos completos",
+    featureGuestsDesc: "Huéspedes, acompañantes y ficha FNRH.",
+    featureSecureTitle: "Acceso protegido",
+    featureSecureDesc: "Inicio de sesión seguro para administradores y recepción.",
+    featureTeamTitle: "Equipo organizado",
+    featureTeamDesc: "Roles y permisos por usuario.",
     bootstrapTitle: "Crear cuenta de administrador",
     loginTitle: "Panel de recepción",
     bootstrapBody: "Este es el primer acceso: cree la cuenta principal del hotel.",
@@ -540,6 +551,10 @@ export const es: MessageTree = {
     emailNotConfirmed:
       "Correo aún no confirmado. En Supabase, abra el usuario y márquelo como confirmado o reenvíe la invitación.",
     turnstileRequired: "Complete la verificación de seguridad antes de continuar.",
+    suspiciousInput: "Caracteres o patrones no permitidos en los campos. Revise e intente de nuevo.",
+    invalidEmail: "Ingrese un correo electrónico válido.",
+    invalidName: "Ingrese un nombre válido (solo letras, espacios y guiones).",
+    passwordTooLong: "La contraseña debe tener como máximo 128 caracteres.",
   },
   admin: {
     panel: "Panel administrativo",

@@ -19,7 +19,9 @@ import {
 import { BrandLogo } from "@/components/BrandLogo";
 import { PhoneDisplay } from "@/components/checkin/PhoneDisplay";
 import { WhatsAppIcon } from "@/components/icons/WhatsAppIcon";
-import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { PortalFeatureGrid } from "@/components/PortalFeatureGrid";
+import { PortalHeroBackground } from "@/components/PortalHeroBackground";
+import { PortalSplitLayout } from "@/components/PortalSplitLayout";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -85,23 +87,6 @@ const SUPPORT_WHATSAPP = "+55 11 96747-0800";
 const SUPPORT_WHATSAPP_LINK = "https://wa.me/5511967470800";
 const SUPPORT_EMAIL = "central@audaar.com.br";
 const SUPPORT_EMAIL_LINK = "mailto:central@audaar.com.br";
-
-function HeroBackground({ className }: { className?: string }) {
-  return (
-    <div className={cn("hero-bg-layer absolute inset-0 overflow-hidden", className)} aria-hidden>
-      <img
-        src="/bg_portal.png"
-        alt=""
-        className="absolute inset-0 size-full object-cover animate-hero-bg-pan"
-        loading="eager"
-        decoding="async"
-        fetchPriority="high"
-      />
-      <div className="absolute inset-0 bg-linear-to-r from-slate-950/75 via-slate-900/45 to-slate-900/25" />
-      <div className="absolute inset-0 bg-linear-to-t from-slate-950/60 via-transparent to-slate-950/20" />
-    </div>
-  );
-}
 
 const STEP_INTERVAL_MS = 2800;
 
@@ -192,17 +177,12 @@ export function CheckinLanding({
 }: CheckinLandingProps) {
   const { t } = useI18n();
 
-  useEffect(() => {
-    const syncMotion = () => {
-      document.documentElement.classList.toggle("hero-motion-paused", document.hidden);
-    };
-    syncMotion();
-    document.addEventListener("visibilitychange", syncMotion);
-    return () => {
-      document.removeEventListener("visibilitychange", syncMotion);
-      document.documentElement.classList.remove("hero-motion-paused");
-    };
-  }, []);
+  const heroTitle = (
+    <>
+      {t("checkin.landing.heroTitlePrefix")}{" "}
+      <span className="text-[#6CA0FF]">{t("checkin.landing.heroTitleHighlight")}</span>
+    </>
+  );
 
   const formCard = children ?? (
     <>
@@ -340,86 +320,35 @@ export function CheckinLanding({
   );
 
   return (
-    <div className="app-container relative min-h-screen lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(min(100%,380px),1fr)] xl:grid-cols-2">
-      <HeroBackground className="fixed inset-0 -z-10" />
-
-      <aside className="relative hidden flex-col justify-between px-10 py-10 text-white xl:px-14 xl:py-12 lg:flex lg:min-h-screen">
-        <div className="space-y-10">
+    <PortalSplitLayout
+      topAside={
+        <>
           <BrandLogo variant="white" className="max-h-10 xl:max-h-11" />
-
           <div className="max-w-lg space-y-5">
             <h1 className="font-display text-4xl font-semibold leading-[1.15] tracking-tight xl:text-[2.75rem]">
-              {t("checkin.landing.heroTitlePrefix")}{" "}
-              <span className="text-[#6CA0FF]">{t("checkin.landing.heroTitleHighlight")}</span>
+              {heroTitle}
             </h1>
             <p className="max-w-md text-base leading-relaxed text-white/85 xl:text-lg">
               {t("checkin.landing.heroSubtitle")}
             </p>
           </div>
-
           <ProcessStepper />
-        </div>
-
-        <div className="mt-10 rounded-2xl border border-white/10 bg-black/35 px-3 py-4 backdrop-blur-md xl:px-4">
-          <ul className="responsive-grid-sm cq-grid-4">
-            {FEATURES.map(({ icon: Icon, titleKey, descKey }) => (
-              <li key={titleKey} className="flex min-w-0 items-start gap-2.5 px-1 py-1">
-                <Icon className="mt-0.5 size-5 shrink-0 text-[#6CA0FF]" strokeWidth={1.75} aria-hidden />
-                <div className="min-w-0">
-                  <p className="text-xs font-semibold leading-snug text-white xl:text-sm">
-                    {t(titleKey)}
-                  </p>
-                  <p className="mt-0.5 text-[10px] leading-snug text-white/65 xl:text-xs">
-                    {t(descKey)}
-                  </p>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </aside>
-
-      <div className="relative flex min-h-screen flex-col">
-        <div className="relative overflow-hidden px-6 py-8 text-white lg:hidden">
-          <HeroBackground />
+        </>
+      }
+      bottomAside={<PortalFeatureGrid features={FEATURES} />}
+      mobileHero={
+        <>
+          <PortalHeroBackground />
           <div className="relative space-y-4">
             <BrandLogo variant="white" className="max-h-9" />
-            <h1 className="font-display text-2xl font-semibold leading-tight">
-              {t("checkin.landing.heroTitlePrefix")}{" "}
-              <span className="text-[#6CA0FF]">{t("checkin.landing.heroTitleHighlight")}</span>
-            </h1>
+            <h1 className="font-display text-2xl font-semibold leading-tight">{heroTitle}</h1>
             <p className="text-sm text-white/85">{t("checkin.landing.heroSubtitle")}</p>
             <ProcessStepper />
           </div>
-        </div>
-
-        <div className="absolute right-4 top-4 z-10 lg:right-8 lg:top-8">
-          <LanguageSwitcher
-            variant="outline"
-            size="sm"
-            showLabelOnMobile
-            className="border-white/20 bg-white/90 text-slate-700 backdrop-blur-sm hover:bg-white lg:border-slate-200"
-          />
-        </div>
-
-        <div className="relative flex flex-1 flex-col items-center justify-center px-4 py-8 sm:px-6 lg:px-10 lg:py-12 xl:px-12">
-          <div className="w-full max-w-[440px] lg:max-w-[480px] xl:max-w-[520px] rounded-3xl bg-white p-6 shadow-[0_24px_64px_rgba(15,23,42,0.18)] sm:p-8">
-            {formCard}
-          </div>
-
-          <p className="mt-6 text-center text-[10px] text-white/70 lg:text-slate-500">
-            {t("checkin.landing.developedBy")}{" "}
-            <a
-              href="https://www.agentslabs.cloud/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="transition-colors hover:underline lg:text-slate-400 lg:hover:text-slate-600"
-            >
-              AgentsLabs
-            </a>
-          </p>
-        </div>
-      </div>
-    </div>
+        </>
+      }
+    >
+      {formCard}
+    </PortalSplitLayout>
   );
 }
