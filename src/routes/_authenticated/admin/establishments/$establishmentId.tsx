@@ -22,6 +22,7 @@ import {
   EstablishmentInboxPanel,
   type InboxManagedUnitOption,
 } from "@/components/admin/EstablishmentInboxPanel";
+import { EstablishmentUsefulInfoEditor } from "@/components/admin/EstablishmentUsefulInfoEditor";
 import { AdminShell, useAdminAccount } from "@/components/admin/AdminShell";
 import { PhoneDisplay } from "@/components/checkin/PhoneDisplay";
 import { Button } from "@/components/ui/button";
@@ -37,7 +38,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cloneDefaultSections, type TermsSection } from "@/lib/establishment-terms";
-import { MAX_SUCCESS_PAGE_PHOTO_BYTES, type InboxUnitMapping } from "@/lib/establishment-settings";
+import { MAX_SUCCESS_PAGE_PHOTO_BYTES, type InboxUnitMapping, type UsefulInfoItem } from "@/lib/establishment-settings";
 import { useI18n } from "@/lib/i18n/context";
 import { maskPhone } from "@/lib/validators";
 
@@ -87,6 +88,7 @@ function EstablishmentConfigPage() {
   const [inboxEnabled, setInboxEnabled] = useState(false);
   const [inboxManagedUnitId, setInboxManagedUnitId] = useState<number | null>(null);
   const [inboxUnitMappings, setInboxUnitMappings] = useState<InboxUnitMapping[]>([]);
+  const [usefulInfoItems, setUsefulInfoItems] = useState<UsefulInfoItem[]>([]);
   const [inboxUnits, setInboxUnits] = useState<InboxManagedUnitOption[]>([]);
   const [inboxConfigured, setInboxConfigured] = useState(false);
   const [inboxUnitsLoading, setInboxUnitsLoading] = useState(false);
@@ -119,6 +121,7 @@ function EstablishmentConfigPage() {
         setInboxEnabled(settings.settings.inboxEnabled);
         setInboxManagedUnitId(settings.settings.inboxManagedUnitId);
         setInboxUnitMappings(settings.settings.inboxUnitMappings);
+        setUsefulInfoItems(settings.settings.usefulInfoItems);
       })
       .finally(() => setLoading(false));
   }, [establishmentId, getEstablishment, getTerms, getContact, listFields, getSettings]);
@@ -208,6 +211,7 @@ function EstablishmentConfigPage() {
           inboxEnabled,
           inboxManagedUnitId,
           inboxUnitMappings,
+          usefulInfoItems,
         },
       });
       toast.success(t("admin.establishmentConfig.settingsSaved"));
@@ -264,6 +268,7 @@ function EstablishmentConfigPage() {
             <TabsTrigger value="terms">{t("admin.establishmentConfig.tabTerms")}</TabsTrigger>
             <TabsTrigger value="contact">{t("admin.establishmentConfig.tabContact")}</TabsTrigger>
             <TabsTrigger value="checkin">{t("admin.establishmentConfig.tabCheckin")}</TabsTrigger>
+            <TabsTrigger value="usefulInfo">{t("admin.establishmentConfig.tabUsefulInfo")}</TabsTrigger>
             <TabsTrigger value="security">{t("admin.establishmentConfig.tabSecurity")}</TabsTrigger>
             <TabsTrigger value="inbox">{t("admin.establishmentConfig.tabInbox")}</TabsTrigger>
             <TabsTrigger value="fields">{t("admin.establishmentConfig.tabFields")}</TabsTrigger>
@@ -378,6 +383,15 @@ function EstablishmentConfigPage() {
             <Button disabled={savingSettings} onClick={() => void handleSaveSettings()}>
               {t("admin.establishmentConfig.saveCheckinSettings")}
             </Button>
+          </TabsContent>
+
+          <TabsContent value="usefulInfo" className="mt-6">
+            <EstablishmentUsefulInfoEditor
+              items={usefulInfoItems}
+              saving={savingSettings}
+              onChange={setUsefulInfoItems}
+              onSave={() => void handleSaveSettings()}
+            />
           </TabsContent>
 
           <TabsContent value="security" className="mt-6 space-y-4">

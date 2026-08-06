@@ -1496,6 +1496,7 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
                   alreadyCompleted={checkinAlreadyDone}
                   establishmentPhotoUrl={establishmentSettings.successPagePhotoUrl}
                   inboxPortariaEnabled={establishmentSettings.inboxEnabled}
+                  usefulInfoItems={establishmentSettings.usefulInfoItems}
                 />
                 <Button
                   variant="ghost"

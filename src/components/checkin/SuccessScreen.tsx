@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import {
   AlertTriangle,
   BedDouble,
@@ -16,7 +17,12 @@ import {
   ScanFace,
   Share2,
   ShieldCheck,
+  Sparkles,
   Users,
+  Wifi,
+  Car,
+  Clock,
+  CircleHelp,
 } from "lucide-react";
 import { toast } from "sonner";
 import { WhatsAppIcon } from "@/components/icons/WhatsAppIcon";
@@ -31,6 +37,12 @@ import { useI18n } from "@/lib/i18n/context";
 import { localeToDateLocale, type Locale } from "@/lib/i18n/types";
 import { cn } from "@/lib/utils";
 import type { Dependent, GuestLookup, Reservation } from "@/lib/api/types";
+import type { UsefulInfoItem, UsefulInfoItemKind } from "@/lib/establishment-settings";
+import { parseUsefulInfoSteps, shouldRenderUsefulInfoAsSteps } from "@/lib/useful-info-format";
+import {
+  buildUsefulInfoVariableContext,
+  resolveUsefulInfoItemText,
+} from "@/lib/useful-info-variables";
 
 type Props = {
   reservation: Reservation;
@@ -42,6 +54,8 @@ type Props = {
   establishmentPhotoUrl?: string | null;
   /** Integração Inbox (portaria) ativa no estabelecimento */
   inboxPortariaEnabled?: boolean;
+  /** Comodidades, Wi-Fi e informações de acesso configuradas no painel */
+  usefulInfoItems?: UsefulInfoItem[];
 };
 
 function formatMoney(value: number | string | undefined, locale: Locale): string | null {
@@ -164,6 +178,115 @@ function CardShell({
   );
 }
 
+function usefulInfoIcon(kind: UsefulInfoItemKind) {
+  switch (kind) {
+    case "wifi":
+      return Wifi;
+    case "access":
+      return KeyRound;
+    case "parking":
+      return Car;
+    case "hours":
+      return Clock;
+    case "amenity":
+      return Sparkles;
+    case "info":
+      return Info;
+    default:
+      return CircleHelp;
+  }
+}
+
+function UsefulInfoValue({
+  item,
+  networkLabel,
+}: {
+  item: UsefulInfoItem;
+  networkLabel: string;
+}) {
+  if (!item.value) return null;
+
+  if (item.kind === "wifi") {
+    return (
+      <div>
+        <p className="text-xs text-muted-foreground">{networkLabel}</p>
+        <p className="wrap-anywhere text-sm font-medium text-foreground">{item.value}</p>
+      </div>
+    );
+  }
+
+  if (shouldRenderUsefulInfoAsSteps(item.kind, item.value)) {
+    const steps = parseUsefulInfoSteps(item.value);
+    return (
+      <ol className="list-decimal space-y-2.5 pl-5 text-sm leading-relaxed text-foreground marker:font-semibold marker:text-primary">
+        {steps.map((step, index) => (
+          <li key={index} className="pl-1 wrap-anywhere">
+            {step}
+          </li>
+        ))}
+      </ol>
+    );
+  }
+
+  return <p className="wrap-anywhere text-sm font-medium text-foreground">{item.value}</p>;
+}
+
+function UsefulInfoCard({
+  item,
+  onCopySecret,
+  copyLabel,
+  secretLabel,
+  networkLabel,
+}: {
+  item: UsefulInfoItem;
+  onCopySecret: (value: string) => void;
+  copyLabel: string;
+  secretLabel: string;
+  networkLabel: string;
+}) {
+  const Icon = usefulInfoIcon(item.kind);
+  const isAccessSteps = item.kind === "access" && shouldRenderUsefulInfoAsSteps(item.kind, item.value);
+
+  return (
+    <li
+      className={cn(
+        "rounded-xl border border-border/80 bg-muted/20 p-3.5 sm:p-4",
+        isAccessSteps && "sm:col-span-2",
+      )}
+    >
+      <div className="flex items-start gap-3">
+        <span
+          className="flex size-9 shrink-0 items-center justify-center rounded-full bg-background text-primary shadow-sm"
+          aria-hidden
+        >
+          <Icon className="size-4" strokeWidth={1.75} />
+        </span>
+        <div className="min-w-0 flex-1 space-y-2">
+          <p className="text-sm font-semibold text-foreground">{item.title}</p>
+          <UsefulInfoValue item={item} networkLabel={networkLabel} />
+          {item.secret ? (
+            <div>
+              <p className="text-xs text-muted-foreground">{secretLabel}</p>
+              <div className="mt-0.5 flex flex-wrap items-center gap-2">
+                <p className="font-code text-sm font-semibold tracking-wide wrap-anywhere">{item.secret}</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 gap-1.5 px-2 text-xs print:hidden"
+                  onClick={() => onCopySecret(item.secret!)}
+                >
+                  <Copy className="size-3" aria-hidden />
+                  {copyLabel}
+                </Button>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </li>
+  );
+}
+
 export function SuccessScreen({
   reservation,
   mainGuest,
@@ -171,6 +294,7 @@ export function SuccessScreen({
   alreadyCompleted,
   establishmentPhotoUrl,
   inboxPortariaEnabled = false,
+  usefulInfoItems = [],
 }: Props) {
   const { locale, t } = useI18n();
   const guest = mainGuest ?? reservation.mainGuest ?? reservation.responsible;
@@ -221,7 +345,26 @@ export function SuccessScreen({
       ? `${guestsQuantity} ${guestsQuantity === 1 ? t("common.guest") : t("common.guests")}`
       : null;
 
-  const showUsefulInfo = Boolean(reservation.localizer || dependents.length > 0);
+  const showUsefulInfo = Boolean(
+    reservation.localizer || dependents.length > 0 || usefulInfoItems.length > 0,
+  );
+  const variableContext = useMemo(
+    () => buildUsefulInfoVariableContext(reservation, guest, locale),
+    [reservation, guest, locale],
+  );
+  const resolvedUsefulInfoItems = useMemo(
+    () =>
+      usefulInfoItems
+        .map((item) => ({
+          ...item,
+          value: resolveUsefulInfoItemText(item.value, variableContext),
+          secret: item.secret
+            ? resolveUsefulInfoItemText(item.secret, variableContext) || null
+            : null,
+        }))
+        .filter((item) => item.value || item.secret),
+    [usefulInfoItems, variableContext],
+  );
   const heroImageUrl = establishmentPhotoUrl?.trim() || "/bg_portal.png";
 
   async function share() {
@@ -243,6 +386,15 @@ export function SuccessScreen({
     try {
       await navigator.clipboard.writeText(String(roomPassword));
       toast.success(t("checkin.success.passwordCopied"));
+    } catch {
+      /* clipboard indisponível */
+    }
+  }
+
+  async function copyUsefulSecret(value: string) {
+    try {
+      await navigator.clipboard.writeText(value);
+      toast.success(t("checkin.success.secretCopied"));
     } catch {
       /* clipboard indisponível */
     }
@@ -476,6 +628,51 @@ export function SuccessScreen({
             </div>
           </CardShell>
 
+          {showUsefulInfo ? (
+            <CardShell className="p-5">
+              <div className="mb-4 flex items-center gap-2">
+                <Info className="size-4 text-muted-foreground" aria-hidden />
+                <h4 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                  {t("checkin.success.usefulInfoTitle")}
+                </h4>
+              </div>
+              <div className="space-y-4">
+                {resolvedUsefulInfoItems.length > 0 ? (
+                  <ul className="grid gap-3 sm:grid-cols-2">
+                    {resolvedUsefulInfoItems.map((item) => (
+                      <UsefulInfoCard
+                        key={item.id}
+                        item={item}
+                        onCopySecret={(value) => void copyUsefulSecret(value)}
+                        copyLabel={t("checkin.success.copySecret")}
+                        secretLabel={t("checkin.success.secretLabel")}
+                        networkLabel={t("checkin.success.networkLabel")}
+                      />
+                    ))}
+                  </ul>
+                ) : null}
+                {reservation.localizer || dependents.length > 0 ? (
+                  <ul className="space-y-3 border-t border-border/60 pt-4 text-sm">
+                    {reservation.localizer ? (
+                      <li>
+                        <p className="text-xs text-muted-foreground">{t("checkin.success.localizerInfo")}</p>
+                        <p className="font-code font-medium">{reservation.localizer}</p>
+                      </li>
+                    ) : null}
+                    {dependents.length > 0 ? (
+                      <li>
+                        <p className="text-xs text-muted-foreground">{t("checkin.success.companionsInfo")}</p>
+                        <p className="font-medium">
+                          {dependents.length} {t("common.companions").toLowerCase()}
+                        </p>
+                      </li>
+                    ) : null}
+                  </ul>
+                ) : null}
+              </div>
+            </CardShell>
+          ) : null}
+
           {price || reservation.label ? (
             <CardShell className="p-5">
               <h4 className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
@@ -497,33 +694,6 @@ export function SuccessScreen({
                   </div>
                 ) : null}
               </div>
-            </CardShell>
-          ) : null}
-
-          {showUsefulInfo ? (
-            <CardShell className="p-5">
-              <div className="mb-4 flex items-center gap-2">
-                <Info className="size-4 text-muted-foreground" aria-hidden />
-                <h4 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                  {t("checkin.success.usefulInfoTitle")}
-                </h4>
-              </div>
-              <ul className="space-y-3 text-sm">
-                {reservation.localizer ? (
-                  <li>
-                    <p className="text-xs text-muted-foreground">{t("checkin.success.localizerInfo")}</p>
-                    <p className="font-code font-medium">{reservation.localizer}</p>
-                  </li>
-                ) : null}
-                {dependents.length > 0 ? (
-                  <li>
-                    <p className="text-xs text-muted-foreground">{t("checkin.success.companionsInfo")}</p>
-                    <p className="font-medium">
-                      {dependents.length} {t("common.companions").toLowerCase()}
-                    </p>
-                  </li>
-                ) : null}
-              </ul>
             </CardShell>
           ) : null}
         </div>

@@ -4,6 +4,25 @@ export type InboxUnitMapping = {
   managedUnitId: number;
 };
 
+export type UsefulInfoItemKind =
+  | "wifi"
+  | "access"
+  | "amenity"
+  | "parking"
+  | "hours"
+  | "info"
+  | "custom";
+
+export type UsefulInfoItem = {
+  id: string;
+  kind: UsefulInfoItemKind;
+  title: string;
+  value: string;
+  /** Senha Wi-Fi, código de acesso etc. */
+  secret: string | null;
+  sortOrder: number;
+};
+
 export type EstablishmentSettings = {
   requireBirthDateConfirmation: boolean;
   requireBirthDateConfirmationOnReaccess: boolean;
@@ -15,6 +34,8 @@ export type EstablishmentSettings = {
   inboxManagedUnitId: number | null;
   /** Mapeamento opcional unidade PMS → unidade Inbox (por número/nome do quarto). */
   inboxUnitMappings: InboxUnitMapping[];
+  /** Comodidades, Wi-Fi e demais informações na seção "Informações úteis" do check-in concluído. */
+  usefulInfoItems: UsefulInfoItem[];
 };
 
 export const DEFAULT_ESTABLISHMENT_SETTINGS: EstablishmentSettings = {
@@ -24,7 +45,14 @@ export const DEFAULT_ESTABLISHMENT_SETTINGS: EstablishmentSettings = {
   inboxEnabled: false,
   inboxManagedUnitId: null,
   inboxUnitMappings: [],
+  usefulInfoItems: [],
 };
+
+export const MAX_USEFUL_INFO_ITEMS = 20;
+export const MAX_USEFUL_INFO_TITLE_LENGTH = 80;
+export const MAX_USEFUL_INFO_VALUE_LENGTH = 500;
+export const MAX_USEFUL_INFO_ACCESS_VALUE_LENGTH = 2500;
+export const MAX_USEFUL_INFO_SECRET_LENGTH = 120;
 
 export const MAX_SUCCESS_PAGE_PHOTO_BYTES = 800_000;
 
@@ -95,6 +123,67 @@ function parseSuccessPagePhotoUrl(value: unknown): string | null {
   return trimmed;
 }
 
+const USEFUL_INFO_KINDS = new Set<UsefulInfoItemKind>([
+  "wifi",
+  "access",
+  "amenity",
+  "parking",
+  "hours",
+  "info",
+  "custom",
+]);
+
+function usefulInfoValueLimit(kind: UsefulInfoItemKind): number {
+  return kind === "access" ? MAX_USEFUL_INFO_ACCESS_VALUE_LENGTH : MAX_USEFUL_INFO_VALUE_LENGTH;
+}
+
+function parseUsefulInfoItems(value: unknown): UsefulInfoItem[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item, index) => {
+      if (!item || typeof item !== "object") return null;
+      const row = item as Record<string, unknown>;
+      const id = String(row.id ?? "").trim();
+      const kindRaw = String(row.kind ?? "custom").trim() as UsefulInfoItemKind;
+      const kind = USEFUL_INFO_KINDS.has(kindRaw) ? kindRaw : "custom";
+      const title = String(row.title ?? "").trim().slice(0, MAX_USEFUL_INFO_TITLE_LENGTH);
+      const itemValue = String(row.value ?? "")
+        .trim()
+        .slice(0, usefulInfoValueLimit(kind));
+      const secretRaw = row.secret;
+      const secret =
+        secretRaw == null || secretRaw === ""
+          ? null
+          : String(secretRaw).trim().slice(0, MAX_USEFUL_INFO_SECRET_LENGTH) || null;
+      const sortOrder = Number.isFinite(Number(row.sortOrder)) ? Number(row.sortOrder) : index;
+      if (!id || !title) return null;
+      if (!itemValue && !secret) return null;
+      return { id, kind, title, value: itemValue, secret, sortOrder };
+    })
+    .filter((item): item is UsefulInfoItem => item !== null)
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .slice(0, MAX_USEFUL_INFO_ITEMS);
+}
+
+export function sanitizeUsefulInfoItems(items: UsefulInfoItem[]): UsefulInfoItem[] {
+  return items
+    .map((item, index) => {
+      const kind = USEFUL_INFO_KINDS.has(item.kind) ? item.kind : "custom";
+      return {
+        id: item.id.trim(),
+        kind,
+        title: item.title.trim().slice(0, MAX_USEFUL_INFO_TITLE_LENGTH),
+        value: item.value.trim().slice(0, usefulInfoValueLimit(kind)),
+        secret: item.secret?.trim()
+          ? item.secret.trim().slice(0, MAX_USEFUL_INFO_SECRET_LENGTH)
+          : null,
+        sortOrder: index,
+      };
+    })
+    .filter((item) => item.id && item.title && (item.value || item.secret))
+    .slice(0, MAX_USEFUL_INFO_ITEMS);
+}
+
 export function parseEstablishmentSettings(raw: unknown): EstablishmentSettings {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
     return DEFAULT_ESTABLISHMENT_SETTINGS;
@@ -108,6 +197,7 @@ export function parseEstablishmentSettings(raw: unknown): EstablishmentSettings 
     inboxEnabled: settings.inboxEnabled === true,
     inboxManagedUnitId: parseInboxManagedUnitId(settings.inboxManagedUnitId),
     inboxUnitMappings: parseInboxUnitMappings(settings.inboxUnitMappings),
+    usefulInfoItems: parseUsefulInfoItems(settings.usefulInfoItems),
   };
 }
 

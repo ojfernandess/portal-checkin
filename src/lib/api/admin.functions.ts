@@ -920,15 +920,26 @@ export const adminSaveSettings = createServerFn({ method: "POST" })
             }),
           )
           .optional(),
+        usefulInfoItems: z
+          .array(
+            z.object({
+              id: z.string().trim().min(1).max(64),
+              kind: z.enum(["wifi", "access", "amenity", "parking", "hours", "info", "custom"]),
+              title: z.string().trim().min(1).max(80),
+              value: z.string().trim().max(2500),
+              secret: z.string().trim().max(120).nullable().optional(),
+              sortOrder: z.number().int().min(0).max(100),
+            }),
+          )
+          .optional(),
       })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { parseEstablishmentSettings, MAX_SUCCESS_PAGE_PHOTO_BYTES } = await import(
-      "@/lib/establishment-settings"
-    );
+    const { parseEstablishmentSettings, MAX_SUCCESS_PAGE_PHOTO_BYTES, sanitizeUsefulInfoItems } =
+      await import("@/lib/establishment-settings");
     const email = await getStaffEmail(context);
 
     const { data: existing } = await supabaseAdmin
@@ -963,6 +974,9 @@ export const adminSaveSettings = createServerFn({ method: "POST" })
         : {}),
       ...(data.inboxUnitMappings !== undefined
         ? { inboxUnitMappings: data.inboxUnitMappings }
+        : {}),
+      ...(data.usefulInfoItems !== undefined
+        ? { usefulInfoItems: sanitizeUsefulInfoItems(data.usefulInfoItems) }
         : {}),
     };
 
