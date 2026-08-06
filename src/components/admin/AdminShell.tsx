@@ -152,7 +152,7 @@ export function AdminShell({ title, subtitle, account, breadcrumbs, children }: 
 
   return (
     <div className="min-h-screen bg-muted/20">
-      <div className="mx-auto flex min-h-screen max-w-7xl 2xl:max-w-[1600px]">
+      <div className="admin-shell flex min-h-screen">
         <aside className="hidden w-64 shrink-0 border-r border-border bg-card lg:block xl:w-72">{sidebar}</aside>
 
         <div className="flex min-w-0 flex-1 flex-col">
@@ -199,7 +199,7 @@ export function AdminShell({ title, subtitle, account, breadcrumbs, children }: 
             </div>
           </header>
 
-          <main className="flex-1 px-4 py-6 lg:px-6">{children}</main>
+          <main className="app-container flex-1 px-4 py-6 lg:px-6">{children}</main>
         </div>
       </div>
     </div>

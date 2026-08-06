@@ -340,8 +340,7 @@ export function CheckinLanding({
   );
 
   return (
-    <div className="checkin-landing-shell">
-      <div className="checkin-landing-root relative min-h-screen lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(380px,1fr)] xl:grid-cols-2">
+    <div className="app-container relative min-h-screen lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(min(100%,380px),1fr)] xl:grid-cols-2">
       <HeroBackground className="fixed inset-0 -z-10" />
 
       <aside className="relative hidden flex-col justify-between px-10 py-10 text-white xl:px-14 xl:py-12 lg:flex lg:min-h-screen">
@@ -362,7 +361,7 @@ export function CheckinLanding({
         </div>
 
         <div className="mt-10 rounded-2xl border border-white/10 bg-black/35 px-3 py-4 backdrop-blur-md xl:px-4">
-          <ul className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-2">
+          <ul className="responsive-grid-sm cq-grid-4">
             {FEATURES.map(({ icon: Icon, titleKey, descKey }) => (
               <li key={titleKey} className="flex min-w-0 items-start gap-2.5 px-1 py-1">
                 <Icon className="mt-0.5 size-5 shrink-0 text-[#6CA0FF]" strokeWidth={1.75} aria-hidden />
@@ -421,7 +420,6 @@ export function CheckinLanding({
           </p>
         </div>
       </div>
-    </div>
     </div>
   );
 }

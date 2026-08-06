@@ -28,7 +28,7 @@ export function Stepper({ current }: { current: number }) {
               </span>
               <span
                 className={cn(
-                  "hidden text-[10px] uppercase tracking-wide sm:block lg:hidden xl:block",
+                  "hidden text-[10px] uppercase tracking-wide sm:block",
                   active ? "text-foreground" : "text-muted-foreground",
                 )}
               >

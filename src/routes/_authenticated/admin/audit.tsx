@@ -72,7 +72,7 @@ function AdminAuditPage() {
           value={action}
           onChange={(e) => setAction(e.target.value)}
           placeholder={t("admin.auditPage.filterPlaceholder")}
-          className="max-w-sm lg:max-w-md xl:max-w-lg"
+          className="max-w-sm"
         />
         <Button type="submit" disabled={loading}>
           {t("common.filter")}

@@ -1,0 +1,239 @@
+/*
+ * Global desktop responsive architecture
+ *
+ * Applies only at min-width: 1024px (lg). Mobile/tablet (<1024px) is untouched.
+ *
+ * Strategy:
+ * 1. Fluid root font-size scales all rem-based Tailwind utilities proportionally.
+ * 2. CSS custom properties centralize shell widths, gaps, and layout tokens.
+ * 3. Reusable layout utilities (fluid grids, scroll regions, containers).
+ * 4. No transform/zoom hacks — preserves fixed/sticky positioning.
+ */
+
+/* ── Design tokens (mobile baseline — unchanged) ─────────────────────────── */
+
+:root {
+  --app-viewport-width: 100vw;
+  --app-viewport-height: 100dvh;
+  --shell-padding-inline: 1.25rem;
+  --shell-max-width: 32rem;
+  --shell-max-width-wide: 64rem;
+  --admin-shell-max-width: 100%;
+  --content-gap: 1.25rem;
+  --fluid-col-min: 14rem;
+  --fluid-col-min-sm: 11rem;
+  --fluid-col-min-lg: 18rem;
+}
+
+/* ── Desktop-only scaling & tokens ───────────────────────────────────────── */
+
+@media (min-width: 1024px) {
+  :root {
+    /*
+     * Scale factor derived from viewport width AND height.
+     * ~12.5px at 1024×768, ~13px at 1366×768, 16px at 1920×1080, capped at 18px.
+     * Adapts automatically when the user changes browser zoom (vw/vh shrink).
+     */
+    --app-font-size: clamp(
+      12.5px,
+      min(calc(6px + 0.52vw), calc(4px + 0.85vh)),
+      18px
+    );
+
+    --shell-padding-inline: clamp(0.875rem, 1.5vw, 1.25rem);
+    --shell-max-width: min(56rem, 94vw);
+    --shell-max-width-wide: min(88rem, 98vw);
+    --admin-shell-max-width: min(100rem, 98vw);
+    --content-gap: clamp(0.75rem, 1.2vw, 1.25rem);
+    --fluid-col-min: clamp(11rem, 14vw, 16rem);
+    --fluid-col-min-sm: clamp(9rem, 12vw, 13rem);
+    --fluid-col-min-lg: clamp(14rem, 18vw, 20rem);
+  }
+
+  html.app-root {
+    font-size: var(--app-font-size);
+  }
+
+  body.app-root {
+    overflow-x: clip;
+    min-height: var(--app-viewport-height);
+  }
+
+  /*
+   * Prevent horizontal overflow from fixed pixel widths without altering mobile.
+   */
+  body.app-root :where(img, video, svg, canvas, iframe) {
+    max-width: 100%;
+  }
+
+  body.app-root :where(table) {
+    max-width: 100%;
+  }
+
+  /* Tabs with many items wrap instead of overflowing */
+  body.app-root :where([role="tablist"]) {
+    flex-wrap: wrap;
+    height: auto;
+    max-width: 100%;
+    justify-content: flex-start;
+    gap: 0.25rem;
+  }
+}
+
+/* ── Fluid typography (desktop headings inherit rem scale; fine-tune display) ─ */
+
+@media (min-width: 1024px) {
+  body.app-root :where(h1) {
+    font-size: clamp(1.375rem, 1.15rem + 0.8vw, 2.25rem);
+  }
+
+  body.app-root :where(h2) {
+    font-size: clamp(1.125rem, 1rem + 0.5vw, 1.75rem);
+  }
+
+  body.app-root :where(h3) {
+    font-size: clamp(1rem, 0.925rem + 0.35vw, 1.5rem);
+  }
+}
+
+/* ── Layout utilities ──────────────────────────────────────────────────────── */
+
+@utility app-container {
+  container-type: inline-size;
+  container-name: app;
+  width: 100%;
+  min-width: 0;
+}
+
+@utility admin-shell {
+  width: 100%;
+  max-width: var(--admin-shell-max-width);
+  margin-inline: auto;
+}
+
+@utility responsive-grid {
+  display: grid;
+  gap: var(--content-gap);
+  grid-template-columns: repeat(
+    auto-fit,
+    minmax(min(100%, var(--fluid-col-min, 14rem)), 1fr)
+  );
+}
+
+@utility responsive-grid-sm {
+  display: grid;
+  gap: var(--content-gap);
+  grid-template-columns: repeat(
+    auto-fit,
+    minmax(min(100%, var(--fluid-col-min-sm, 11rem)), 1fr)
+  );
+}
+
+@utility responsive-grid-lg {
+  display: grid;
+  gap: var(--content-gap);
+  grid-template-columns: repeat(
+    auto-fit,
+    minmax(min(100%, var(--fluid-col-min-lg, 18rem)), 1fr)
+  );
+}
+
+@utility content-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--content-gap);
+}
+
+@utility scroll-region {
+  overflow-y: auto;
+  min-height: 0;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+@utility viewport-height {
+  min-height: var(--app-viewport-height);
+}
+
+@utility overflow-x-safe {
+  overflow-x: clip;
+  max-width: 100%;
+}
+
+@utility form-shell {
+  width: 100%;
+  max-width: min(42rem, 96vw);
+  margin-inline: auto;
+}
+
+@utility auth-shell {
+  width: 100%;
+  max-width: min(24rem, 92vw);
+  margin-inline: auto;
+}
+
+/*
+ * Two-column layout that collapses automatically via container width.
+ * Use on a parent with app-container.
+ */
+@utility split-layout {
+  display: grid;
+  gap: var(--content-gap);
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@container app (min-width: 48rem) {
+  .split-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+@container app (min-width: 64rem) {
+  .split-layout-wide {
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  }
+}
+
+/* ── Shell height management (desktop forms / wizards) ─────────────────────── */
+
+@media (min-width: 1024px) {
+  .app-viewport-fit {
+    display: flex;
+    flex-direction: column;
+    min-height: var(--app-viewport-height);
+    max-height: var(--app-viewport-height);
+    overflow: hidden;
+  }
+
+  .app-viewport-fit > .app-viewport-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .app-viewport-fit > .app-viewport-sticky-header,
+  .app-viewport-fit > .app-viewport-sticky-footer {
+    flex-shrink: 0;
+  }
+}
+
+/* ── Container-query grid tiers (auto column count) ────────────────────────── */
+
+@container app (min-width: 28rem) {
+  .cq-grid-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@container app (min-width: 42rem) {
+  .cq-grid-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@container app (min-width: 56rem) {
+  .cq-grid-4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
