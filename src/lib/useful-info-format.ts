@@ -14,3 +14,7 @@ export function shouldRenderUsefulInfoAsSteps(kind: string, value: string): bool
   if (kind === "access") return parseUsefulInfoSteps(value).length > 0;
   return parseUsefulInfoSteps(value).length > 1;
 }
+
+export function shouldRenderUsefulInfoAsFormattedBlock(kind: string, value: string): boolean {
+  return kind === "parking" && value.includes("\n");
+}

@@ -134,7 +134,8 @@ const USEFUL_INFO_KINDS = new Set<UsefulInfoItemKind>([
 ]);
 
 function usefulInfoValueLimit(kind: UsefulInfoItemKind): number {
-  return kind === "access" ? MAX_USEFUL_INFO_ACCESS_VALUE_LENGTH : MAX_USEFUL_INFO_VALUE_LENGTH;
+  if (kind === "access" || kind === "parking") return MAX_USEFUL_INFO_ACCESS_VALUE_LENGTH;
+  return MAX_USEFUL_INFO_VALUE_LENGTH;
 }
 
 function parseUsefulInfoItems(value: unknown): UsefulInfoItem[] {

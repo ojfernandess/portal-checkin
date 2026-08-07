@@ -489,6 +489,7 @@ export const en: MessageTree = {
       companionsInfo: "Registered companions",
       networkLabel: "Network",
       secretLabel: "Password",
+      parkingPriceLabel: "Fee",
       copySecret: "Copy",
       secretCopied: "Copied!",
       helpDuringStay: "Need help during your stay?",
@@ -789,6 +790,13 @@ export const en: MessageTree = {
       usefulInfoAccessStepsHint:
         "One step per line. Use variables like {senha}, {unidade}, and {categoria} — they are filled automatically from the reservation.",
       usefulInfoAccessSecretLabel: "Door password / code (optional)",
+      usefulInfoParkingDetailsLabel: "Parking details",
+      usefulInfoParkingDetailsPlaceholder:
+        "Covered parking in the basement, access via Flower Street.\nLimited spaces — we recommend arriving early.\nEnter through the side gate and identify yourself at reception.",
+      usefulInfoParkingDetailsHint:
+        "Use line breaks to organize instructions, location, and notes. Variables like {estabelecimento} and {unidade} are filled automatically.",
+      usefulInfoParkingPriceLabel: "Parking fee (optional)",
+      usefulInfoParkingPricePlaceholder: "E.g. R$ 30.00/day or Free for guests",
       usefulInfoVariablesTitle: "Insert variable",
       usefulInfoVariablesHint:
         "Click the target field, then click a variable. It will be replaced with reservation data on the guest page.",

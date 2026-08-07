@@ -492,6 +492,7 @@ export const es: MessageTree = {
       companionsInfo: "Acompañantes registrados",
       networkLabel: "Red",
       secretLabel: "Contraseña",
+      parkingPriceLabel: "Tarifa",
       copySecret: "Copiar",
       secretCopied: "¡Copiado!",
       helpDuringStay: "¿Necesita ayuda durante su estadía?",
@@ -795,6 +796,13 @@ export const es: MessageTree = {
       usefulInfoAccessStepsHint:
         "Un paso por línea. Use variables como {senha}, {unidade} y {categoria} — se completan automáticamente con los datos de la reserva.",
       usefulInfoAccessSecretLabel: "Contraseña de la puerta / código (opcional)",
+      usefulInfoParkingDetailsLabel: "Información del estacionamiento",
+      usefulInfoParkingDetailsPlaceholder:
+        "Estacionamiento cubierto en el subsuelo, acceso por la Calle de las Flores.\nPlazas limitadas — recomendamos llegar con anticipación.\nEntrada por el portón lateral, identifíquese en recepción.",
+      usefulInfoParkingDetailsHint:
+        "Use saltos de línea para organizar instrucciones, ubicación y observaciones. Variables como {estabelecimento} y {unidade} se completan automáticamente.",
+      usefulInfoParkingPriceLabel: "Tarifa del estacionamiento (opcional)",
+      usefulInfoParkingPricePlaceholder: "Ej.: R$ 30,00/día o Gratis para huéspedes",
       usefulInfoVariablesTitle: "Insertar variable",
       usefulInfoVariablesHint:
         "Haga clic en el campo deseado y luego en la variable. Se reemplazará por los datos de la reserva en la página del huésped.",

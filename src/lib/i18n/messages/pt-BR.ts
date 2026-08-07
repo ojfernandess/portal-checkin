@@ -490,6 +490,7 @@ export const ptBR = {
       companionsInfo: "Acompanhantes registrados",
       networkLabel: "Rede",
       secretLabel: "Senha",
+      parkingPriceLabel: "Valor",
       copySecret: "Copiar",
       secretCopied: "Copiado!",
       helpDuringStay: "Precisa de ajuda durante sua estadia?",
@@ -793,6 +794,13 @@ export const ptBR = {
       usefulInfoAccessStepsHint:
         "Um passo por linha. Use variáveis como {senha}, {unidade} e {categoria} — serão preenchidas automaticamente com os dados da reserva.",
       usefulInfoAccessSecretLabel: "Senha da porta / código (opcional)",
+      usefulInfoParkingDetailsLabel: "Informações do estacionamento",
+      usefulInfoParkingDetailsPlaceholder:
+        "Estacionamento coberto no subsolo, acesso pela Rua das Flores.\nVagas limitadas — recomendamos chegar com antecedência.\nEntrada pelo portão lateral, identifique-se na portaria.",
+      usefulInfoParkingDetailsHint:
+        "Use quebras de linha para organizar instruções, localização e observações. Variáveis como {estabelecimento} e {unidade} são preenchidas automaticamente.",
+      usefulInfoParkingPriceLabel: "Valor do estacionamento (opcional)",
+      usefulInfoParkingPricePlaceholder: "Ex.: R$ 30,00/dia ou Grátis para hóspedes",
       usefulInfoVariablesTitle: "Inserir variável",
       usefulInfoVariablesHint:
         "Clique no campo desejado e depois na variável. Ela será substituída pelos dados da reserva na página do hóspede.",

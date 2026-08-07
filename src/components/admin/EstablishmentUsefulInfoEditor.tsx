@@ -88,7 +88,8 @@ function UsefulInfoItemEditor({
   const valueRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
   const secretRef = useRef<HTMLInputElement>(null);
   const [activeField, setActiveField] = useState<ActiveField>("value");
-  const showSecret = item.kind === "wifi" || item.kind === "access";
+  const showSecret = item.kind === "wifi" || item.kind === "access" || item.kind === "parking";
+  const isLongText = item.kind === "access" || item.kind === "parking";
 
   function insertToken(token: string) {
     if (activeField === "secret") {
@@ -173,21 +174,29 @@ function UsefulInfoItemEditor({
               ? t("admin.establishmentConfig.usefulInfoNetworkLabel")
               : item.kind === "access"
                 ? t("admin.establishmentConfig.usefulInfoAccessStepsLabel")
-                : t("admin.establishmentConfig.usefulInfoValueLabel")}
+                : item.kind === "parking"
+                  ? t("admin.establishmentConfig.usefulInfoParkingDetailsLabel")
+                  : t("admin.establishmentConfig.usefulInfoValueLabel")}
           </Label>
-          {item.kind === "access" ? (
+          {isLongText ? (
             <>
               <Textarea
                 ref={valueRef as React.RefObject<HTMLTextAreaElement>}
                 value={item.value}
                 onFocus={() => setActiveField("value")}
                 onChange={(e) => onUpdate({ value: e.target.value })}
-                placeholder={t("admin.establishmentConfig.usefulInfoAccessStepsPlaceholder")}
-                rows={8}
-                className="min-h-[10rem] resize-y font-mono text-sm leading-relaxed"
+                placeholder={
+                  item.kind === "access"
+                    ? t("admin.establishmentConfig.usefulInfoAccessStepsPlaceholder")
+                    : t("admin.establishmentConfig.usefulInfoParkingDetailsPlaceholder")
+                }
+                rows={item.kind === "parking" ? 6 : 8}
+                className="min-h-[9rem] resize-y text-sm leading-relaxed"
               />
               <p className="text-xs leading-relaxed text-muted-foreground">
-                {t("admin.establishmentConfig.usefulInfoAccessStepsHint")}
+                {item.kind === "access"
+                  ? t("admin.establishmentConfig.usefulInfoAccessStepsHint")
+                  : t("admin.establishmentConfig.usefulInfoParkingDetailsHint")}
               </p>
             </>
           ) : (
@@ -209,7 +218,9 @@ function UsefulInfoItemEditor({
             <Label>
               {item.kind === "access"
                 ? t("admin.establishmentConfig.usefulInfoAccessSecretLabel")
-                : t("admin.establishmentConfig.usefulInfoSecretLabel")}
+                : item.kind === "parking"
+                  ? t("admin.establishmentConfig.usefulInfoParkingPriceLabel")
+                  : t("admin.establishmentConfig.usefulInfoSecretLabel")}
             </Label>
             <Input
               ref={secretRef}
@@ -218,7 +229,11 @@ function UsefulInfoItemEditor({
               onChange={(e) =>
                 onUpdate({ secret: e.target.value.trim() ? e.target.value : null })
               }
-              placeholder={t("admin.establishmentConfig.usefulInfoSecretPlaceholder")}
+              placeholder={
+                item.kind === "parking"
+                  ? t("admin.establishmentConfig.usefulInfoParkingPricePlaceholder")
+                  : t("admin.establishmentConfig.usefulInfoSecretPlaceholder")
+              }
             />
           </div>
         ) : null}

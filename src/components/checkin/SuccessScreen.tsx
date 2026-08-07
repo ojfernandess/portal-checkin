@@ -39,7 +39,7 @@ import { localeToDateLocale, type Locale } from "@/lib/i18n/types";
 import { cn } from "@/lib/utils";
 import type { Dependent, GuestLookup, Reservation } from "@/lib/api/types";
 import type { UsefulInfoItem, UsefulInfoItemKind } from "@/lib/establishment-settings";
-import { parseUsefulInfoSteps, shouldRenderUsefulInfoAsSteps } from "@/lib/useful-info-format";
+import { parseUsefulInfoSteps, shouldRenderUsefulInfoAsFormattedBlock, shouldRenderUsefulInfoAsSteps } from "@/lib/useful-info-format";
 import {
   buildUsefulInfoVariableContext,
   resolveUsefulInfoItemText,
@@ -216,6 +216,14 @@ function UsefulInfoValue({
     );
   }
 
+  if (item.kind === "parking") {
+    return (
+      <p className="whitespace-pre-line text-sm leading-relaxed text-foreground wrap-anywhere">
+        {item.value}
+      </p>
+    );
+  }
+
   if (shouldRenderUsefulInfoAsSteps(item.kind, item.value)) {
     const steps = parseUsefulInfoSteps(item.value);
     return (
@@ -237,22 +245,28 @@ function UsefulInfoCard({
   onCopySecret,
   copyLabel,
   secretLabel,
+  parkingPriceLabel,
   networkLabel,
 }: {
   item: UsefulInfoItem;
   onCopySecret: (value: string) => void;
   copyLabel: string;
   secretLabel: string;
+  parkingPriceLabel: string;
   networkLabel: string;
 }) {
   const Icon = usefulInfoIcon(item.kind);
   const isAccessSteps = item.kind === "access" && shouldRenderUsefulInfoAsSteps(item.kind, item.value);
+  const isParkingWide =
+    item.kind === "parking" &&
+    Boolean(item.value) &&
+    (shouldRenderUsefulInfoAsFormattedBlock(item.kind, item.value) || item.value.length > 80);
 
   return (
     <li
       className={cn(
         "rounded-xl border border-border/80 bg-muted/20 p-3.5 sm:p-4",
-        isAccessSteps && "sm:col-span-2",
+        (isAccessSteps || isParkingWide) && "sm:col-span-2",
       )}
     >
       <div className="flex items-start gap-3">
@@ -267,7 +281,9 @@ function UsefulInfoCard({
           <UsefulInfoValue item={item} networkLabel={networkLabel} />
           {item.secret ? (
             <div>
-              <p className="text-xs text-muted-foreground">{secretLabel}</p>
+              <p className="text-xs text-muted-foreground">
+                {item.kind === "parking" ? parkingPriceLabel : secretLabel}
+              </p>
               <div className="mt-0.5 flex flex-wrap items-center gap-2">
                 <p className="font-code text-sm font-semibold tracking-wide wrap-anywhere">{item.secret}</p>
                 <Button
@@ -741,6 +757,7 @@ export function SuccessScreen({
                         onCopySecret={(value) => void copyUsefulSecret(value)}
                         copyLabel={t("checkin.success.copySecret")}
                         secretLabel={t("checkin.success.secretLabel")}
+                        parkingPriceLabel={t("checkin.success.parkingPriceLabel")}
                         networkLabel={t("checkin.success.networkLabel")}
                       />
                     ))}
