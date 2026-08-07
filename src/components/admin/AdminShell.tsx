@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { BrandLogo } from "@/components/BrandLogo";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { supabase } from "@/integrations/supabase/client";
 import { adminMe } from "@/lib/api/admin.functions";
 import { useI18n } from "@/lib/i18n/context";
@@ -53,11 +54,17 @@ type NavItem = {
   adminOnly?: boolean;
 };
 
+type NavGroup = {
+  label: string;
+  items: NavItem[];
+};
+
 type Props = {
-  title: string;
+  title?: string;
   subtitle?: string;
   account?: AdminAccount | null;
   breadcrumbs?: Breadcrumb[];
+  hidePageHeader?: boolean;
   children: React.ReactNode;
 };
 
@@ -85,8 +92,8 @@ function AdminNavLink({
       className={cn(
         "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
         active
-          ? "bg-primary text-primary-foreground shadow-sm"
-          : "text-muted-foreground hover:bg-muted hover:text-foreground",
+          ? "bg-white/15 text-white shadow-sm ring-1 ring-white/10"
+          : "text-white/70 hover:bg-white/10 hover:text-white",
       )}
     >
       <Icon className="size-4 shrink-0" aria-hidden />
@@ -95,7 +102,14 @@ function AdminNavLink({
   );
 }
 
-export function AdminShell({ title, subtitle, account, breadcrumbs, children }: Props) {
+export function AdminShell({
+  title,
+  subtitle,
+  account,
+  breadcrumbs,
+  hidePageHeader = false,
+  children,
+}: Props) {
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const { t } = useI18n();
@@ -109,40 +123,83 @@ export function AdminShell({ title, subtitle, account, breadcrumbs, children }: 
 
   const roleLabel = isAdmin ? t("admin.adminRole") : t("admin.receptionRole");
   const displayName = account?.fullName?.trim() || account?.email || t("admin.panel");
+  const initials = displayName.slice(0, 2).toUpperCase();
 
-  const navItems: NavItem[] = [
-    { to: "/admin/dashboard", label: t("admin.dashboard"), icon: LayoutDashboard },
-    { to: "/admin/checkins", label: t("admin.checkins"), icon: ClipboardList },
-    { to: "/admin/establishments", label: t("admin.establishments"), icon: Building2, adminOnly: true },
-    { to: "/admin/security", label: t("admin.security"), icon: Shield, adminOnly: true },
-    { to: "/admin/audit", label: t("admin.audit"), icon: ScrollText, adminOnly: true },
-    { to: "/admin/users", label: t("admin.users"), icon: Users, adminOnly: true },
-  ].filter((item) => !item.adminOnly || isAdmin);
+  const navGroups: NavGroup[] = [
+    {
+      label: t("admin.navGroupOperation"),
+      items: [
+        { to: "/admin/dashboard", label: t("admin.dashboard"), icon: LayoutDashboard },
+        { to: "/admin/checkins", label: t("admin.checkins"), icon: ClipboardList },
+        { to: "/admin/establishments", label: t("admin.establishments"), icon: Building2, adminOnly: true },
+      ],
+    },
+    {
+      label: t("admin.navGroupControl"),
+      items: [
+        { to: "/admin/security", label: t("admin.security"), icon: Shield, adminOnly: true },
+        { to: "/admin/audit", label: t("admin.audit"), icon: ScrollText, adminOnly: true },
+        { to: "/admin/users", label: t("admin.users"), icon: Users, adminOnly: true },
+      ],
+    },
+  ]
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => !item.adminOnly || isAdmin),
+    }))
+    .filter((group) => group.items.length > 0);
 
   const sidebar = (
-    <div className="flex h-full flex-col">
-      <div className="border-b border-border px-4 py-5">
-        <BrandLogo className="max-h-10" />
-        <p className="mt-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+    <div className="flex h-full flex-col bg-[#1B3A57] text-white">
+      <div className="border-b border-white/10 px-4 py-5">
+        <BrandLogo variant="white" className="max-h-9" />
+        <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/55">
           {t("admin.panel")}
         </p>
       </div>
 
-      <nav className="flex-1 space-y-1 px-3 py-4" aria-label={t("admin.navLabel")}>
-        {navItems.map((item) => (
-          <AdminNavLink key={item.to} item={item} pathname={pathname} onNavigate={() => setMobileOpen(false)} />
+      <nav className="flex-1 space-y-5 px-3 py-4" aria-label={t("admin.navLabel")}>
+        {navGroups.map((group) => (
+          <div key={group.label} className="space-y-1">
+            <p className="px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-white/45">
+              {group.label}
+            </p>
+            {group.items.map((item) => (
+              <AdminNavLink
+                key={item.to}
+                item={item}
+                pathname={pathname}
+                onNavigate={() => setMobileOpen(false)}
+              />
+            ))}
+          </div>
         ))}
       </nav>
 
-      <div className="mt-auto border-t border-border px-4 py-4">
-        <div className="rounded-lg bg-muted/50 px-3 py-3">
-          <p className="truncate text-sm font-medium text-foreground">{displayName}</p>
-          <p className="truncate text-xs text-muted-foreground">{account?.email}</p>
-          <p className="mt-1 text-xs text-muted-foreground">{roleLabel}</p>
+      <div className="mt-auto border-t border-white/10 px-4 py-4">
+        <div className="rounded-xl bg-white/10 p-3 ring-1 ring-white/10">
+          <div className="flex items-center gap-3">
+            <Avatar className="size-10 border border-white/20">
+              <AvatarFallback className="bg-white/15 text-sm font-semibold text-white">{initials}</AvatarFallback>
+            </Avatar>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium text-white">{displayName}</p>
+              <p className="truncate text-xs text-white/60">{roleLabel}</p>
+            </div>
+          </div>
         </div>
         <div className="mt-3 flex flex-col gap-2">
-          <LanguageSwitcher variant="outline" size="sm" className="w-full justify-center" />
-          <Button variant="outline" size="sm" className="w-full" onClick={() => void signOut()}>
+          <LanguageSwitcher
+            variant="outline"
+            size="sm"
+            className="w-full justify-center border-white/15 bg-white/10 text-white hover:bg-white/15 hover:text-white"
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full border-white/15 bg-transparent text-white hover:bg-white/10 hover:text-white"
+            onClick={() => void signOut()}
+          >
             <LogOut className="size-4" aria-hidden /> {t("admin.signOut")}
           </Button>
         </div>
@@ -151,53 +208,73 @@ export function AdminShell({ title, subtitle, account, breadcrumbs, children }: 
   );
 
   return (
-    <div className="min-h-screen bg-muted/20">
+    <div className="min-h-screen bg-[#f4f6f9]">
       <div className="admin-shell flex min-h-screen">
-        <aside className="hidden w-64 shrink-0 border-r border-border bg-card lg:block xl:w-72">{sidebar}</aside>
+        <aside className="hidden w-64 shrink-0 lg:block xl:w-72">{sidebar}</aside>
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-            <div className="flex items-center justify-between gap-4 px-4 py-4 lg:px-6">
-              <div className="flex min-w-0 items-center gap-3">
-                <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-                  <SheetTrigger asChild>
-                    <Button variant="outline" size="icon" className="lg:hidden" aria-label={t("admin.openMenu")}>
-                      <Menu className="size-4" />
-                    </Button>
-                  </SheetTrigger>
-                  <SheetContent side="left" className="w-72 p-0">
-                    <SheetHeader className="sr-only">
-                      <SheetTitle>{t("admin.navLabel")}</SheetTitle>
-                    </SheetHeader>
-                    {sidebar}
-                  </SheetContent>
-                </Sheet>
+          {!hidePageHeader ? (
+            <header className="sticky top-0 z-20 border-b border-border/70 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+              <div className="flex items-center justify-between gap-4 px-4 py-4 lg:px-6">
+                <div className="flex min-w-0 items-center gap-3">
+                  <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+                    <SheetTrigger asChild>
+                      <Button variant="outline" size="icon" className="lg:hidden" aria-label={t("admin.openMenu")}>
+                        <Menu className="size-4" />
+                      </Button>
+                    </SheetTrigger>
+                    <SheetContent side="left" className="w-72 p-0">
+                      <SheetHeader className="sr-only">
+                        <SheetTitle>{t("admin.navLabel")}</SheetTitle>
+                      </SheetHeader>
+                      {sidebar}
+                    </SheetContent>
+                  </Sheet>
 
-                <div className="min-w-0">
-                  {breadcrumbs && breadcrumbs.length > 0 ? (
-                    <nav className="mb-1 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
-                      {breadcrumbs.map((crumb, index) => (
-                        <span key={`${crumb.label}-${index}`} className="inline-flex items-center gap-1">
-                          {index > 0 ? <ChevronRight className="size-3" aria-hidden /> : null}
-                          {crumb.to ? (
-                            <Link to={crumb.to} className="hover:text-foreground hover:underline">
-                              {crumb.label}
-                            </Link>
-                          ) : (
-                            <span className="text-foreground">{crumb.label}</span>
-                          )}
-                        </span>
-                      ))}
-                    </nav>
-                  ) : null}
-                  <h1 className="truncate font-display text-xl">{title}</h1>
-                  <p className="truncate text-xs text-muted-foreground">
-                    {subtitle ?? `${displayName} · ${roleLabel}`}
-                  </p>
+                  <div className="min-w-0">
+                    {breadcrumbs && breadcrumbs.length > 0 ? (
+                      <nav className="mb-1 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+                        {breadcrumbs.map((crumb, index) => (
+                          <span key={`${crumb.label}-${index}`} className="inline-flex items-center gap-1">
+                            {index > 0 ? <ChevronRight className="size-3" aria-hidden /> : null}
+                            {crumb.to ? (
+                              <Link to={crumb.to} className="hover:text-foreground hover:underline">
+                                {crumb.label}
+                              </Link>
+                            ) : (
+                              <span className="text-foreground">{crumb.label}</span>
+                            )}
+                          </span>
+                        ))}
+                      </nav>
+                    ) : null}
+                    {title ? <h1 className="truncate text-xl font-semibold">{title}</h1> : null}
+                    {subtitle || account ? (
+                      <p className="truncate text-xs text-muted-foreground">
+                        {subtitle ?? `${displayName} · ${roleLabel}`}
+                      </p>
+                    ) : null}
+                  </div>
                 </div>
               </div>
+            </header>
+          ) : (
+            <div className="sticky top-0 z-20 border-b border-border/70 bg-background/95 px-4 py-3 backdrop-blur lg:hidden">
+              <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+                <SheetTrigger asChild>
+                  <Button variant="outline" size="icon" aria-label={t("admin.openMenu")}>
+                    <Menu className="size-4" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="left" className="w-72 p-0">
+                  <SheetHeader className="sr-only">
+                    <SheetTitle>{t("admin.navLabel")}</SheetTitle>
+                  </SheetHeader>
+                  {sidebar}
+                </SheetContent>
+              </Sheet>
             </div>
-          </header>
+          )}
 
           <main className="app-container flex-1 px-4 py-6 lg:px-6">{children}</main>
         </div>
@@ -223,7 +300,7 @@ export function AdminSection({
     <section className={cn("space-y-4", className)}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="font-display text-lg">{title}</h2>
+          <h2 className="text-lg font-semibold">{title}</h2>
           {description ? <p className="mt-1 text-sm text-muted-foreground">{description}</p> : null}
         </div>
         {action}
