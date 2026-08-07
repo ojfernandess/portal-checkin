@@ -26,7 +26,7 @@ export function DashboardOperationSection({ events, attentionItems, loading }: P
   const hours = Array.from(new Set(events.map((event) => event.hour))).sort((a, b) => a - b);
 
   return (
-    <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.6fr)_minmax(280px,1fr)]">
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-[minmax(0,1.6fr)_minmax(280px,1fr)]">
       <section className="rounded-xl border border-border/80 bg-card p-5 shadow-sm">
         <div className="mb-4 flex items-center gap-2">
           <Clock3 className="size-4 text-[#1B3A57]" aria-hidden />

@@ -1,4 +1,7 @@
+import { Link } from "@tanstack/react-router";
+import { Settings } from "lucide-react";
 import { AdminShell, useAdminAccount } from "@/components/admin/AdminShell";
+import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n/context";
 import { useState } from "react";
 import { DashboardCheckoutsTable } from "./DashboardCheckoutsTable";
@@ -12,7 +15,7 @@ import { useDashboardData } from "./useDashboardData";
 import { buildAttentionItems, buildTimelineEvents, hasHourChartData, todayIso } from "./utils";
 
 export function AdminDashboardView() {
-  const { locale } = useI18n();
+  const { locale, t } = useI18n();
   const account = useAdminAccount();
   const [date, setDate] = useState(todayIso);
   const { portal, portalError, checkouts, created, loading, refresh } = useDashboardData(date);
@@ -23,8 +26,21 @@ export function AdminDashboardView() {
   const referenceDate = portal?.date ?? date;
 
   return (
-    <AdminShell account={account} hidePageHeader>
-      <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-6 pb-8">
+    <AdminShell
+      account={account}
+      hidePageHeader
+      mobileTitle={t("admin.dashboard")}
+      mobileActions={
+        account?.role === "admin" ? (
+          <Button variant="outline" size="icon" className="size-9" asChild>
+            <Link to="/admin/security" aria-label={t("admin.security")}>
+              <Settings className="size-4" />
+            </Link>
+          </Button>
+        ) : null
+      }
+    >
+      <div className="flex w-full min-w-0 flex-col gap-4 pb-6 sm:gap-6 sm:pb-8">
         <DashboardHeader
           account={account}
           date={date}

@@ -107,8 +107,8 @@
 
 @utility admin-shell {
   width: 100%;
-  max-width: var(--admin-shell-max-width);
-  margin-inline: auto;
+  max-width: none;
+  min-width: 0;
 }
 
 @utility responsive-grid {
@@ -164,6 +164,25 @@
   width: 100%;
   max-width: min(42rem, 96vw);
   margin-inline: auto;
+}
+
+@utility admin-page {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+@utility admin-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+@container app (min-width: 40rem) {
+  .admin-toolbar {
+    flex-direction: row;
+    align-items: center;
+  }
 }
 
 @utility auth-shell {

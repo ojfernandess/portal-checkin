@@ -65,6 +65,8 @@ type Props = {
   account?: AdminAccount | null;
   breadcrumbs?: Breadcrumb[];
   hidePageHeader?: boolean;
+  mobileTitle?: string;
+  mobileActions?: React.ReactNode;
   children: React.ReactNode;
 };
 
@@ -102,12 +104,49 @@ function AdminNavLink({
   );
 }
 
+function AdminMobileMenu({
+  open,
+  onOpenChange,
+  triggerClassName,
+  sidebar,
+  label,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  triggerClassName?: string;
+  sidebar: React.ReactNode;
+  label: string;
+}) {
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetTrigger asChild>
+        <Button
+          variant="outline"
+          size="icon"
+          className={cn("size-9 shrink-0", triggerClassName)}
+          aria-label={label}
+        >
+          <Menu className="size-4" />
+        </Button>
+      </SheetTrigger>
+      <SheetContent side="left" className="w-[min(18rem,88vw)] p-0 sm:w-72">
+        <SheetHeader className="sr-only">
+          <SheetTitle>{label}</SheetTitle>
+        </SheetHeader>
+        {sidebar}
+      </SheetContent>
+    </Sheet>
+  );
+}
+
 export function AdminShell({
   title,
   subtitle,
   account,
   breadcrumbs,
   hidePageHeader = false,
+  mobileTitle,
+  mobileActions,
   children,
 }: Props) {
   const navigate = useNavigate();
@@ -124,6 +163,7 @@ export function AdminShell({
   const roleLabel = isAdmin ? t("admin.adminRole") : t("admin.receptionRole");
   const displayName = account?.fullName?.trim() || account?.email || t("admin.panel");
   const initials = displayName.slice(0, 2).toUpperCase();
+  const resolvedMobileTitle = mobileTitle ?? title ?? t("admin.panel");
 
   const navGroups: NavGroup[] = [
     {
@@ -150,7 +190,7 @@ export function AdminShell({
     .filter((group) => group.items.length > 0);
 
   const sidebar = (
-    <div className="flex h-full flex-col bg-[#1B3A57] text-white">
+    <div className="flex h-full min-h-0 flex-col bg-[#1B3A57] text-white">
       <div className="border-b border-white/10 px-4 py-5">
         <BrandLogo variant="white" className="max-h-9" />
         <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/55">
@@ -158,7 +198,7 @@ export function AdminShell({
         </p>
       </div>
 
-      <nav className="flex-1 space-y-5 px-3 py-4" aria-label={t("admin.navLabel")}>
+      <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-4" aria-label={t("admin.navLabel")}>
         {navGroups.map((group) => (
           <div key={group.label} className="space-y-1">
             <p className="px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-white/45">
@@ -207,30 +247,43 @@ export function AdminShell({
     </div>
   );
 
+  const mobileTopBar = (
+    <header className="sticky top-0 z-20 border-b border-border/70 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 lg:hidden">
+      <div className="flex items-center justify-between gap-3 px-3 py-3 sm:px-4">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <AdminMobileMenu
+            open={mobileOpen}
+            onOpenChange={setMobileOpen}
+            sidebar={sidebar}
+            label={t("admin.openMenu")}
+          />
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold">{resolvedMobileTitle}</p>
+            {!hidePageHeader && (subtitle || account) ? (
+              <p className="truncate text-xs text-muted-foreground">
+                {subtitle ?? `${displayName} · ${roleLabel}`}
+              </p>
+            ) : null}
+          </div>
+        </div>
+        {mobileActions ? <div className="flex shrink-0 items-center gap-2">{mobileActions}</div> : null}
+      </div>
+    </header>
+  );
+
   return (
-    <div className="min-h-screen bg-[#f4f6f9]">
-      <div className="admin-shell flex min-h-screen">
+    <div className="min-h-screen w-full overflow-x-hidden bg-[#f4f6f9]">
+      <div className="admin-shell flex min-h-screen w-full min-w-0">
         <aside className="hidden w-64 shrink-0 lg:block xl:w-72">{sidebar}</aside>
 
-        <div className="flex min-w-0 flex-1 flex-col">
-          {!hidePageHeader ? (
-            <header className="sticky top-0 z-20 border-b border-border/70 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-              <div className="flex items-center justify-between gap-4 px-4 py-4 lg:px-6">
-                <div className="flex min-w-0 items-center gap-3">
-                  <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-                    <SheetTrigger asChild>
-                      <Button variant="outline" size="icon" className="lg:hidden" aria-label={t("admin.openMenu")}>
-                        <Menu className="size-4" />
-                      </Button>
-                    </SheetTrigger>
-                    <SheetContent side="left" className="w-72 p-0">
-                      <SheetHeader className="sr-only">
-                        <SheetTitle>{t("admin.navLabel")}</SheetTitle>
-                      </SheetHeader>
-                      {sidebar}
-                    </SheetContent>
-                  </Sheet>
-
+        <div className="flex w-full min-w-0 flex-1 flex-col">
+          {hidePageHeader ? (
+            mobileTopBar
+          ) : (
+            <>
+              {mobileTopBar}
+              <header className="sticky top-0 z-20 hidden border-b border-border/70 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 lg:block">
+                <div className="flex items-center justify-between gap-4 px-6 py-4">
                   <div className="min-w-0">
                     {breadcrumbs && breadcrumbs.length > 0 ? (
                       <nav className="mb-1 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
@@ -256,27 +309,13 @@ export function AdminShell({
                     ) : null}
                   </div>
                 </div>
-              </div>
-            </header>
-          ) : (
-            <div className="sticky top-0 z-20 border-b border-border/70 bg-background/95 px-4 py-3 backdrop-blur lg:hidden">
-              <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-                <SheetTrigger asChild>
-                  <Button variant="outline" size="icon" aria-label={t("admin.openMenu")}>
-                    <Menu className="size-4" />
-                  </Button>
-                </SheetTrigger>
-                <SheetContent side="left" className="w-72 p-0">
-                  <SheetHeader className="sr-only">
-                    <SheetTitle>{t("admin.navLabel")}</SheetTitle>
-                  </SheetHeader>
-                  {sidebar}
-                </SheetContent>
-              </Sheet>
-            </div>
+              </header>
+            </>
           )}
 
-          <main className="app-container flex-1 px-4 py-6 lg:px-6">{children}</main>
+          <main className="app-container w-full min-w-0 flex-1 overflow-x-hidden px-3 py-4 sm:px-4 sm:py-6 lg:px-6">
+            {children}
+          </main>
         </div>
       </div>
     </div>
@@ -299,7 +338,7 @@ export function AdminSection({
   return (
     <section className={cn("space-y-4", className)}>
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+        <div className="min-w-0">
           <h2 className="text-lg font-semibold">{title}</h2>
           {description ? <p className="mt-1 text-sm text-muted-foreground">{description}</p> : null}
         </div>

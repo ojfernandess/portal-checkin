@@ -8,6 +8,7 @@ import {
   type CheckinRecordRow,
 } from "@/lib/api/admin.functions";
 import { CheckinRecordDetail } from "@/components/admin/CheckinRecordDetail";
+import { AdminResponsiveTable } from "@/components/admin/AdminResponsiveTable";
 import { AdminShell, useAdminAccount } from "@/components/admin/AdminShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -74,88 +75,119 @@ function AdminCheckinsPage() {
 
   return (
     <AdminShell title={t("admin.checkinsPage.title")} account={account}>
-      <p className="mb-4 text-sm text-muted-foreground">{t("admin.checkinsPage.body")}</p>
+      <div className="min-w-0 space-y-4 sm:space-y-6">
+        <p className="text-sm text-muted-foreground">{t("admin.checkinsPage.body")}</p>
 
-      <form
-        className="mb-6 responsive-grid"
-        onSubmit={(e) => {
-          e.preventDefault();
-          setApplied({ localizer: localizer.trim().toUpperCase(), date });
-        }}
-      >
-        <Input
-          value={localizer}
-          onChange={(e) => setLocalizer(e.target.value.toUpperCase())}
-          placeholder={t("admin.checkinsPage.localizerPlaceholder")}
-          className="uppercase"
-        />
-        <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-        <div className="flex gap-2">
-          <Button type="submit" disabled={loading}>
-            <Search className="size-4" /> {t("common.search")}
-          </Button>
-          <Button type="button" variant="outline" disabled={loading} onClick={() => void load()}>
-            <RefreshCw className="size-4" />
-          </Button>
-        </div>
-      </form>
+        <form
+          className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_auto]"
+          onSubmit={(e) => {
+            e.preventDefault();
+            setApplied({ localizer: localizer.trim().toUpperCase(), date });
+          }}
+        >
+          <Input
+            value={localizer}
+            onChange={(e) => setLocalizer(e.target.value.toUpperCase())}
+            placeholder={t("admin.checkinsPage.localizerPlaceholder")}
+            className="uppercase"
+          />
+          <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button type="submit" disabled={loading} className="w-full sm:w-auto">
+              <Search className="size-4" /> {t("common.search")}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={loading}
+              className="w-full sm:w-auto"
+              onClick={() => void load()}
+            >
+              <RefreshCw className="size-4" />
+            </Button>
+          </div>
+        </form>
 
-      {error ? (
-        <div className="mb-6 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          {error}
-        </div>
-      ) : null}
-
-      <div className="overflow-x-auto rounded-xl border border-border">
-        <table className="w-full text-sm">
-          <thead className="bg-muted/50 text-left text-xs uppercase text-muted-foreground">
-            <tr>
-              <th className="px-4 py-3">{t("admin.checkinsPage.dateTime")}</th>
-              <th className="px-4 py-3">{t("common.localizer")}</th>
-              <th className="px-4 py-3">{t("common.guest")}</th>
-              <th className="px-4 py-3">{t("common.establishment")}</th>
-              <th className="px-4 py-3">{t("admin.checkinsPage.termsCol")}</th>
-              <th className="px-4 py-3">{t("admin.checkinsPage.fnrhCol")}</th>
-              <th className="px-4 py-3">{t("common.actions")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((record) => (
-              <tr key={record.id} className="border-t border-border">
-                <td className="px-4 py-3 whitespace-nowrap">
-                  {formatDateTime(record.checked_in_at, locale)}
-                </td>
-                <td className="px-4 py-3 font-code">{record.localizer}</td>
-                <td className="px-4 py-3">{record.guest_name}</td>
-                <td className="px-4 py-3">{record.establishment_name ?? "—"}</td>
-                <td className="px-4 py-3">
-                  <Badge variant={record.terms_accepted ? "default" : "secondary"}>
-                    {record.terms_accepted ? t("common.termsAccepted") : t("common.termsNotAccepted")}
-                  </Badge>
-                </td>
-                <td className="px-4 py-3">
-                  <Badge variant={hasEmbraturData(record.embratur) ? "default" : "secondary"}>
-                    {hasEmbraturData(record.embratur)
-                      ? t("admin.checkinsPage.fnrhFilled")
-                      : t("admin.checkinsPage.fnrhMissing")}
-                  </Badge>
-                </td>
-                <td className="px-4 py-3">
-                  <Button size="sm" variant="ghost" onClick={() => void openDetail(record.id)}>
-                    <Eye className="size-4" />
-                  </Button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {!loading && rows.length === 0 ? (
-          <p className="p-6 text-center text-sm text-muted-foreground">{t("admin.checkinsPage.empty")}</p>
+        {error ? (
+          <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            {error}
+          </div>
         ) : null}
+
+        <AdminResponsiveTable
+          rows={rows}
+          rowKey={(record) => record.id}
+          loading={loading}
+          empty={t("admin.checkinsPage.empty")}
+          minTableWidth="960px"
+          columns={[
+            {
+              id: "datetime",
+              header: t("admin.checkinsPage.dateTime"),
+              mobileLabel: t("admin.checkinsPage.dateTime"),
+              mobilePrimary: true,
+              className: "whitespace-nowrap",
+              cell: (record) => (
+                <span className="font-medium">{formatDateTime(record.checked_in_at, locale)}</span>
+              ),
+            },
+            {
+              id: "localizer",
+              header: t("common.localizer"),
+              mobileLabel: t("common.localizer"),
+              cell: (record) => <span className="font-code">{record.localizer}</span>,
+            },
+            {
+              id: "guest",
+              header: t("common.guest"),
+              mobileLabel: t("common.guest"),
+              cell: (record) => record.guest_name,
+            },
+            {
+              id: "establishment",
+              header: t("common.establishment"),
+              mobileLabel: t("common.establishment"),
+              cell: (record) => record.establishment_name ?? "—",
+            },
+            {
+              id: "terms",
+              header: t("admin.checkinsPage.termsCol"),
+              mobileLabel: t("admin.checkinsPage.termsCol"),
+              cell: (record) => (
+                <Badge variant={record.terms_accepted ? "default" : "secondary"}>
+                  {record.terms_accepted ? t("common.termsAccepted") : t("common.termsNotAccepted")}
+                </Badge>
+              ),
+            },
+            {
+              id: "fnrh",
+              header: t("admin.checkinsPage.fnrhCol"),
+              mobileLabel: t("admin.checkinsPage.fnrhCol"),
+              cell: (record) => (
+                <Badge variant={hasEmbraturData(record.embratur) ? "default" : "secondary"}>
+                  {hasEmbraturData(record.embratur)
+                    ? t("admin.checkinsPage.fnrhFilled")
+                    : t("admin.checkinsPage.fnrhMissing")}
+                </Badge>
+              ),
+            },
+            {
+              id: "actions",
+              header: t("common.actions"),
+              mobileLabel: t("common.actions"),
+              cell: (record) => (
+                <Button size="sm" variant="ghost" onClick={() => void openDetail(record.id)}>
+                  <Eye className="size-4" />
+                  <span className="sr-only">{t("admin.checkinsPage.detailTitle")}</span>
+                </Button>
+              ),
+            },
+          ]}
+        />
       </div>
 
       <Dialog open={!!detail} onOpenChange={(open) => !open && setDetail(null)}>
-        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+        <DialogContent className="max-h-[85vh] w-[calc(100vw-1.5rem)] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{t("admin.checkinsPage.detailTitle")}</DialogTitle>
           </DialogHeader>

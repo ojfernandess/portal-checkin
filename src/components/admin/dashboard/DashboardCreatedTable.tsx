@@ -1,4 +1,5 @@
 import type { CreatedFeedRow } from "@/lib/api/admin.functions";
+import { AdminResponsiveTable } from "@/components/admin/AdminResponsiveTable";
 import { Badge } from "@/components/ui/badge";
 import { formatDate, formatDateTime } from "@/lib/format-dates";
 import type { Locale } from "@/lib/i18n/types";
@@ -15,77 +16,89 @@ type Props = {
 export function DashboardCreatedTable({ rows, error, locale, loading }: Props) {
   const { t } = useI18n();
 
-  return (
-    <section className="rounded-xl border border-border/80 bg-card shadow-sm">
-      <div className="border-b border-border/60 px-4 py-3">
-        <h2 className="text-base font-semibold">{t("admin.dashboardPage.createdSection")}</h2>
-      </div>
-
-      {error ? (
-        <div className="m-4 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+  if (error) {
+    return (
+      <section className="rounded-xl border border-border/80 bg-card shadow-sm">
+        <div className="border-b border-border/60 px-3 py-3 sm:px-4">
+          <h2 className="text-base font-semibold">{t("admin.dashboardPage.createdSection")}</h2>
+        </div>
+        <div className="m-3 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive sm:m-4">
           {error}
         </div>
-      ) : loading ? (
-        <div className="space-y-2 p-4">
-          {Array.from({ length: 4 }).map((_, index) => (
-            <div key={index} className="h-10 animate-pulse rounded-md bg-muted/60" />
-          ))}
-        </div>
-      ) : rows.length === 0 ? (
-        <p className="p-4 text-sm text-muted-foreground">{t("admin.dashboardPage.createdEmpty")}</p>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-sm">
-            <thead className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
-              <tr>
-                <th className="px-4 py-2.5 font-medium">{t("common.guest")}</th>
-                <th className="px-4 py-2.5 font-medium">{t("common.establishment")}</th>
-                <th className="px-4 py-2.5 font-medium">{t("admin.dashboardPage.entryDate")}</th>
-                <th className="px-4 py-2.5 font-medium">{t("admin.dashboardPage.colValue")}</th>
-                <th className="px-4 py-2.5 font-medium">{t("admin.dashboardPage.colStatus")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => {
-                const entryDate = row.checkinDate ?? row.reservationDate?.slice(0, 10);
-                return (
-                  <tr
-                    key={`${row.localizer ?? row.reservationId}`}
-                    className="border-t border-border/60 transition-colors hover:bg-muted/20"
-                  >
-                    <td className="px-4 py-3">
-                      <p className="font-medium">{row.guestName ?? t("common.guest")}</p>
-                      <p className="font-code text-xs text-muted-foreground">{row.localizer ?? "—"}</p>
-                      {row.createdBy?.name ? (
-                        <p className="text-xs text-muted-foreground">
-                          {t("admin.dashboardPage.createdBy")}: {row.createdBy.name}
-                        </p>
-                      ) : null}
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground">{row.establishmentName ?? "—"}</td>
-                    <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
-                      {entryDate ? formatDate(entryDate, locale) : "—"}
-                      {row.reservationDate ? (
-                        <p className="text-xs">{formatDateTime(row.reservationDate, locale)}</p>
-                      ) : null}
-                    </td>
-                    <td className="px-4 py-3 font-medium">
-                      {row.price != null ? formatMoney(Number(row.price), locale) : "—"}
-                    </td>
-                    <td className="px-4 py-3">
-                      {row.statusLabel ? (
-                        <Badge variant="secondary">{row.statusLabel}</Badge>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </section>
+      </section>
+    );
+  }
+
+  return (
+    <AdminResponsiveTable
+      title={t("admin.dashboardPage.createdSection")}
+      rows={rows}
+      rowKey={(row) => String(row.localizer ?? row.reservationId)}
+      loading={loading}
+      empty={t("admin.dashboardPage.createdEmpty")}
+      minTableWidth="760px"
+      columns={[
+        {
+          id: "guest",
+          header: t("common.guest"),
+          mobilePrimary: true,
+          cell: (row) => (
+            <>
+              <p className="font-medium">{row.guestName ?? t("common.guest")}</p>
+              <p className="font-code text-xs text-muted-foreground">{row.localizer ?? "—"}</p>
+              {row.createdBy?.name ? (
+                <p className="text-xs text-muted-foreground">
+                  {t("admin.dashboardPage.createdBy")}: {row.createdBy.name}
+                </p>
+              ) : null}
+            </>
+          ),
+        },
+        {
+          id: "establishment",
+          header: t("common.establishment"),
+          mobileLabel: t("common.establishment"),
+          cell: (row) => <span className="text-muted-foreground">{row.establishmentName ?? "—"}</span>,
+        },
+        {
+          id: "entry",
+          header: t("admin.dashboardPage.entryDate"),
+          mobileLabel: t("admin.dashboardPage.entryDate"),
+          className: "whitespace-nowrap",
+          cell: (row) => {
+            const entryDate = row.checkinDate ?? row.reservationDate?.slice(0, 10);
+            return (
+              <div className="text-muted-foreground">
+                <p>{entryDate ? formatDate(entryDate, locale) : "—"}</p>
+                {row.reservationDate ? (
+                  <p className="text-xs">{formatDateTime(row.reservationDate, locale)}</p>
+                ) : null}
+              </div>
+            );
+          },
+        },
+        {
+          id: "value",
+          header: t("admin.dashboardPage.colValue"),
+          mobileLabel: t("admin.dashboardPage.colValue"),
+          cell: (row) => (
+            <span className="font-medium">
+              {row.price != null ? formatMoney(Number(row.price), locale) : "—"}
+            </span>
+          ),
+        },
+        {
+          id: "status",
+          header: t("admin.dashboardPage.colStatus"),
+          mobileLabel: t("admin.dashboardPage.colStatus"),
+          cell: (row) =>
+            row.statusLabel ? (
+              <Badge variant="secondary">{row.statusLabel}</Badge>
+            ) : (
+              <span className="text-muted-foreground">—</span>
+            ),
+        },
+      ]}
+    />
   );
 }

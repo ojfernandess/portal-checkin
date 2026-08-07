@@ -33,13 +33,13 @@ export function DashboardHeader({
     <div className="space-y-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+          <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl lg:text-3xl">
             {t(`admin.dashboardPage.greeting.${greetingKey}`, { name: displayName })}
           </h1>
           <p className="text-sm text-muted-foreground">{t("admin.dashboardPage.greetingSubtitle")}</p>
         </div>
 
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
           {isAdmin ? (
             <Button variant="outline" size="icon" className="size-9" asChild>
               <Link to="/admin/security" aria-label={t("admin.security")}>
@@ -47,7 +47,7 @@ export function DashboardHeader({
               </Link>
             </Button>
           ) : null}
-          <div className="hidden items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 sm:flex">
+          <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-2.5 py-2 sm:px-3">
             <div className="flex size-8 items-center justify-center rounded-full bg-[#1B3A57] text-xs font-semibold text-white">
               {displayName.slice(0, 2).toUpperCase()}
             </div>
@@ -86,7 +86,7 @@ export function DashboardHeader({
           <Button
             onClick={onRefresh}
             disabled={loading}
-            className="h-10 bg-[#1B3A57] text-white hover:bg-[#142E47]"
+            className="h-10 w-full bg-[#1B3A57] text-white hover:bg-[#142E47] sm:w-auto"
           >
             <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} aria-hidden />
             {t("admin.dashboardPage.refresh")}
