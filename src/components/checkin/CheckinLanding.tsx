@@ -20,7 +20,6 @@ import { BrandLogo } from "@/components/BrandLogo";
 import { PhoneDisplay } from "@/components/checkin/PhoneDisplay";
 import { WhatsAppIcon } from "@/components/icons/WhatsAppIcon";
 import { PortalFeatureGrid } from "@/components/PortalFeatureGrid";
-import { PortalHeroBackground } from "@/components/PortalHeroBackground";
 import { PortalSplitLayout } from "@/components/PortalSplitLayout";
 import { Button } from "@/components/ui/button";
 import {
@@ -321,6 +320,7 @@ export function CheckinLanding({
 
   return (
     <PortalSplitLayout
+      mobileCenterForm
       topAside={
         <>
           <BrandLogo variant="white" className="max-h-10 xl:max-h-11" />
@@ -336,17 +336,6 @@ export function CheckinLanding({
         </>
       }
       bottomAside={<PortalFeatureGrid features={FEATURES} />}
-      mobileHero={
-        <>
-          <PortalHeroBackground />
-          <div className="relative space-y-4">
-            <BrandLogo variant="white" className="max-h-9" />
-            <h1 className="font-display text-2xl font-semibold leading-tight">{heroTitle}</h1>
-            <p className="text-sm text-white/85">{t("checkin.landing.heroSubtitle")}</p>
-            <ProcessStepper />
-          </div>
-        </>
-      }
     >
       {formCard}
     </PortalSplitLayout>

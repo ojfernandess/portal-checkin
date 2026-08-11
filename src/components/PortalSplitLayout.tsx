@@ -6,9 +6,11 @@ import { useI18n } from "@/lib/i18n/context";
 type PortalSplitLayoutProps = {
   topAside: React.ReactNode;
   bottomAside?: React.ReactNode;
-  mobileHero: React.ReactNode;
+  mobileHero?: React.ReactNode;
   children: React.ReactNode;
   backgroundImageSrc?: string;
+  /** On mobile, center the form panel in the viewport (guest check-in home). */
+  mobileCenterForm?: boolean;
 };
 
 export function PortalSplitLayout({
@@ -17,6 +19,7 @@ export function PortalSplitLayout({
   mobileHero,
   children,
   backgroundImageSrc,
+  mobileCenterForm = false,
 }: PortalSplitLayoutProps) {
   const { t } = useI18n();
 
@@ -42,7 +45,9 @@ export function PortalSplitLayout({
       </aside>
 
       <div className="relative flex min-h-screen flex-col">
-        <div className="relative overflow-hidden px-6 py-8 text-white lg:hidden">{mobileHero}</div>
+        {!mobileCenterForm && mobileHero ? (
+          <div className="relative overflow-hidden px-6 py-8 text-white lg:hidden">{mobileHero}</div>
+        ) : null}
 
         <div className="absolute right-4 top-4 z-10 lg:right-8 lg:top-8">
           <LanguageSwitcher
@@ -53,7 +58,13 @@ export function PortalSplitLayout({
           />
         </div>
 
-        <div className="relative flex flex-1 flex-col items-center justify-center px-4 py-8 sm:px-6 lg:px-10 lg:py-12 xl:px-12">
+        <div
+          className={
+            mobileCenterForm
+              ? "relative flex min-h-dvh flex-1 flex-col items-center justify-center px-4 py-8 sm:px-6 lg:min-h-0 lg:px-10 lg:py-12 xl:px-12"
+              : "relative flex flex-1 flex-col items-center justify-center px-4 py-8 sm:px-6 lg:px-10 lg:py-12 xl:px-12"
+          }
+        >
           <div className="w-full max-w-[440px] rounded-3xl bg-white p-6 shadow-[0_24px_64px_rgba(15,23,42,0.18)] sm:p-8 lg:max-w-[480px] xl:max-w-[520px]">
             {children}
           </div>
