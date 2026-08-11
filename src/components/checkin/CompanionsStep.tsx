@@ -524,8 +524,7 @@ export function CompanionsStep({
 
           <Button
             type="button"
-            variant="secondary"
-            className="tap-safe w-full"
+            className="tap-safe w-full border-transparent bg-accent font-semibold text-accent-foreground shadow-md shadow-accent/30 hover:bg-accent/90"
             disabled={countriesLoading}
             onClick={add}
           >
@@ -535,8 +534,12 @@ export function CompanionsStep({
       )}
 
       {!adding && dependents.length < max && (
-        <Button type="button" variant="outline" className="tap-safe w-full" onClick={() => setAdding(true)}>
-          {t("checkin.companions.yesRegister")}
+        <Button
+          type="button"
+          className="tap-safe w-full border-transparent bg-accent font-semibold text-accent-foreground shadow-md shadow-accent/30 hover:bg-accent/90"
+          onClick={() => setAdding(true)}
+        >
+          <Plus className="size-4" aria-hidden /> {t("checkin.companions.yesRegister")}
         </Button>
       )}
 
