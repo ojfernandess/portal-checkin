@@ -130,6 +130,7 @@ export const es: MessageTree = {
     mobilePhoneDdiHint: "Digite el DDI (ej.: 55) o toque la bandera para buscar el país.",
     mobilePhoneNationalPlaceholder: "Número con código de área",
     birthDate: "Fecha de nacimiento",
+    birthDatePlaceholder: "DD/MM/AAAA",
     originCountry: "País de origen / Ciudadanía",
     citizenship: "Naturalidad / Ciudadanía",
     passportNumber: "Número de pasaporte",
@@ -290,7 +291,7 @@ export const es: MessageTree = {
         "Encontramos un registro con los datos ingresados. Ingrese su fecha de nacimiento para continuar.",
       birthDateConfirmLabel: "Fecha de nacimiento *",
       birthDateConfirmHint:
-        "Ingrese la misma fecha de nacimiento registrada. No se mostrará en esta pantalla.",
+        "Escriba la fecha en formato DD/MM/AAAA, igual a la registrada. No se mostrará en esta pantalla.",
       birthDateRequired: "Ingrese su fecha de nacimiento para continuar.",
       birthDateMismatch: "La fecha de nacimiento no coincide con el registro.",
     },
@@ -497,6 +498,8 @@ export const es: MessageTree = {
       secretCopied: "¡Copiado!",
       helpDuringStay: "¿Necesita ayuda durante su estadía?",
       helpTitle: "¿Necesita ayuda durante la estadía?",
+      whatsappPrefill:
+        "¡Hola! Estoy contactándolos a través del portal de check-in en línea sobre mi reserva en {establishment} (localizador {localizer}). Me gustaría hablar con el equipo y necesito asistencia, por favor.",
       call: "Llamar",
       location: "Ubicación",
       viewOnMaps: "Ver en Google Maps",

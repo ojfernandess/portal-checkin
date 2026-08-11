@@ -129,6 +129,7 @@ export const en: MessageTree = {
     mobilePhoneDdiHint: "Type the country code (e.g. 55) or tap the flag to search.",
     mobilePhoneNationalPlaceholder: "Number with area code",
     birthDate: "Date of birth",
+    birthDatePlaceholder: "DD/MM/YYYY",
     originCountry: "Country of origin / Citizenship",
     citizenship: "Place of birth / Citizenship",
     passportNumber: "Passport number",
@@ -289,7 +290,7 @@ export const en: MessageTree = {
         "We found a registration matching your details. Enter your date of birth to continue.",
       birthDateConfirmLabel: "Date of birth *",
       birthDateConfirmHint:
-        "Enter the same date of birth on file. It will not be shown on this screen.",
+        "Type the date as DD/MM/YYYY, matching the one on file. It will not be shown on this screen.",
       birthDateRequired: "Enter your date of birth to continue.",
       birthDateMismatch: "The date of birth does not match our records.",
     },
@@ -494,6 +495,8 @@ export const en: MessageTree = {
       secretCopied: "Copied!",
       helpDuringStay: "Need help during your stay?",
       helpTitle: "Need help during your stay?",
+      whatsappPrefill:
+        "Hello! I'm contacting you through the online check-in portal regarding my reservation at {establishment} (locator {localizer}). I'd like to speak with your team and need assistance, please.",
       call: "Call",
       location: "Location",
       viewOnMaps: "View on Google Maps",

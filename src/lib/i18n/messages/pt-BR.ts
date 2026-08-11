@@ -128,6 +128,7 @@ export const ptBR = {
     mobilePhoneDdiHint: "Digite o DDI (ex.: 55) ou toque na bandeira para buscar o país.",
     mobilePhoneNationalPlaceholder: "Número com DDD",
     birthDate: "Data de nascimento",
+    birthDatePlaceholder: "DD/MM/AAAA",
     originCountry: "País de origem / Cidadania",
     citizenship: "Naturalidade / Cidadania",
     passportNumber: "Número do passaporte",
@@ -288,7 +289,7 @@ export const ptBR = {
         "Encontramos um cadastro com os dados informados. Informe sua data de nascimento para continuar.",
       birthDateConfirmLabel: "Data de nascimento *",
       birthDateConfirmHint:
-        "Informe a mesma data de nascimento cadastrada. Ela não será exibida nesta tela.",
+        "Digite a data no formato DD/MM/AAAA, igual à cadastrada. Ela não será exibida nesta tela.",
       birthDateRequired: "Informe sua data de nascimento para continuar.",
       birthDateMismatch: "A data de nascimento informada não confere com o cadastro.",
     },
@@ -495,6 +496,8 @@ export const ptBR = {
       secretCopied: "Copiado!",
       helpDuringStay: "Precisa de ajuda durante sua estadia?",
       helpTitle: "Precisa de ajuda durante a estadia?",
+      whatsappPrefill:
+        "Olá! Estou entrando em contato pelo portal de check-in online referente à minha reserva em {establishment} (localizador {localizer}). Gostaria de falar com a equipe e preciso de assistência, por favor.",
       call: "Ligar",
       location: "Localização",
       viewOnMaps: "Ver no Google Maps",

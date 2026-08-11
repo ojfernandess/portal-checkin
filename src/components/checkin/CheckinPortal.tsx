@@ -5,6 +5,7 @@ import { AlertTriangle, ArrowRight, Loader2, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 
 import { BrandLogo } from "@/components/BrandLogo";
+import { BirthDateInput } from "@/components/checkin/BirthDateInput";
 import { CountryFlag } from "@/components/checkin/CountryFlag";
 import { CheckinLanding } from "@/components/checkin/CheckinLanding";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
@@ -1174,17 +1175,15 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
               <article className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-card">
                 <div className="space-y-1.5">
                   <Label htmlFor="birthDateVerify">{t("checkin.lookup.birthDateConfirmLabel")}</Label>
-                  <Input
+                  <BirthDateInput
                     id="birthDateVerify"
-                    type="date"
-                    className="tap-safe"
                     value={birthDateConfirmInput}
-                    onChange={(event) => {
-                      setBirthDateConfirmInput(event.target.value);
+                    onChange={(value) => {
+                      setBirthDateConfirmInput(value);
                       if (birthDateConfirmError) setBirthDateConfirmError("");
                     }}
                     aria-invalid={Boolean(birthDateConfirmError)}
-                    autoComplete="bday"
+                    placeholder={t("guest.birthDatePlaceholder")}
                   />
                   <p className="text-xs text-muted-foreground">{t("checkin.lookup.birthDateConfirmHint")}</p>
                   {birthDateConfirmError ? (

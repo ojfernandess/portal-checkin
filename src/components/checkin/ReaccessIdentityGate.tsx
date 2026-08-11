@@ -1,6 +1,6 @@
 import { Fingerprint, Loader2, Lock, ShieldCheck } from "lucide-react";
+import { BirthDateInput } from "@/components/checkin/BirthDateInput";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useI18n } from "@/lib/i18n/context";
 import { cn } from "@/lib/utils";
@@ -55,14 +55,13 @@ export function ReaccessIdentityGate({
             <Label htmlFor="reaccessBirthDateVerify" className="text-sm font-medium">
               {t("checkin.lookup.birthDateConfirmLabel")}
             </Label>
-            <Input
+            <BirthDateInput
               id="reaccessBirthDateVerify"
-              type="date"
-              className={cn("tap-safe h-11", birthDateError && "border-destructive")}
+              className={cn("h-11", birthDateError && "border-destructive")}
               value={birthDateInput}
-              onChange={(event) => onBirthDateChange(event.target.value)}
+              onChange={onBirthDateChange}
               aria-invalid={Boolean(birthDateError)}
-              autoComplete="bday"
+              placeholder={t("guest.birthDatePlaceholder")}
             />
             <p className="text-xs text-muted-foreground">{t("checkin.lookup.birthDateConfirmHint")}</p>
             {birthDateError ? (

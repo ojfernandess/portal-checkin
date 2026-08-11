@@ -36,6 +36,7 @@ import { getGoogleMapsUrl } from "@/lib/establishment-address";
 import { formatDocumentLine } from "@/lib/guest-display";
 import { useI18n } from "@/lib/i18n/context";
 import { localeToDateLocale, type Locale } from "@/lib/i18n/types";
+import { buildWhatsAppUrl } from "@/lib/phone-display";
 import { cn } from "@/lib/utils";
 import type { Dependent, GuestLookup, Reservation } from "@/lib/api/types";
 import type { UsefulInfoItem, UsefulInfoItemKind } from "@/lib/establishment-settings";
@@ -368,6 +369,11 @@ export function SuccessScreen({
     guestsQuantity != null
       ? `${guestsQuantity} ${guestsQuantity === 1 ? t("common.guest") : t("common.guests")}`
       : null;
+  const whatsappMessage = t("checkin.success.whatsappPrefill", {
+    establishment: establishmentName,
+    localizer: reservation.localizer?.trim() || "—",
+  });
+  const whatsappUrl = whatsapp ? buildWhatsAppUrl(String(whatsapp), whatsappMessage) : null;
 
   const showCheckoutFarewell = checkoutPast && !isCancelled;
   const showUsefulInfo =
@@ -862,13 +868,9 @@ export function SuccessScreen({
         <CardShell className="p-5">
           <p className="text-sm font-medium">{t("checkin.success.helpDuringStay")}</p>
           <div className="mt-4 flex flex-wrap gap-2 print:hidden">
-            {whatsapp ? (
+            {whatsappUrl ? (
               <Button variant="outline" size="sm" className="gap-2" asChild>
-                <a
-                  href={`https://wa.me/${String(whatsapp).replace(/\D/g, "")}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
+                <a href={whatsappUrl} target="_blank" rel="noopener noreferrer">
                   <WhatsAppIcon className="size-4 text-[#25D366]" />
                   {t("common.whatsapp")}
                 </a>

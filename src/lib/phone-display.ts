@@ -121,3 +121,18 @@ export function phoneDisplayIso(phone: string): string {
 export function formatNationalPhoneInput(iso: string, nationalDigits: string): string {
   return iso === "BR" ? formatBrazilianNational(nationalDigits) : nationalDigits;
 }
+
+/** Dígitos E.164 sem "+" para wa.me (ex.: 5511999999999). */
+export function toWhatsAppDigits(phone: string): string {
+  const { callingCode, nationalDigits } = splitPhoneInput(phone);
+  if (!nationalDigits) return onlyDigits(phone);
+  return `${callingCode}${nationalDigits}`;
+}
+
+/** Link do WhatsApp com número normalizado e mensagem opcional. */
+export function buildWhatsAppUrl(phone: string, text?: string): string {
+  const digits = toWhatsAppDigits(phone);
+  const base = `https://wa.me/${digits}`;
+  if (!text?.trim()) return base;
+  return `${base}?text=${encodeURIComponent(text.trim())}`;
+}

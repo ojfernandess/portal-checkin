@@ -12,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { BirthDateInput } from "@/components/checkin/BirthDateInput";
 import { SearchableSelect } from "@/components/checkin/SearchableSelect";
 import { PhoneWithDialCodeInput } from "@/components/checkin/PhoneWithDialCodeInput";
 import { getEmbraturReference } from "@/lib/api/checkin.functions";
@@ -361,7 +362,19 @@ export function CompanionsStep({
               inputMode: "email",
               autoComplete: "email",
             })}
-            {field("birthDate", `${t("guest.birthDate")} *`, { type: "date" })}
+            <div className="space-y-1.5">
+              <Label htmlFor="dep-birthDate">{`${t("guest.birthDate")} *`}</Label>
+              <BirthDateInput
+                id="dep-birthDate"
+                value={String(draft.birthDate ?? "")}
+                onChange={(value) => setDraftField("birthDate", value)}
+                aria-invalid={Boolean(errors["birthDate"])}
+                placeholder={t("guest.birthDatePlaceholder")}
+              />
+              {errors["birthDate"] && (
+                <p className="text-xs text-destructive">{errors["birthDate"]}</p>
+              )}
+            </div>
             <PhoneWithDialCodeInput
               id="dep-mobilePhoneNumber"
               label={t("guest.mobilePhone")}

@@ -10,10 +10,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { BirthDateInput } from "@/components/checkin/BirthDateInput";
 import { SearchableSelect } from "@/components/checkin/SearchableSelect";
 import { PhoneWithDialCodeInput } from "@/components/checkin/PhoneWithDialCodeInput";
 import { getEmbraturReference } from "@/lib/api/checkin.functions";
 import type { MainGuest } from "@/lib/api/types";
+import { birthDateToIso } from "@/lib/birth-date";
 import { normalizeEmbratur } from "@/lib/embratur";
 import {
   BRAZIL_PMS_COUNTRY,
@@ -111,7 +113,7 @@ export function GuestForm({ foreign, initial, onSubmit, onBack }: Props) {
     const next: Record<string, string> = {};
     if (!guest.name?.trim()) next["name"] = t("guest.validation.fullName");
     if (!guest.email || !isValidEmail(guest.email)) next["email"] = t("guest.validation.email");
-    if (!guest.birthDate) next["birthDate"] = t("guest.validation.birthDate");
+    if (!birthDateToIso(guest.birthDate)) next["birthDate"] = t("guest.validation.birthDate");
     if (!hasGenderSelection(guest.gender)) next["gender"] = t("guest.validation.gender");
     if (!guest.documentNumber?.trim()) next["documentNumber"] = t("guest.validation.document");
     if (!guest.citizenship?.trim()) {
@@ -137,6 +139,7 @@ export function GuestForm({ foreign, initial, onSubmit, onBack }: Props) {
     if (!validate()) return;
     onSubmit({
       ...guest,
+      birthDate: birthDateToIso(guest.birthDate) ?? guest.birthDate,
       documentType: foreign ? "PASSPORT" : (guest.documentType ?? "CPF"),
       citizenship:
         matchPmsCountryValue(
@@ -183,7 +186,17 @@ export function GuestForm({ foreign, initial, onSubmit, onBack }: Props) {
           error={errors["mobilePhoneNumber"]}
           onChange={(value) => set("mobilePhoneNumber", value)}
         />
-        {field("birthDate", `${t("guest.birthDate")} *`, { type: "date" })}
+        <div className="space-y-1.5">
+          <Label htmlFor="birthDate">{`${t("guest.birthDate")} *`}</Label>
+          <BirthDateInput
+            id="birthDate"
+            value={String(guest.birthDate ?? "")}
+            onChange={(value) => set("birthDate", value)}
+            aria-invalid={Boolean(errors["birthDate"])}
+            placeholder={t("guest.birthDatePlaceholder")}
+          />
+          {errors["birthDate"] && <p className="text-xs text-destructive">{errors["birthDate"]}</p>}
+        </div>
         <div className="space-y-1.5">
           <Label htmlFor="gender">{`${t("common.gender")} *`}</Label>
           <Select value={String(guest.gender ?? "")} onValueChange={(value) => set("gender", value)}>
