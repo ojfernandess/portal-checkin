@@ -32,6 +32,7 @@ import { cn } from "@/lib/utils";
 
 import {
   findReservation,
+  getCompletedCheckinContext,
   getEmbraturReference,
   getEstablishmentContact,
   getEstablishmentExtraFields,
@@ -43,6 +44,7 @@ import {
   uploadCheckinMedia,
   verifyReaccessBirthDate,
   type CheckinExtraField,
+  type CompletedCheckinContext,
 } from "@/lib/api/checkin.functions";
 import { normalizeEmbratur } from "@/lib/embratur";
 import { mergeCheckinResult, mergeGuests, preserveReservationDetails } from "@/lib/api/reservation-normalizer";
@@ -219,6 +221,7 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
   const loadReference = useServerFn(getEmbraturReference);
   const submit = useServerFn(submitCheckin);
   const verifyReaccess = useServerFn(verifyReaccessBirthDate);
+  const loadCompletedContext = useServerFn(getCompletedCheckinContext);
 
   const [step, setStep] = useState(0);
   const [subStep, setSubStep] = useState<
@@ -354,6 +357,14 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
   const [reaccessBirthDateInput, setReaccessBirthDateInput] = useState("");
   const [reaccessBirthDateError, setReaccessBirthDateError] = useState("");
   const [reaccessVerifying, setReaccessVerifying] = useState(false);
+  const [addingPostCompanions, setAddingPostCompanions] = useState(false);
+  const [postCompanionsSaving, setPostCompanionsSaving] = useState(false);
+  const [postCompanionsLockedCount, setPostCompanionsLockedCount] = useState(0);
+  const [postCompanionsCanAdd, setPostCompanionsCanAdd] = useState(false);
+  const [postCompanionsDraft, setPostCompanionsDraft] = useState<Dependent[]>([]);
+  const [postCompanionsContext, setPostCompanionsContext] = useState<CompletedCheckinContext | null>(
+    null,
+  );
 
   const reservationId = String(reservation?.localizer ?? reservation?.reservationId ?? localizer);
   const capacity = Number(reservation?.room?.capacity ?? 1);
@@ -502,6 +513,7 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
         setCheckinAlreadyDone(true);
         applyReaccessSecurityForLocalizer(normalized, settings);
         setStep(8);
+        void refreshPostCompanionsAvailability(normalized);
       } else {
         setCheckinAlreadyDone(false);
         setReaccessSecurityRequired(false);
@@ -543,6 +555,8 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
     setReaccessVerifiedFor(null);
     setReaccessSecurityRequired(false);
     resetReaccessBirthDateConfirm();
+    resetPostCompanionsEditor();
+    setPostCompanionsCanAdd(false);
     setLocalizer("");
     autoSearchStarted.current = null;
     void navigate({ to: "/" });
@@ -962,6 +976,7 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
     setReaccessSecurityRequired(false);
     setReaccessVerifiedFor(String(reservation?.localizer ?? localizer).trim().toUpperCase());
     setStep(8);
+    void refreshPostCompanionsAvailability(String(reservation?.localizer ?? localizer).trim().toUpperCase());
   }
 
   function successReservation(): Reservation | null {
@@ -982,6 +997,139 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
             : {}),
       },
     };
+  }
+
+  function resetPostCompanionsEditor() {
+    setAddingPostCompanions(false);
+    setPostCompanionsSaving(false);
+    setPostCompanionsDraft([]);
+    setPostCompanionsLockedCount(0);
+    setPostCompanionsContext(null);
+  }
+
+  async function refreshPostCompanionsAvailability(code?: string) {
+    const localizerCode = String(code ?? reservation?.localizer ?? localizer)
+      .trim()
+      .toUpperCase();
+    if (localizerCode.length < 3) {
+      setPostCompanionsCanAdd(false);
+      return;
+    }
+    try {
+      const ctx = await loadCompletedContext({ data: { localizer: localizerCode } });
+      setPostCompanionsContext(ctx);
+      setPostCompanionsCanAdd(ctx.canAdd);
+      if (!addingPostCompanions) {
+        setPostCompanionsLockedCount(ctx.dependents.length);
+        if (ctx.dependents.length > 0) {
+          setDependents(ctx.dependents);
+        }
+        if (ctx.mainGuest.name) setGuest(ctx.mainGuest);
+        if (ctx.embratur) setEmbratur(ctx.embratur);
+      }
+    } catch {
+      setPostCompanionsCanAdd(false);
+    }
+  }
+
+  async function startAddPostCompanions() {
+    const localizerCode = String(reservation?.localizer ?? localizer).trim().toUpperCase();
+    setLoading(true);
+    try {
+      const ctx = await loadCompletedContext({ data: { localizer: localizerCode } });
+      setPostCompanionsContext(ctx);
+      if (ctx.blockedReason === "cancelled" || ctx.blockedReason === "pending_cancellation") {
+        toast.error(t("checkin.companions.postBlockedCancelled"));
+        setPostCompanionsCanAdd(false);
+        return;
+      }
+      if (ctx.blockedReason === "no_slots") {
+        toast.error(t("checkin.companions.postNoSlots"));
+        setPostCompanionsCanAdd(false);
+        return;
+      }
+      if (!ctx.canAdd || !ctx.embratur) {
+        toast.error(t("checkin.companions.postIncompleteContext"));
+        setPostCompanionsCanAdd(false);
+        return;
+      }
+      setGuest(ctx.mainGuest);
+      setEmbratur(ctx.embratur);
+      setPostCompanionsLockedCount(ctx.dependents.length);
+      setPostCompanionsDraft(ctx.dependents);
+      setDependents(ctx.dependents);
+      setPostCompanionsCanAdd(true);
+      setAddingPostCompanions(true);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t("checkin.companions.postLoadFailed"));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function savePostCompanions() {
+    if (!reservation || !postCompanionsContext?.embratur) return;
+    if (postCompanionsDraft.length <= postCompanionsLockedCount) {
+      toast.error(t("checkin.companions.postNeedNew"));
+      return;
+    }
+
+    const labels = buildCheckinErrorLabels(t);
+    const mainGuest = postCompanionsContext.mainGuest;
+    const issues = validateDependents(postCompanionsDraft, mainGuest);
+    if (issues.length > 0) {
+      showCheckinError(formatCheckinIssues(issues, labels));
+      return;
+    }
+
+    setPostCompanionsSaving(true);
+    try {
+      await submit({
+        data: {
+          reservationId,
+          localizer: String(reservation.localizer ?? localizer).trim().toUpperCase(),
+          establishmentId: String(reservation.establishmentId ?? ""),
+          establishmentName: reservation.establishmentName,
+          reservationSnapshot: reservation,
+          mainGuest: mainGuest as Record<string, unknown>,
+          embratur: postCompanionsContext.embratur as unknown as Record<string, unknown>,
+          dependents: postCompanionsDraft as unknown as Record<string, unknown>[],
+          purpose: "companions",
+          registeredPhotos: {
+            ...(mainGuest.profilePhotoUrl ? { profileUrl: mainGuest.profilePhotoUrl } : {}),
+            ...(mainGuest.profilePhotoId != null ? { profileId: mainGuest.profilePhotoId } : {}),
+            ...(mainGuest.documentPhotoUrl ? { documentUrl: mainGuest.documentPhotoUrl } : {}),
+            ...(mainGuest.documentPhotoId != null ? { documentId: mainGuest.documentPhotoId } : {}),
+          },
+        },
+      });
+
+      const code = String(reservation.localizer ?? localizer).trim().toUpperCase();
+      const refreshed = await refreshReservation({ data: { localizer: code } });
+      if (refreshed) {
+        setReservation(
+          preserveReservationDetails(reservation, {
+            ...refreshed,
+            dependents: postCompanionsDraft,
+            mainGuest: mergeGuests(mainGuest, refreshed.mainGuest),
+          }),
+        );
+      }
+      setDependents(postCompanionsDraft);
+      setGuest(mainGuest);
+      setEmbratur(postCompanionsContext.embratur);
+      resetPostCompanionsEditor();
+      toast.success(t("checkin.companions.postSaved"));
+      void refreshPostCompanionsAvailability(code);
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? humanizeCheckinApiError(error.message, labels)
+          : t("checkin.companions.postSaveFailed");
+      showCheckinError(message);
+    } finally {
+      setPostCompanionsSaving(false);
+    }
   }
 
   if (step === 0) {
@@ -1491,12 +1639,39 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
                   reservation={displayReservation}
                   mainGuest={mergeGuests(displayReservation.mainGuest, guest)}
                   dependents={
-                    dependents.length > 0 ? dependents : (reservation?.dependents ?? [])
+                    addingPostCompanions
+                      ? postCompanionsDraft
+                      : dependents.length > 0
+                        ? dependents
+                        : (reservation?.dependents ?? [])
                   }
                   alreadyCompleted={checkinAlreadyDone}
                   establishmentPhotoUrl={establishmentSettings.successPagePhotoUrl}
                   inboxPortariaEnabled={establishmentSettings.inboxEnabled}
                   usefulInfoItems={establishmentSettings.usefulInfoItems}
+                  canAddCompanions={
+                    postCompanionsCanAdd &&
+                    !displayReservation.isCancelled &&
+                    !displayReservation.isPendingCancellation
+                  }
+                  addingCompanions={addingPostCompanions}
+                  companionsSaving={postCompanionsSaving || loading}
+                  onStartAddCompanions={() => void startAddPostCompanions()}
+                  companionsEditor={
+                    addingPostCompanions && postCompanionsContext ? (
+                      <CompanionsStep
+                        mode="postCheckin"
+                        guestsQuantity={postCompanionsContext.guestsQuantity}
+                        mainGuest={postCompanionsContext.mainGuest}
+                        dependents={postCompanionsDraft}
+                        lockedCount={postCompanionsLockedCount}
+                        saving={postCompanionsSaving}
+                        onChange={setPostCompanionsDraft}
+                        onBack={resetPostCompanionsEditor}
+                        onContinue={() => void savePostCompanions()}
+                      />
+                    ) : null
+                  }
                 />
                 <Button
                   variant="ghost"

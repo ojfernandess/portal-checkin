@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import {
   AlertTriangle,
   BedDouble,
@@ -58,6 +58,12 @@ type Props = {
   inboxPortariaEnabled?: boolean;
   /** Comodidades, Wi-Fi e informações de acesso configuradas no painel */
   usefulInfoItems?: UsefulInfoItem[];
+  /** Permite cadastrar acompanhantes após o check-in */
+  canAddCompanions?: boolean;
+  addingCompanions?: boolean;
+  companionsSaving?: boolean;
+  onStartAddCompanions?: () => void;
+  companionsEditor?: ReactNode;
 };
 
 function formatMoney(value: number | string | undefined, locale: Locale): string | null {
@@ -313,6 +319,11 @@ export function SuccessScreen({
   establishmentPhotoUrl,
   inboxPortariaEnabled = false,
   usefulInfoItems = [],
+  canAddCompanions = false,
+  addingCompanions = false,
+  companionsSaving = false,
+  onStartAddCompanions,
+  companionsEditor,
 }: Props) {
   const { locale, t } = useI18n();
   const guest = mainGuest ?? reservation.mainGuest ?? reservation.responsible;
@@ -666,46 +677,71 @@ export function SuccessScreen({
             </div>
           </CardShell>
 
-          {registeredCompanions.length > 0 ? (
+          {registeredCompanions.length > 0 || canAddCompanions || addingCompanions ? (
             <CardShell className="p-5">
-              <h4 className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                {t("common.companions")}
-              </h4>
-              <ul className="space-y-4">
-                {registeredCompanions.map((companion, index) => (
-                  <li
-                    key={`${companion.documentNumber}-${index}`}
-                    className={cn(index > 0 && "border-t border-border pt-4")}
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                {!addingCompanions ? (
+                  <h4 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                    {t("common.companions")}
+                  </h4>
+                ) : (
+                  <span className="sr-only">{t("common.companions")}</span>
+                )}
+                {canAddCompanions && !addingCompanions && !hideGuestDetails ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="gap-1.5 border-transparent bg-accent font-semibold text-accent-foreground shadow-sm shadow-accent/30 hover:bg-accent/90"
+                    disabled={companionsSaving}
+                    onClick={onStartAddCompanions}
                   >
-                    <div className="space-y-3">
-                      <div>
-                        <p className="text-xs text-muted-foreground">{t("common.name")}</p>
-                        <p className="font-medium wrap-anywhere">{companion.name}</p>
+                    <Users className="size-3.5" aria-hidden />
+                    {t("checkin.companions.postCta")}
+                  </Button>
+                ) : null}
+              </div>
+
+              {addingCompanions && companionsEditor ? (
+                <div>{companionsEditor}</div>
+              ) : registeredCompanions.length > 0 ? (
+                <ul className="space-y-4">
+                  {registeredCompanions.map((companion, index) => (
+                    <li
+                      key={`${companion.documentNumber}-${index}`}
+                      className={cn(index > 0 && "border-t border-border pt-4")}
+                    >
+                      <div className="space-y-3">
+                        <div>
+                          <p className="text-xs text-muted-foreground">{t("common.name")}</p>
+                          <p className="font-medium wrap-anywhere">{companion.name}</p>
+                        </div>
+                        {!hideGuestDetails && companion.mobilePhoneNumber ? (
+                          <div>
+                            <p className="text-xs text-muted-foreground">{t("common.phone")}</p>
+                            <PhoneDisplay phone={companion.mobilePhoneNumber} className="font-medium" />
+                          </div>
+                        ) : null}
+                        {!hideGuestDetails ? (
+                          <div>
+                            <p className="text-xs text-muted-foreground">{t("common.document")}</p>
+                            <p className="font-medium wrap-anywhere">
+                              {formatDocumentLine(
+                                {
+                                  documentNumber: companion.documentNumber,
+                                  documentType: companion.documentType,
+                                },
+                                locale,
+                              ) || "—"}
+                            </p>
+                          </div>
+                        ) : null}
                       </div>
-                      {!hideGuestDetails && companion.mobilePhoneNumber ? (
-                        <div>
-                          <p className="text-xs text-muted-foreground">{t("common.phone")}</p>
-                          <PhoneDisplay phone={companion.mobilePhoneNumber} className="font-medium" />
-                        </div>
-                      ) : null}
-                      {!hideGuestDetails ? (
-                        <div>
-                          <p className="text-xs text-muted-foreground">{t("common.document")}</p>
-                          <p className="font-medium wrap-anywhere">
-                            {formatDocumentLine(
-                              {
-                                documentNumber: companion.documentNumber,
-                                documentType: companion.documentType,
-                              },
-                              locale,
-                            ) || "—"}
-                          </p>
-                        </div>
-                      ) : null}
-                    </div>
-                  </li>
-                ))}
-              </ul>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-muted-foreground">{t("checkin.companions.postEmpty")}</p>
+              )}
             </CardShell>
           ) : null}
 

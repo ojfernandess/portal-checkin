@@ -358,6 +358,21 @@ export const ptBR = {
       sameDocumentAsMain: "O documento do acompanhante deve ser diferente do hóspede principal.",
       duplicateDocument: "Este documento já foi cadastrado para outro acompanhante.",
       fixFields: "Corrija os campos destacados abaixo.",
+      postTitle: "Completar acompanhantes",
+      postBody:
+        "Sua reserva é para {count} hóspede(s). Ainda há {remaining} vaga(s) para cadastrar acompanhantes.",
+      postCta: "Adicionar acompanhante",
+      postEmpty: "Nenhum acompanhante cadastrado ainda.",
+      postSave: "Salvar acompanhantes",
+      postSaved: "Acompanhantes atualizados com sucesso.",
+      postSaveFailed: "Não foi possível salvar os acompanhantes.",
+      postLoadFailed: "Não foi possível carregar os dados para cadastrar acompanhantes.",
+      postNeedNew: "Adicione ao menos um novo acompanhante antes de salvar.",
+      postNoSlots: "Todos os acompanhantes da reserva já foram cadastrados.",
+      postIncompleteContext:
+        "Não encontramos os dados completos do check-in anterior. Entre em contato com a recepção.",
+      postBlockedCancelled: "Esta reserva não permite cadastrar acompanhantes no momento.",
+      alreadyRegistered: "Já cadastrado",
     },
     errors: {
       intro: "Corrija os seguintes pontos antes de continuar:",

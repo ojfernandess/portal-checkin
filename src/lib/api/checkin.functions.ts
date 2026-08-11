@@ -702,6 +702,144 @@ export const getEmbraturReference = createServerFn({ method: "GET" }).handler(as
   return unwrap<Record<string, any>>(payload);
 });
 
+function asEmbraturForm(value: unknown): EmbraturForm | null {
+  if (!value || typeof value !== "object") return null;
+  const row = value as Record<string, unknown>;
+  const form: EmbraturForm = {
+    snmotvia: String(row.snmotvia ?? "").trim(),
+    sntiptran: String(row.sntiptran ?? "").trim(),
+    bgstdscpais: String(row.bgstdscpais ?? "").trim(),
+    bgstdscpaisdest: String(row.bgstdscpaisdest ?? "").trim(),
+    snidcidadeibge: String(row.snidcidadeibge ?? "").trim(),
+    snidcidadeibgedest: String(row.snidcidadeibgedest ?? "").trim(),
+  };
+  if (validateEmbraturForm(form).length > 0) return null;
+  return form;
+}
+
+function asDependentList(value: unknown): Dependent[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item): item is Dependent => !!item && typeof item === "object")
+    .map((item) => ({
+      ...item,
+      dependentId: item.dependentId != null ? String(item.dependentId) : null,
+      name: String(item.name ?? ""),
+      documentNumber: String(item.documentNumber ?? ""),
+      documentType: String(item.documentType ?? "CPF"),
+      gender: String(item.gender ?? ""),
+      fnrhId: item.fnrhId != null ? String(item.fnrhId) : null,
+    }))
+    .filter((item) => item.name.trim());
+}
+
+export type CompletedCheckinContext = {
+  mainGuest: MainGuest;
+  embratur: EmbraturForm | null;
+  dependents: Dependent[];
+  guestsQuantity: number;
+  remainingSlots: number;
+  canAdd: boolean;
+  contextComplete: boolean;
+  blockedReason:
+    | "cancelled"
+    | "pending_cancellation"
+    | "no_slots"
+    | "incomplete_context"
+    | "not_checked_in"
+    | null;
+  source: "checkin_record" | "reservation";
+};
+
+/** Recupera mainGuest/embratur/dependents para adicionar acompanhantes após check-in. */
+export const getCompletedCheckinContext = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    z.object({ localizer: LOCALIZER_SCHEMA }).parse(input),
+  )
+  .handler(async ({ data }): Promise<CompletedCheckinContext> => {
+    await enforceRateLimit(clientIpBucket("completed-checkin-context"), { maxRequests: 20 });
+    const code = data.localizer.trim().toUpperCase();
+    const reservation = await fetchReservationByLocalizer(code);
+    const { assertRegisteredEstablishmentAccess, resolveReservationEstablishmentId } = await import(
+      "@/lib/establishment-registry.server"
+    );
+    await assertRegisteredEstablishmentAccess(resolveReservationEstablishmentId(reservation));
+
+    const guestsQuantity = Math.max(
+      1,
+      Number(reservation?.stay?.guestsQuantity ?? reservation?.guestsQuantity ?? 1) || 1,
+    );
+
+    const emptyBlocked = (
+      blockedReason: CompletedCheckinContext["blockedReason"],
+    ): CompletedCheckinContext => ({
+      mainGuest: {},
+      embratur: null,
+      dependents: reservation?.dependents ?? [],
+      guestsQuantity,
+      remainingSlots: 0,
+      canAdd: false,
+      contextComplete: false,
+      blockedReason,
+      source: "reservation",
+    });
+
+    if (reservation?.isCancelled === true) return emptyBlocked("cancelled");
+    if (reservation?.isPendingCancellation === true) return emptyBlocked("pending_cancellation");
+
+    const { isAlreadyCheckedIn } = await import("./types");
+    if (!isAlreadyCheckedIn(reservation)) return emptyBlocked("not_checked_in");
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: record } = await supabaseAdmin
+      .from("checkin_records")
+      .select("main_guest, dependents, embratur")
+      .eq("localizer", code)
+      .order("checked_in_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    let mainGuest: MainGuest = {};
+    let embratur: EmbraturForm | null = null;
+    let dependents: Dependent[] = [];
+    let source: CompletedCheckinContext["source"] = "reservation";
+
+    if (record) {
+      source = "checkin_record";
+      mainGuest = (record.main_guest as MainGuest) ?? {};
+      dependents = asDependentList(record.dependents);
+      embratur = asEmbraturForm(record.embratur);
+    }
+
+    if (!mainGuest.name?.trim() && reservation?.mainGuest) {
+      mainGuest = { ...reservation.mainGuest, ...mainGuest };
+    }
+    if (dependents.length === 0 && reservation?.dependents?.length) {
+      dependents = asDependentList(reservation.dependents);
+    }
+
+    const remainingSlots = Math.max(0, guestsQuantity - 1 - dependents.length);
+    const guestIssues = validateMainGuest(mainGuest);
+    const photoIssues = validatePhotos(mainGuest.profilePhotoUrl, mainGuest.documentPhotoUrl);
+    const contextComplete = guestIssues.length === 0 && !!embratur && photoIssues.length === 0;
+
+    let blockedReason: CompletedCheckinContext["blockedReason"] = null;
+    if (!contextComplete) blockedReason = "incomplete_context";
+    else if (remainingSlots <= 0) blockedReason = "no_slots";
+
+    return {
+      mainGuest,
+      embratur,
+      dependents,
+      guestsQuantity,
+      remainingSlots,
+      canAdd: contextComplete && remainingSlots > 0,
+      contextComplete,
+      blockedReason,
+      source,
+    };
+  });
+
 export const submitCheckin = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
     z
@@ -714,6 +852,7 @@ export const submitCheckin = createServerFn({ method: "POST" })
         mainGuest: z.record(z.any()),
         embratur: z.record(z.any()),
         dependents: z.array(z.record(z.any())),
+        purpose: z.enum(["checkin", "companions"]).optional(),
         termsAcceptedAt: z.string().datetime().optional(),
         termsVersion: z.number().int().optional(),
         extraFields: z.record(z.any()).optional(),
@@ -736,6 +875,7 @@ export const submitCheckin = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     await enforceRateLimit(clientIpBucket("submit-checkin"), { maxRequests: 10 });
+    const purpose = data.purpose ?? "checkin";
     const { assertRegisteredEstablishmentAccess, resolveReservationEstablishmentId } = await import(
       "@/lib/establishment-registry.server"
     );
@@ -751,14 +891,49 @@ export const submitCheckin = createServerFn({ method: "POST" })
     const dependentsInput = data.dependents as Dependent[];
     const embraturInput = data.embratur as EmbraturForm;
 
+    const snapshot = data.reservationSnapshot as Reservation | undefined;
+    if (purpose === "companions") {
+      const localizerCode = (data.localizer ?? data.reservationId).trim().toUpperCase();
+      const live =
+        snapshot ?? (await fetchReservationByLocalizer(localizerCode).catch(() => null));
+      if (live?.isCancelled === true) {
+        throw new Error("Esta reserva está cancelada. Não é possível adicionar acompanhantes.");
+      }
+      if (live?.isPendingCancellation === true) {
+        throw new Error(
+          "Esta reserva possui cancelamento pendente. Não é possível adicionar acompanhantes.",
+        );
+      }
+    }
+
     const issues = [
       ...validateMainGuest(mainGuestInput),
       ...validateDependents(dependentsInput, mainGuestInput),
       ...validateEmbraturForm(embraturInput),
-      ...validatePhotos(mainGuestInput.profilePhotoUrl, mainGuestInput.documentPhotoUrl),
     ];
+
+    if (purpose === "companions") {
+      const photoIssues = validatePhotos(
+        mainGuestInput.profilePhotoUrl,
+        mainGuestInput.documentPhotoUrl,
+      );
+      if (photoIssues.length > 0) {
+        throw new Error(
+          "Não encontramos as fotos do check-in anterior. Entre em contato com a recepção para cadastrar acompanhantes.",
+        );
+      }
+    } else {
+      issues.push(
+        ...validatePhotos(mainGuestInput.profilePhotoUrl, mainGuestInput.documentPhotoUrl),
+      );
+    }
+
     if (issues.length > 0) {
       throw new Error(formatCheckinIssues(issues, labels));
+    }
+
+    if (purpose === "companions" && dependentsInput.length === 0) {
+      throw new Error("Informe ao menos um acompanhante para continuar.");
     }
 
     const mainGuest = prepareMainGuestForCheckin(
@@ -839,6 +1014,18 @@ export const submitCheckin = createServerFn({ method: "POST" })
           extraFields: data.extraFields,
           termsAcceptedAt: data.termsAcceptedAt ?? null,
           termsVersion: data.termsVersion ?? null,
+        },
+      });
+    }
+
+    if (purpose === "companions") {
+      await writeAuditLog({
+        action: "checkin.companions_update",
+        entityType: "reservation",
+        entityId: data.reservationId,
+        newData: {
+          dependentsCount: dependentsInput.length,
+          localizer,
         },
       });
     }

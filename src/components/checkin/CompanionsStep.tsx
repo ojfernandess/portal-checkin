@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -38,6 +38,11 @@ type Props = {
   onChange: (dependents: Dependent[]) => void;
   onContinue: () => void;
   onBack: () => void;
+  /** Pós-check-in: lista existente somente leitura; botão salva em vez de continuar. */
+  mode?: "flow" | "postCheckin";
+  /** Quantidade de acompanhantes já gravados (somente leitura no modo postCheckin). */
+  lockedCount?: number;
+  saving?: boolean;
 };
 
 const EMPTY: Dependent = {
@@ -109,11 +114,16 @@ export function CompanionsStep({
   onChange,
   onContinue,
   onBack,
+  mode = "flow",
+  lockedCount = 0,
+  saving = false,
 }: Props) {
   const { t } = useI18n();
   const loadReference = useServerFn(getEmbraturReference);
   const max = Math.max(0, guestsQuantity - 1);
-  const [adding, setAdding] = useState(dependents.length > 0);
+  const isPostCheckin = mode === "postCheckin";
+  const readOnlyCount = isPostCheckin ? Math.min(lockedCount, dependents.length) : 0;
+  const [adding, setAdding] = useState(isPostCheckin || dependents.length > 0);
   const [draft, setDraft] = useState<Dependent>(EMPTY);
   const [useMainGuestAddress, setUseMainGuestAddress] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -316,39 +326,56 @@ export function CompanionsStep({
   return (
     <div className="space-y-5">
       <header className="space-y-1">
-        <h2 className="font-display text-2xl">{t("checkin.companions.title")}</h2>
+        <h2 className="font-display text-2xl">
+          {isPostCheckin ? t("checkin.companions.postTitle") : t("checkin.companions.title")}
+        </h2>
         <p className="text-sm text-muted-foreground">
-          {t("checkin.companions.body", { count: guestsQuantity })}
+          {isPostCheckin
+            ? t("checkin.companions.postBody", {
+                count: guestsQuantity,
+                remaining: Math.max(0, max - dependents.length),
+              })
+            : t("checkin.companions.body", { count: guestsQuantity })}
         </p>
       </header>
 
       {dependents.length > 0 && (
         <ul className="space-y-2">
-          {dependents.map((dependent, index) => (
-            <li
-              key={`${dependent.documentNumber}-${index}`}
-              className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3"
-            >
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium">{dependent.name}</p>
-                <p className="font-code text-xs text-muted-foreground">
-                  {dependent.documentType} · {dependent.documentNumber}
-                </p>
-                {dependent.email ? (
-                  <p className="truncate text-xs text-muted-foreground">{dependent.email}</p>
-                ) : null}
-              </div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                aria-label={t("checkin.companions.removeAria", { name: dependent.name })}
-                onClick={() => onChange(dependents.filter((_, i) => i !== index))}
+          {dependents.map((dependent, index) => {
+            const locked = index < readOnlyCount;
+            return (
+              <li
+                key={`${dependent.documentNumber}-${index}`}
+                className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3"
               >
-                <Trash2 className="size-4 text-destructive" aria-hidden />
-              </Button>
-            </li>
-          ))}
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">{dependent.name}</p>
+                  <p className="font-code text-xs text-muted-foreground">
+                    {dependent.documentType} · {dependent.documentNumber}
+                  </p>
+                  {dependent.email ? (
+                    <p className="truncate text-xs text-muted-foreground">{dependent.email}</p>
+                  ) : null}
+                  {locked ? (
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      {t("checkin.companions.alreadyRegistered")}
+                    </p>
+                  ) : null}
+                </div>
+                {!locked ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    aria-label={t("checkin.companions.removeAria", { name: dependent.name })}
+                    onClick={() => onChange(dependents.filter((_, i) => i !== index))}
+                  >
+                    <Trash2 className="size-4 text-destructive" aria-hidden />
+                  </Button>
+                ) : null}
+              </li>
+            );
+          })}
         </ul>
       )}
 
@@ -544,11 +571,21 @@ export function CompanionsStep({
       )}
 
       <div className="flex gap-3">
-        <Button type="button" variant="outline" className="tap-safe" onClick={onBack}>
+        <Button type="button" variant="outline" className="tap-safe" disabled={saving} onClick={onBack}>
           {t("common.back")}
         </Button>
-        <Button type="button" className="tap-safe flex-1" onClick={onContinue}>
-          {dependents.length > 0 ? t("common.continue") : t("checkin.companions.noContinue")}
+        <Button
+          type="button"
+          className="tap-safe flex-1"
+          disabled={saving || (isPostCheckin && dependents.length <= readOnlyCount)}
+          onClick={onContinue}
+        >
+          {saving ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
+          {isPostCheckin
+            ? t("checkin.companions.postSave")
+            : dependents.length > 0
+              ? t("common.continue")
+              : t("checkin.companions.noContinue")}
         </Button>
       </div>
     </div>

@@ -359,6 +359,21 @@ export const en: MessageTree = {
       sameDocumentAsMain: "The companion's document must differ from the main guest's.",
       duplicateDocument: "This document is already registered for another companion.",
       fixFields: "Fix the highlighted fields below.",
+      postTitle: "Complete companions",
+      postBody:
+        "Your reservation is for {count} guest(s). There are {remaining} slot(s) left to register companions.",
+      postCta: "Add companion",
+      postEmpty: "No companions registered yet.",
+      postSave: "Save companions",
+      postSaved: "Companions updated successfully.",
+      postSaveFailed: "Could not save companions.",
+      postLoadFailed: "Could not load data to register companions.",
+      postNeedNew: "Add at least one new companion before saving.",
+      postNoSlots: "All companions for this reservation are already registered.",
+      postIncompleteContext:
+        "We could not find the complete previous check-in data. Please contact the front desk.",
+      postBlockedCancelled: "This reservation cannot register companions right now.",
+      alreadyRegistered: "Already registered",
     },
     errors: {
       intro: "Please fix the following before continuing:",

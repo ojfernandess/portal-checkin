@@ -360,6 +360,21 @@ export const es: MessageTree = {
       sameDocumentAsMain: "El documento del acompañante debe ser distinto al del huésped principal.",
       duplicateDocument: "Este documento ya está registrado para otro acompañante.",
       fixFields: "Corrija los campos resaltados abajo.",
+      postTitle: "Completar acompañantes",
+      postBody:
+        "Su reserva es para {count} huésped(es). Quedan {remaining} plaza(s) para registrar acompañantes.",
+      postCta: "Agregar acompañante",
+      postEmpty: "Aún no hay acompañantes registrados.",
+      postSave: "Guardar acompañantes",
+      postSaved: "Acompañantes actualizados con éxito.",
+      postSaveFailed: "No fue posible guardar los acompañantes.",
+      postLoadFailed: "No fue posible cargar los datos para registrar acompañantes.",
+      postNeedNew: "Agregue al menos un acompañante nuevo antes de guardar.",
+      postNoSlots: "Todos los acompañantes de la reserva ya están registrados.",
+      postIncompleteContext:
+        "No encontramos los datos completos del check-in anterior. Contacte la recepción.",
+      postBlockedCancelled: "Esta reserva no permite registrar acompañantes en este momento.",
+      alreadyRegistered: "Ya registrado",
     },
     errors: {
       intro: "Corrija lo siguiente antes de continuar:",
