@@ -251,11 +251,14 @@ export const es: MessageTree = {
       featureProtectedEstablishmentsDesc: "Su estadía es nuestra prioridad",
     },
     confirmation: {
-      title: "¿Es usted el responsable de la reserva?",
+      title: "¿Es usted el huésped principal de la reserva?",
       bodyPrefix: "Esta reserva está a nombre de",
+      bodyHint:
+        "El check-in en línea debe realizarlo el huésped principal que se alojará.",
       yes: "Sí, soy yo",
       no: "No, soy acompañante",
-      onlyMainGuest: "Solo el responsable de la reserva puede iniciar el check-in.",
+      onlyMainGuest:
+        "Solo el huésped principal puede iniciar el check-in. Los acompañantes se registran en los pasos siguientes.",
     },
     terms: {
       title: "Políticas del establecimiento",

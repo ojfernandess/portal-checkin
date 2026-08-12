@@ -1248,6 +1248,9 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
                     {t("checkin.confirmation.bodyPrefix")}{" "}
                     <strong className="text-foreground">{reservation.responsible?.name ?? "—"}</strong>.
                   </p>
+                  <p className="text-sm leading-relaxed text-muted-foreground">
+                    {t("checkin.confirmation.bodyHint")}
+                  </p>
                   <Button className="tap-safe w-full" onClick={() => setStep(2)}>
                     {t("checkin.confirmation.yes")} <ArrowRight className="size-4" aria-hidden />
                   </Button>

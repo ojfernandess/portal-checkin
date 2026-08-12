@@ -249,11 +249,14 @@ export const ptBR = {
       featureProtectedEstablishmentsDesc: "Sua estadia é nossa prioridade",
     },
     confirmation: {
-      title: "Você é o responsável pela reserva?",
+      title: "Você é o hóspede principal da reserva?",
       bodyPrefix: "Esta reserva está no nome de",
+      bodyHint:
+        "O check-in online deve ser feito pelo hóspede principal que irá se hospedar.",
       yes: "Sim, sou eu",
       no: "Não, sou acompanhante",
-      onlyMainGuest: "Somente o responsável pela reserva pode iniciar o check-in.",
+      onlyMainGuest:
+        "Somente o hóspede principal pode iniciar o check-in. Acompanhantes são cadastrados nas etapas seguintes.",
     },
     terms: {
       title: "Políticas do estabelecimento",

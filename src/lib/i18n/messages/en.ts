@@ -250,11 +250,14 @@ export const en: MessageTree = {
       featureProtectedEstablishmentsDesc: "Your stay is our priority",
     },
     confirmation: {
-      title: "Are you the reservation holder?",
+      title: "Are you the main guest on this reservation?",
       bodyPrefix: "This reservation is under the name",
+      bodyHint:
+        "Online check-in must be completed by the main guest who will stay.",
       yes: "Yes, that's me",
       no: "No, I'm a companion",
-      onlyMainGuest: "Only the reservation holder can start check-in.",
+      onlyMainGuest:
+        "Only the main guest can start check-in. Companions are added in the following steps.",
     },
     terms: {
       title: "Property policies",
