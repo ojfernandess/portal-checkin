@@ -33,4 +33,6 @@ services:
       AWS_S3_ENDPOINT: ${AWS_S3_ENDPOINT}
       AWS_S3_BUCKET: ${AWS_S3_BUCKET:-vivakey}
       AWS_S3_FORCE_PATH_STYLE: ${AWS_S3_FORCE_PATH_STYLE:-true}
+      PUBLIC_CHECKIN_ORIGIN: ${PUBLIC_CHECKIN_ORIGIN:-https://checkin.audaar.com.br}
+      ADMIN_PANEL_ORIGIN: ${ADMIN_PANEL_ORIGIN:-https://checkin.techospitality.com}
     restart: unless-stopped

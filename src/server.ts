@@ -2,6 +2,7 @@ import "./lib/error-capture";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
+import { applyDomainRouting } from "./lib/domain-routing.server";
 import { applySecurityHeaders } from "./lib/security";
 
 type ServerEntry = {
@@ -47,6 +48,9 @@ function isH3SwallowedErrorBody(body: string): boolean {
 
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
+    const domainRoute = applyDomainRouting(request);
+    if (domainRoute) return applySecurityHeaders(domainRoute);
+
     try {
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);

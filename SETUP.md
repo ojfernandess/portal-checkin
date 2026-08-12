@@ -152,6 +152,29 @@ App em `http://localhost:3000`.
 
 Não commite `.env` — configure tudo no painel do EasyPanel.
 
+### Domínios (check-in vs admin)
+
+Dois domínios apontam para o **mesmo** app Docker (porta 3000):
+
+| Domínio | Uso |
+|---------|-----|
+| `checkin.audaar.com.br` | Portal do hóspede (`/`, `/LOCALIZADOR`) |
+| `checkin.techospitality.com` | Login e painel (`/auth`, `/admin/*`) |
+
+Variáveis de runtime (opcional — há defaults):
+
+```env
+PUBLIC_CHECKIN_ORIGIN=https://checkin.audaar.com.br
+ADMIN_PANEL_ORIGIN=https://checkin.techospitality.com
+```
+
+**No EasyPanel:** cadastre os dois domínios no mesmo serviço. **Remova** redirecionamentos globais no proxy (ex.: techospitality → audaar para todas as rotas). O app faz o redirect por path:
+
+- `checkin.techospitality.com/` → `checkin.audaar.com.br/`
+- `checkin.audaar.com.br/auth` ou `/admin` → `checkin.techospitality.com` (mesmo path)
+
+Se o proxy redirecionar antes do Node, `/auth` no domínio audaar nunca chega à aplicação e o painel não abre no domínio correto.
+
 ### Variáveis VITE vs runtime
 
 | Momento | Variáveis |
