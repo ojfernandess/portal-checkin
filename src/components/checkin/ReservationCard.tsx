@@ -20,28 +20,55 @@ function Row({ icon, label, value }: { icon: React.ReactNode; label: string; val
   );
 }
 
-export function paymentBadgeClass(reservation: Reservation, status: string): string {
-  if (reservation.isCancelled) {
-    return "border-0 bg-destructive text-destructive-foreground";
-  }
-  const normalized = status.toLowerCase();
-  const isPaid =
-    reservation.financial?.isPaid === true ||
-    reservation.isPaid === true ||
-    normalized.includes("paid") ||
-    (normalized.includes("pago") && !normalized.includes("não") && !normalized.includes("nao"));
-  const isUnpaid =
+function normalizePaymentStatus(status: string): string {
+  return status.trim().toLowerCase();
+}
+
+function labelIndicatesPaid(status: string): boolean {
+  const normalized = normalizePaymentStatus(status);
+  if (normalized.includes("não pago") || normalized.includes("nao pago")) return false;
+  return /\bpago\b/.test(normalized) || normalized.includes("paid");
+}
+
+function labelIndicatesUnpaid(status: string): boolean {
+  const normalized = normalizePaymentStatus(status);
+  return (
     normalized.includes("não pago") ||
     normalized.includes("nao pago") ||
     normalized.includes("unpaid") ||
     normalized.includes("pendente") ||
-    normalized.includes("pending") ||
-    reservation.financial?.isPaid === false ||
-    reservation.isPaid === false;
+    normalized.includes("pending")
+  );
+}
 
-  if (isPaid && !isUnpaid) return "border-0 bg-emerald-600 text-white";
-  if (isUnpaid) return "border-0 bg-destructive text-destructive-foreground";
-  return "border-0 bg-muted text-muted-foreground";
+export function isReservationPaid(reservation: Reservation, status: string): boolean {
+  if (labelIndicatesUnpaid(status)) return false;
+  return (
+    reservation.financial?.isPaid === true ||
+    reservation.isPaid === true ||
+    labelIndicatesPaid(status)
+  );
+}
+
+export function paymentBadgeClass(reservation: Reservation, status: string): string {
+  if (reservation.isCancelled) {
+    return "border-0 bg-destructive text-destructive-foreground hover:bg-destructive";
+  }
+
+  if (isReservationPaid(reservation, status)) {
+    return "border-0 bg-emerald-600 text-white hover:bg-emerald-600";
+  }
+
+  const isUnpaid =
+    labelIndicatesUnpaid(status) ||
+    ((reservation.financial?.isPaid === false || reservation.isPaid === false) &&
+      !labelIndicatesPaid(status));
+
+  if (isUnpaid) {
+    return "border-0 bg-destructive text-destructive-foreground hover:bg-destructive";
+  }
+
+  return "border-0 bg-muted text-muted-foreground hover:bg-muted";
 }
 
 export function ReservationCard({ reservation }: { reservation: Reservation }) {
@@ -92,7 +119,9 @@ export function ReservationCard({ reservation }: { reservation: Reservation }) {
       </div>
       <footer className="flex items-center justify-between border-t border-border px-5 py-3">
         <span className="text-xs uppercase tracking-wide text-muted-foreground">{t("common.reservationStatus")}</span>
-        <Badge className={paymentBadgeClass(reservation, status)}>{status}</Badge>
+        <Badge variant="outline" className={paymentBadgeClass(reservation, status)}>
+          {status}
+        </Badge>
       </footer>
     </article>
   );

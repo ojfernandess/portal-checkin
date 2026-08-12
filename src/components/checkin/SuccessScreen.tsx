@@ -28,7 +28,7 @@ import {
 import { toast } from "sonner";
 import { WhatsAppIcon } from "@/components/icons/WhatsAppIcon";
 import { PhoneDisplay } from "@/components/checkin/PhoneDisplay";
-import { paymentBadgeClass } from "@/components/checkin/ReservationCard";
+import { isReservationPaid, paymentBadgeClass } from "@/components/checkin/ReservationCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatDate, formatDateTime, formatDateWithTime, isCheckoutPast } from "@/lib/format-dates";
@@ -125,11 +125,7 @@ function formatStayRangeLabel(
 
 function successPaymentBadgeClass(reservation: Reservation, status: string): string {
   const normalized = status.toLowerCase();
-  const isPaid =
-    reservation.financial?.isPaid === true ||
-    reservation.isPaid === true ||
-    normalized.includes("paid") ||
-    (normalized.includes("pago") && !normalized.includes("não") && !normalized.includes("nao"));
+  const isPaid = isReservationPaid(reservation, status);
   const isPending =
     !isPaid &&
     (normalized.includes("pendente") ||
@@ -137,14 +133,14 @@ function successPaymentBadgeClass(reservation: Reservation, status: string): str
       normalized.includes("não pago") ||
       normalized.includes("nao pago") ||
       normalized.includes("unpaid") ||
-      reservation.financial?.isPaid === false ||
-      reservation.isPaid === false);
+      ((reservation.financial?.isPaid === false || reservation.isPaid === false) &&
+        !/\bpago\b/.test(normalized)));
 
   if (isPaid && !reservation.isCancelled) {
-    return "border-0 bg-emerald-600 text-white";
+    return "border-0 bg-emerald-600 text-white hover:bg-emerald-600";
   }
   if (isPending && !reservation.isCancelled) {
-    return "border-0 bg-amber-100 text-amber-900";
+    return "border-0 bg-amber-100 text-amber-900 hover:bg-amber-100";
   }
   return paymentBadgeClass(reservation, status);
 }
