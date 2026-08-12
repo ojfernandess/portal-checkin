@@ -40,6 +40,7 @@ import {
   getEstablishmentTerms,
   getReservationDetails,
   lookupGuest,
+  startCheckinSession,
   submitCheckin,
   uploadCheckinMedia,
   verifyReaccessBirthDate,
@@ -220,6 +221,7 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
   const upload = useServerFn(uploadCheckinMedia);
   const loadReference = useServerFn(getEmbraturReference);
   const submit = useServerFn(submitCheckin);
+  const startSession = useServerFn(startCheckinSession);
   const verifyReaccess = useServerFn(verifyReaccessBirthDate);
   const loadCompletedContext = useServerFn(getCompletedCheckinContext);
 
@@ -228,6 +230,7 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
     "lookup" | "verifyBirthDate" | "confirm" | "form" | "companions" | "extra"
   >("lookup");
   const [loading, setLoading] = useState(false);
+  const [checkinSessionId, setCheckinSessionId] = useState<string | null>(null);
 
   const [localizer, setLocalizer] = useState(initialLocalizer.toUpperCase());
   const autoSearchStarted = useRef<string | null>(null);
@@ -551,6 +554,7 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
   function resetToSearch() {
     setStep(0);
     setReservation(null);
+    setCheckinSessionId(null);
     setCheckinAlreadyDone(false);
     setReaccessVerifiedFor(null);
     setReaccessSecurityRequired(false);
@@ -560,6 +564,33 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
     setLocalizer("");
     autoSearchStarted.current = null;
     void navigate({ to: "/" });
+  }
+
+  async function beginCheckinFlow() {
+    if (!reservation) {
+      setStep(1);
+      return;
+    }
+
+    const code = String(reservation.localizer ?? localizer).trim().toUpperCase();
+    const reservationId = reservation.reservationId != null ? String(reservation.reservationId) : undefined;
+    const establishmentId =
+      reservation.establishmentId != null ? String(reservation.establishmentId) : undefined;
+
+    try {
+      const result = await startSession({
+        data: {
+          localizer: code,
+          ...(reservationId ? { reservationId } : {}),
+          ...(establishmentId ? { establishmentId } : {}),
+        },
+      });
+      setCheckinSessionId(result.sessionId);
+    } catch {
+      setCheckinSessionId(null);
+    }
+
+    setStep(1);
   }
 
   function resetReaccessBirthDateConfirm() {
@@ -917,6 +948,7 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
           dependents: dependents as unknown as Record<string, unknown>[],
           termsAcceptedAt: termsAcceptedAt ?? undefined,
           termsVersion: termsVersion || undefined,
+          ...(checkinSessionId ? { checkinSessionId } : {}),
           extraFields: extraFieldValues,
         },
       });
@@ -1148,7 +1180,7 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
           ) : reservation.isPendingCancellation ? (
             <Notice tone="warning" text={t("checkin.search.pendingCancel")} />
           ) : (
-            <Button className="tap-safe h-14 w-full text-base" onClick={() => setStep(1)}>
+            <Button className="tap-safe h-14 w-full text-base" onClick={() => void beginCheckinFlow()}>
               {t("checkin.search.start")} <ArrowRight className="size-5" aria-hidden />
             </Button>
           )}
@@ -1159,6 +1191,7 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
             onClick={() => {
               setReservation(null);
               setLocalizer("");
+              setCheckinSessionId(null);
               setReaccessVerifiedFor(null);
               setReaccessSecurityRequired(false);
               resetReaccessBirthDateConfirm();

@@ -1,11 +1,30 @@
 import type { CheckoutFeedRow, CreatedFeedRow } from "@/lib/api/admin.functions";
 
+export type PortalDurationEntry = {
+  id: string;
+  localizer: string;
+  guestName: string;
+  establishmentName: string | null;
+  durationSeconds: number;
+  checkedInAt: string;
+};
+
+export type PortalDurationStats = {
+  measured: number;
+  totalToday: number;
+  averageSeconds: number | null;
+  medianSeconds: number | null;
+  fastest: PortalDurationEntry[];
+  slowest: PortalDurationEntry[];
+};
+
 export type PortalStats = {
   date: string;
   total: number;
   today: number;
   week: number;
   byHour: Record<string, number>;
+  duration: PortalDurationStats;
   recent: Array<{
     id: string;
     localizer: string;

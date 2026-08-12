@@ -6,6 +6,7 @@ import { useI18n } from "@/lib/i18n/context";
 import { useState } from "react";
 import { DashboardCheckoutsTable } from "./DashboardCheckoutsTable";
 import { DashboardCreatedTable } from "./DashboardCreatedTable";
+import { DashboardDurationSection } from "./DashboardDurationSection";
 import { DashboardHeader } from "./DashboardHeader";
 import { DashboardHourChart } from "./DashboardHourChart";
 import { DashboardKpiGrid } from "./DashboardKpiGrid";
@@ -75,6 +76,12 @@ export function AdminDashboardView() {
         />
 
         {portal && hasHourChartData(portal.byHour) ? <DashboardHourChart byHour={portal.byHour} /> : null}
+
+        <DashboardDurationSection
+          stats={portal?.duration}
+          locale={locale}
+          loading={loading && !portal}
+        />
 
         <DashboardRecentCheckinsTable rows={portal?.recent ?? []} locale={locale} loading={loading && !portal} />
 

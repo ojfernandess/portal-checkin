@@ -1219,7 +1219,7 @@ export const adminDashboardPortalStats = createServerFn({ method: "POST" })
 
     const { data: rows, error } = await supabaseAdmin
       .from("checkin_records")
-      .select("id, localizer, guest_name, establishment_name, checked_in_at")
+      .select("id, localizer, guest_name, establishment_name, checked_in_at, started_at")
       .order("checked_in_at", { ascending: false })
       .limit(500);
 
@@ -1246,12 +1246,58 @@ export const adminDashboardPortalStats = createServerFn({ method: "POST" })
       byHour[key] = (byHour[key] ?? 0) + 1;
     }
 
+    const { computeDurationSeconds, medianSeconds } = await import("@/lib/checkin-sessions.server");
+
+    type DurationRow = {
+      id: string;
+      localizer: string;
+      guestName: string;
+      establishmentName: string | null;
+      durationSeconds: number;
+      checkedInAt: string;
+    };
+
+    const durationRows: DurationRow[] = [];
+    for (const row of todayRecords) {
+      const startedAt = row.started_at ? String(row.started_at) : null;
+      const checkedInAt = String(row.checked_in_at ?? "");
+      if (!startedAt) continue;
+      const durationSeconds = computeDurationSeconds(startedAt, checkedInAt);
+      if (durationSeconds == null) continue;
+      durationRows.push({
+        id: String(row.id),
+        localizer: String(row.localizer),
+        guestName: String(row.guest_name),
+        establishmentName: row.establishment_name != null ? String(row.establishment_name) : null,
+        durationSeconds,
+        checkedInAt,
+      });
+    }
+
+    const durations = durationRows.map((row) => row.durationSeconds);
+    const averageSeconds =
+      durations.length > 0
+        ? Math.round(durations.reduce((sum, value) => sum + value, 0) / durations.length)
+        : null;
+
+    const sortedByDuration = [...durationRows].sort(
+      (a, b) => a.durationSeconds - b.durationSeconds,
+    );
+
     return {
       date: selectedDate,
       total: records.length,
       today: todayRecords.length,
       week: weekRecords.length,
       byHour,
+      duration: {
+        measured: durationRows.length,
+        totalToday: todayRecords.length,
+        averageSeconds,
+        medianSeconds: medianSeconds(durations),
+        fastest: sortedByDuration.slice(0, 5),
+        slowest: [...sortedByDuration].reverse().slice(0, 5),
+      },
       recent: todayRecords.slice(0, 8).map((row) => ({
         id: row.id,
         localizer: row.localizer,

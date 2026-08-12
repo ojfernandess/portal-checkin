@@ -361,6 +361,32 @@ export const findReservation = createServerFn({ method: "POST" })
     }
   });
 
+/** Marca o início do fluxo de check-in (para métricas de duração no painel). */
+export const startCheckinSession = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        localizer: LOCALIZER_SCHEMA,
+        reservationId: z.string().trim().min(1).max(64).optional(),
+        establishmentId: z.string().trim().min(1).max(64).optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    await enforceRateLimit(clientIpBucket("checkin-session-start"), { maxRequests: 20 });
+    const { assertRegisteredEstablishmentAccess } = await import("@/lib/establishment-registry.server");
+    if (data.establishmentId) {
+      await assertRegisteredEstablishmentAccess(data.establishmentId);
+    }
+    const { startCheckinSession: createSession } = await import("@/lib/checkin-sessions.server");
+    const sessionId = await createSession({
+      localizer: data.localizer,
+      reservationId: data.reservationId,
+      establishmentId: data.establishmentId,
+    });
+    return { sessionId };
+  });
+
 /** Detalhes completos após localizador validado. */
 export const getReservationDetails = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
@@ -855,6 +881,7 @@ export const submitCheckin = createServerFn({ method: "POST" })
         purpose: z.enum(["checkin", "companions"]).optional(),
         termsAcceptedAt: z.string().datetime().optional(),
         termsVersion: z.number().int().optional(),
+        checkinSessionId: z.string().uuid().optional(),
         extraFields: z.record(z.any()).optional(),
         registeredPhotos: z
           .object({
@@ -984,6 +1011,7 @@ export const submitCheckin = createServerFn({ method: "POST" })
       ...(data.extraFields ? { extraFields: data.extraFields } : {}),
       termsAcceptedAt: data.termsAcceptedAt ?? null,
       termsVersion: data.termsVersion ?? null,
+      checkinSessionId: data.checkinSessionId ?? null,
     });
 
     const resolvedEstablishmentId =

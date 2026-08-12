@@ -325,6 +325,7 @@ export type Database = {
           terms_accepted: boolean
           terms_accepted_at: string | null
           terms_version: number | null
+          started_at: string | null
           checked_in_at: string
           created_at: string
         }
@@ -347,6 +348,7 @@ export type Database = {
           terms_accepted?: boolean
           terms_accepted_at?: string | null
           terms_version?: number | null
+          started_at?: string | null
           checked_in_at?: string
           created_at?: string
         }
@@ -369,7 +371,41 @@ export type Database = {
           terms_accepted?: boolean
           terms_accepted_at?: string | null
           terms_version?: number | null
+          started_at?: string | null
           checked_in_at?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      checkin_sessions: {
+        Row: {
+          id: string
+          localizer: string
+          reservation_id: string | null
+          establishment_id: string | null
+          started_at: string
+          completed_at: string | null
+          checkin_record_id: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          localizer: string
+          reservation_id?: string | null
+          establishment_id?: string | null
+          started_at?: string
+          completed_at?: string | null
+          checkin_record_id?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          localizer?: string
+          reservation_id?: string | null
+          establishment_id?: string | null
+          started_at?: string
+          completed_at?: string | null
+          checkin_record_id?: string | null
           created_at?: string
         }
         Relationships: []

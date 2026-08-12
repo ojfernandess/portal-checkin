@@ -12,6 +12,33 @@ export function formatMoney(value: number | undefined, locale: Locale): string {
   return value.toLocaleString(localeToDateLocale(locale), { style: "currency", currency: "BRL" });
 }
 
+export function formatDuration(seconds: number | null | undefined, locale: Locale): string {
+  if (seconds == null || !Number.isFinite(seconds) || seconds < 0) return "—";
+
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+
+  const labels =
+    locale === "en"
+      ? { hour: "h", minute: "min", second: "s" }
+      : locale === "es"
+        ? { hour: "h", minute: "min", second: "s" }
+        : { hour: "h", minute: "min", second: "s" };
+
+  if (hours > 0) {
+    return minutes > 0
+      ? `${hours}${labels.hour} ${minutes}${labels.minute}`
+      : `${hours}${labels.hour}`;
+  }
+  if (minutes > 0) {
+    return secs > 0
+      ? `${minutes}${labels.minute} ${secs}${labels.second}`
+      : `${minutes}${labels.minute}`;
+  }
+  return `${secs}${labels.second}`;
+}
+
 export function getGreetingKey(): "morning" | "afternoon" | "evening" {
   const hour = new Date().getHours();
   if (hour < 12) return "morning";
