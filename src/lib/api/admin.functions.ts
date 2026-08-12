@@ -328,18 +328,11 @@ export const adminCreateStaff = createServerFn({ method: "POST" })
         password: z.string().min(12).max(72),
         fullName: z.string().trim().min(2).max(120),
         role: z.enum(["admin", "reception"]),
-        turnstileToken: z.string().trim().min(1).optional(),
       })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
-    const { getRequest } = await import("@tanstack/react-start/server");
-    const { getClientIp } = await import("@/lib/rate-limit");
-    const { assertTurnstileIfConfigured } = await import("@/lib/turnstile.server");
-    const request = getRequest();
-    const ip = request?.headers ? getClientIp(request.headers) : "unknown";
-    await assertTurnstileIfConfigured(data.turnstileToken, ip);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: created, error } = await supabaseAdmin.auth.admin.createUser({
       email: data.email,
