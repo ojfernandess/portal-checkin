@@ -173,6 +173,9 @@ function pickMainGuestForApi(guest: MainGuest): Record<string, unknown> {
     documentPhotoUrl: guest.documentPhotoUrl,
   };
 
+  if (guest.profilePhotoId != null) row["profilePhotoId"] = guest.profilePhotoId;
+  if (guest.documentPhotoId != null) row["documentPhotoId"] = guest.documentPhotoId;
+
   row["gender"] = formatGenderForApi(guest.gender);
 
   if (documentType === "CPF" || documentType === "RG") {
@@ -743,6 +746,24 @@ function asEmbraturForm(value: unknown): EmbraturForm | null {
   return form;
 }
 
+/** Aceita FNRH salva mesmo se algum campo vier vazio (recuperação pós check-in). */
+function asStoredEmbraturForm(value: unknown): EmbraturForm | null {
+  if (!value || typeof value !== "object") return null;
+  const strict = asEmbraturForm(value);
+  if (strict) return strict;
+  const row = value as Record<string, unknown>;
+  const form: EmbraturForm = {
+    snmotvia: String(row.snmotvia ?? "").trim(),
+    sntiptran: String(row.sntiptran ?? "").trim(),
+    bgstdscpais: String(row.bgstdscpais ?? "").trim(),
+    bgstdscpaisdest: String(row.bgstdscpaisdest ?? "").trim(),
+    snidcidadeibge: String(row.snidcidadeibge ?? "").trim(),
+    snidcidadeibgedest: String(row.snidcidadeibgedest ?? "").trim(),
+  };
+  const filled = Object.values(form).filter((field) => field.length > 0).length;
+  return filled > 0 ? form : null;
+}
+
 function asDependentList(value: unknown): Dependent[] {
   if (!Array.isArray(value)) return [];
   return value
@@ -757,6 +778,42 @@ function asDependentList(value: unknown): Dependent[] {
       fnrhId: item.fnrhId != null ? String(item.fnrhId) : null,
     }))
     .filter((item) => item.name.trim());
+}
+
+function hasCompanionPhotoRefs(guest: MainGuest): boolean {
+  const hasProfile = Boolean(guest.profilePhotoUrl?.trim() || guest.profilePhotoId != null);
+  const hasDocument = Boolean(guest.documentPhotoUrl?.trim() || guest.documentPhotoId != null);
+  return hasProfile && hasDocument;
+}
+
+function hasCompanionMainGuestIdentity(guest: MainGuest): boolean {
+  return Boolean(
+    guest.name?.trim() && (guest.documentNumber?.trim() || guest.email?.trim()),
+  );
+}
+
+async function enrichMainGuestPhotosForCompanions(guest: MainGuest): Promise<MainGuest> {
+  try {
+    const { enrichGuestLookupPhotos } = await import("@/lib/s3.server");
+    const enriched = await enrichGuestLookupPhotos(guest);
+    return {
+      ...guest,
+      ...enriched,
+      profilePhotoUrl:
+        enriched.profilePhotoDisplayUrl ??
+        enriched.profilePhotoUrl ??
+        guest.profilePhotoUrl,
+      documentPhotoUrl:
+        enriched.documentPhotoDisplayUrl ??
+        enriched.documentPhotoUrl ??
+        guest.documentPhotoUrl,
+      profilePhotoId: enriched.profilePhotoId ?? guest.profilePhotoId,
+      documentPhotoId: enriched.documentPhotoId ?? guest.documentPhotoId,
+    };
+  } catch (error) {
+    console.error("[checkin] falha ao enriquecer fotos do hóspede para acompanhantes:", error);
+    return guest;
+  }
 }
 
 export type CompletedCheckinContext = {
@@ -826,12 +883,13 @@ export const getCompletedCheckinContext = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: record } = await supabaseAdmin
       .from("checkin_records")
-      .select("main_guest, dependents, embratur")
+      .select("main_guest, dependents, embratur, reservation_snapshot")
       .eq("localizer", code)
       .order("checked_in_at", { ascending: false })
       .limit(1)
       .maybeSingle();
 
+    const snapshot = (record?.reservation_snapshot as Reservation | null) ?? null;
     let mainGuest: MainGuest = {};
     let embratur: EmbraturForm | null = null;
     let dependents: Dependent[] = [];
@@ -841,21 +899,70 @@ export const getCompletedCheckinContext = createServerFn({ method: "POST" })
       source = "checkin_record";
       mainGuest = (record.main_guest as MainGuest) ?? {};
       dependents = asDependentList(record.dependents);
-      embratur = asEmbraturForm(record.embratur);
+      embratur = asStoredEmbraturForm(record.embratur);
     }
 
-    if (!mainGuest.name?.trim() && reservation?.mainGuest) {
-      mainGuest = { ...reservation.mainGuest, ...mainGuest };
+    // Preenche lacunas com snapshot local e reserva ao vivo (fotos/IDs/dados do hóspede).
+    mainGuest = {
+      ...(reservation?.mainGuest ?? {}),
+      ...(snapshot?.mainGuest ?? {}),
+      ...mainGuest,
+    };
+
+    if (!embratur) {
+      embratur =
+        asStoredEmbraturForm((snapshot as { embratur?: unknown } | null)?.embratur) ??
+        asStoredEmbraturForm((reservation as { embratur?: unknown } | null)?.embratur);
     }
-    if (dependents.length === 0 && reservation?.dependents?.length) {
-      dependents = asDependentList(reservation.dependents);
+
+    if (dependents.length === 0) {
+      dependents = asDependentList(snapshot?.dependents?.length ? snapshot.dependents : reservation?.dependents);
+    }
+
+    mainGuest = await enrichMainGuestPhotosForCompanions(mainGuest);
+
+    // Se ainda faltarem fotos, tenta lookup pelo documento/e-mail do hóspede principal.
+    if (!hasCompanionPhotoRefs(mainGuest)) {
+      try {
+        const documentNumber = mainGuest.documentNumber?.trim();
+        const email = mainGuest.email?.trim();
+        if (documentNumber || email) {
+          const { apiFetch } = await import("./techospitality.server");
+          const query: Record<string, string> = {};
+          if (documentNumber) query.documentNumber = documentNumber;
+          if (email) query.email = email;
+          const payload = await apiFetch<unknown>("/api/reservations/hub/main-guest/lookup", {
+            query,
+          });
+          const lookedUp = await parseLookupGuestWithPhotos(payload);
+          if (lookedUp) {
+            mainGuest = {
+              ...mainGuest,
+              ...lookedUp,
+              profilePhotoUrl:
+                lookedUp.profilePhotoDisplayUrl ??
+                lookedUp.profilePhotoUrl ??
+                mainGuest.profilePhotoUrl,
+              documentPhotoUrl:
+                lookedUp.documentPhotoDisplayUrl ??
+                lookedUp.documentPhotoUrl ??
+                mainGuest.documentPhotoUrl,
+              profilePhotoId: lookedUp.profilePhotoId ?? mainGuest.profilePhotoId,
+              documentPhotoId: lookedUp.documentPhotoId ?? mainGuest.documentPhotoId,
+            };
+          }
+        }
+      } catch (error) {
+        console.error("[checkin] lookup de fotos para acompanhantes falhou:", error);
+      }
     }
 
     const namedDependentsCount = countNamedDependents(dependents);
     const remainingSlots = Math.max(0, guestsQuantity - 1 - namedDependentsCount);
-    const guestIssues = validateMainGuest(mainGuest);
-    const photoIssues = validatePhotos(mainGuest.profilePhotoUrl, mainGuest.documentPhotoUrl);
-    const contextComplete = guestIssues.length === 0 && !!embratur && photoIssues.length === 0;
+    const contextComplete =
+      hasCompanionMainGuestIdentity(mainGuest) &&
+      hasCompanionPhotoRefs(mainGuest) &&
+      !!embratur;
 
     let blockedReason: CompletedCheckinContext["blockedReason"] = null;
     if (remainingSlots <= 0) blockedReason = "no_slots";
@@ -942,29 +1049,32 @@ export const submitCheckin = createServerFn({ method: "POST" })
       }
     }
 
-    const issues = [
-      ...validateMainGuest(mainGuestInput),
-      ...validateDependents(dependentsInput, mainGuestInput),
-      ...validateEmbraturForm(embraturInput),
-    ];
+    const issues =
+      purpose === "companions"
+        ? []
+        : [
+            ...validateMainGuest(mainGuestInput),
+            ...validateDependents(dependentsInput, mainGuestInput),
+            ...validateEmbraturForm(embraturInput),
+            ...validatePhotos(mainGuestInput.profilePhotoUrl, mainGuestInput.documentPhotoUrl),
+          ];
 
     if (purpose === "companions") {
-      const photoIssues = validatePhotos(
-        mainGuestInput.profilePhotoUrl,
-        mainGuestInput.documentPhotoUrl,
-      );
-      if (photoIssues.length > 0) {
+      if (!hasCompanionMainGuestIdentity(mainGuestInput)) {
+        throw new Error(
+          "Não encontramos os dados completos do check-in anterior. Entre em contato com a recepção.",
+        );
+      }
+      if (!hasCompanionPhotoRefs(mainGuestInput)) {
         throw new Error(
           "Não encontramos as fotos do check-in anterior. Entre em contato com a recepção para cadastrar acompanhantes.",
         );
       }
-    } else {
-      issues.push(
-        ...validatePhotos(mainGuestInput.profilePhotoUrl, mainGuestInput.documentPhotoUrl),
-      );
-    }
-
-    if (issues.length > 0) {
+      const companionIssues = validateDependents(dependentsInput, mainGuestInput);
+      if (companionIssues.length > 0) {
+        throw new Error(formatCheckinIssues(companionIssues, labels));
+      }
+    } else if (issues.length > 0) {
       throw new Error(formatCheckinIssues(issues, labels));
     }
 
