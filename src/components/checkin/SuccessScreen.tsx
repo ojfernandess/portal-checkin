@@ -357,6 +357,14 @@ export function SuccessScreen({
   const isCancelled = reservation.isCancelled === true;
   const checkoutPast = isCheckoutPast(checkoutDate, checkoutTime);
   const hideGuestDetails = isCancelled || checkoutPast;
+  const remainingCompanionSlots = Math.max(
+    0,
+    Number(guestsQuantity ?? 1) - 1 - registeredCompanions.length,
+  );
+  const showAddCompanionsOption =
+    !isCancelled &&
+    !reservation.isPendingCancellation &&
+    remainingCompanionSlots > 0;
   const showRoomPassword = !isCancelled && !checkoutPast && roomPassword != null && roomPassword !== "";
   const checkinTimeLabel = checkinTime?.trim() || "15:00";
   const showInboxFacialNotice =
@@ -673,7 +681,10 @@ export function SuccessScreen({
             </div>
           </CardShell>
 
-          {registeredCompanions.length > 0 || canAddCompanions || addingCompanions ? (
+          {registeredCompanions.length > 0 ||
+          showAddCompanionsOption ||
+          addingCompanions ||
+          remainingCompanionSlots > 0 ? (
             <CardShell className="p-5">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 {!addingCompanions ? (
@@ -683,7 +694,7 @@ export function SuccessScreen({
                 ) : (
                   <span className="sr-only">{t("common.companions")}</span>
                 )}
-                {canAddCompanions && !addingCompanions && !hideGuestDetails ? (
+                {showAddCompanionsOption && !addingCompanions && !hideGuestDetails ? (
                   <Button
                     type="button"
                     size="sm"

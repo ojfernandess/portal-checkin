@@ -370,9 +370,11 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
   );
 
   const reservationId = String(reservation?.localizer ?? reservation?.reservationId ?? localizer);
-  const capacity = Number(reservation?.room?.capacity ?? 1);
-  const guestsQuantity = Number(reservation?.guestsQuantity ?? 1);
-  const hasCompanions = guestsQuantity > 1 && capacity > 1;
+  const guestsQuantity = Math.max(
+    1,
+    Number(reservation?.stay?.guestsQuantity ?? reservation?.guestsQuantity ?? 1) || 1,
+  );
+  const hasCompanions = guestsQuantity > 1;
 
   const exclusiveCameraProps = {
     activeCaptureId: activeCameraId,
@@ -1080,9 +1082,13 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
         setPostCompanionsCanAdd(false);
         return;
       }
-      if (!ctx.canAdd || !ctx.embratur) {
-        toast.error(t("checkin.companions.postIncompleteContext"));
+      if (!ctx.canAdd) {
+        toast.error(t("checkin.companions.postNoSlots"));
         setPostCompanionsCanAdd(false);
+        return;
+      }
+      if (!ctx.contextComplete || !ctx.embratur) {
+        toast.error(t("checkin.companions.postIncompleteContext"));
         return;
       }
       setGuest(ctx.mainGuest);

@@ -796,19 +796,26 @@ export const getCompletedCheckinContext = createServerFn({ method: "POST" })
       Number(reservation?.stay?.guestsQuantity ?? reservation?.guestsQuantity ?? 1) || 1,
     );
 
+    const countNamedDependents = (list: Dependent[]): number =>
+      list.filter((dependent) => Boolean(dependent.name?.trim())).length;
+
     const emptyBlocked = (
       blockedReason: CompletedCheckinContext["blockedReason"],
-    ): CompletedCheckinContext => ({
-      mainGuest: {},
-      embratur: null,
-      dependents: reservation?.dependents ?? [],
-      guestsQuantity,
-      remainingSlots: 0,
-      canAdd: false,
-      contextComplete: false,
-      blockedReason,
-      source: "reservation",
-    });
+    ): CompletedCheckinContext => {
+      const dependents = asDependentList(reservation?.dependents);
+      const remainingSlots = Math.max(0, guestsQuantity - 1 - countNamedDependents(dependents));
+      return {
+        mainGuest: {},
+        embratur: null,
+        dependents,
+        guestsQuantity,
+        remainingSlots,
+        canAdd: false,
+        contextComplete: false,
+        blockedReason,
+        source: "reservation",
+      };
+    };
 
     if (reservation?.isCancelled === true) return emptyBlocked("cancelled");
     if (reservation?.isPendingCancellation === true) return emptyBlocked("pending_cancellation");
@@ -844,14 +851,15 @@ export const getCompletedCheckinContext = createServerFn({ method: "POST" })
       dependents = asDependentList(reservation.dependents);
     }
 
-    const remainingSlots = Math.max(0, guestsQuantity - 1 - dependents.length);
+    const namedDependentsCount = countNamedDependents(dependents);
+    const remainingSlots = Math.max(0, guestsQuantity - 1 - namedDependentsCount);
     const guestIssues = validateMainGuest(mainGuest);
     const photoIssues = validatePhotos(mainGuest.profilePhotoUrl, mainGuest.documentPhotoUrl);
     const contextComplete = guestIssues.length === 0 && !!embratur && photoIssues.length === 0;
 
     let blockedReason: CompletedCheckinContext["blockedReason"] = null;
-    if (!contextComplete) blockedReason = "incomplete_context";
-    else if (remainingSlots <= 0) blockedReason = "no_slots";
+    if (remainingSlots <= 0) blockedReason = "no_slots";
+    else if (!contextComplete) blockedReason = "incomplete_context";
 
     return {
       mainGuest,
@@ -859,7 +867,8 @@ export const getCompletedCheckinContext = createServerFn({ method: "POST" })
       dependents,
       guestsQuantity,
       remainingSlots,
-      canAdd: contextComplete && remainingSlots > 0,
+      // Sempre expor a opção quando ainda houver vagas pela quantidade de hóspedes.
+      canAdd: remainingSlots > 0,
       contextComplete,
       blockedReason,
       source,
