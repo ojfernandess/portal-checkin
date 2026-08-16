@@ -4,7 +4,7 @@ import {
   DEFAULT_LOCALE,
   LOCALE_STORAGE_KEY,
   localeToHtmlLang,
-  resolveLocale,
+  readPreferredLocale,
   type Locale,
 } from "./types";
 
@@ -18,17 +18,26 @@ type I18nContextValue = {
 
 const I18nContext = createContext<I18nContextValue | null>(null);
 
-function readStoredLocale(): Locale {
+function readInitialLocale(): Locale {
   if (typeof window === "undefined") return DEFAULT_LOCALE;
-  try {
-    return resolveLocale(localStorage.getItem(LOCALE_STORAGE_KEY));
-  } catch {
-    return DEFAULT_LOCALE;
+
+  const { locale, fromStorage } = readPreferredLocale();
+
+  // Persiste a primeira detecção do navegador para manter o idioma estável
+  // nas próximas visitas, sem sobrescrever escolha manual já salva.
+  if (!fromStorage) {
+    try {
+      localStorage.setItem(LOCALE_STORAGE_KEY, locale);
+    } catch {
+      /* ignore storage errors */
+    }
   }
+
+  return locale;
 }
 
 export function I18nProvider({ children }: { children: React.ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>(readStoredLocale);
+  const [locale, setLocaleState] = useState<Locale>(readInitialLocale);
 
   const setLocale = useCallback((next: Locale) => {
     setLocaleState(next);
