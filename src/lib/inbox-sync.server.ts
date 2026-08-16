@@ -200,7 +200,18 @@ function isInboxGuestCheckinCompleted(guest: { check_in_completed?: boolean; sta
   return status === "checked_in" || status === "completed" || status === "confirmed";
 }
 
-/** Conclui check-in na Inbox enviando foto (multipart → JSON → endpoint dedicado). */
+/** Inbox 422 em POST /stays/{id}/guests/{id}/photo quando o hóspede já tem foto/check-in. */
+function isInboxAlreadyCheckedInError(error: unknown): boolean {
+  const message = (error instanceof Error ? error.message : String(error)).toLowerCase();
+  return (
+    message.includes("já concluído") ||
+    message.includes("ja concluido") ||
+    message.includes("already completed") ||
+    message.includes("already checked")
+  );
+}
+
+/** Conclui check-in na Inbox enviando foto (multipart → JSON). 422 "já concluído" é sucesso. */
 async function completeInboxGuestCheckin(
   stayId: number,
   stayGuestId: number,
@@ -210,10 +221,20 @@ async function completeInboxGuestCheckin(
     await uploadInboxStayGuestPhotoMultipart(stayId, stayGuestId, photo);
     return;
   } catch (multipartError) {
+    if (isInboxAlreadyCheckedInError(multipartError)) {
+      return;
+    }
     console.warn("[inbox-sync] guest photo multipart failed, trying JSON:", multipartError);
   }
 
-  await uploadInboxStayGuestPhoto(stayId, stayGuestId, photo.base64);
+  try {
+    await uploadInboxStayGuestPhoto(stayId, stayGuestId, photo.base64);
+  } catch (jsonError) {
+    if (isInboxAlreadyCheckedInError(jsonError)) {
+      return;
+    }
+    throw jsonError;
+  }
 }
 
 async function createInboxStayWithGuestPhoto(
@@ -335,6 +356,9 @@ export async function syncCheckinToInbox(input: SyncCheckinToInboxInput): Promis
     let createdStay = await createInboxStayWithGuestPhoto(stayInput, photo);
     const stayId = createdStay.id;
 
+    // A criação com foto já conclui o check-in; a resposta às vezes não traz
+    // check_in_completed. Confirma no GET antes de reenviar a foto.
+    createdStay = await getInboxStay(stayId).catch(() => createdStay);
     let primaryGuest = findPrimaryStayGuest(createdStay);
     if (primaryGuest?.id && !isInboxGuestCheckinCompleted(primaryGuest)) {
       await completeInboxGuestCheckin(stayId, primaryGuest.id, photo);
