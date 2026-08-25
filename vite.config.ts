@@ -6,12 +6,25 @@ import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const csrfMiddlewareShim = path.resolve(root, "src/lib/shims/createCsrfMiddleware.server.ts");
+const startStorageContextClientStub = path.resolve(
+  root,
+  "src/lib/shims/start-storage-context.client.ts",
+);
 
 export default defineConfig({
   tanstackStart: {
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
     // nitro/vite builds from this
     server: { entry: "server" },
+  },
+  environments: {
+    client: {
+      resolve: {
+        alias: {
+          "@tanstack/start-storage-context": startStorageContextClientStub,
+        },
+      },
+    },
   },
   resolve: {
     alias: {

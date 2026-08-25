@@ -1,30 +1,12 @@
-import { createStart, createMiddleware } from "@tanstack/react-start";
+import { createStart } from "@tanstack/react-start";
 
-import { renderErrorPage } from "./lib/error-page";
 import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
 import { attachTenantContext } from "@/integrations/supabase/tenant-attacher";
-import { createCsrfMiddleware } from "@/lib/shims/createCsrfMiddleware.server";
 
-const errorMiddleware = createMiddleware().server(async ({ next }) => {
-  try {
-    return await next();
-  } catch (error) {
-    if (error != null && typeof error === "object" && "statusCode" in error) {
-      throw error;
-    }
-    console.error(error);
-    return new Response(renderErrorPage(), {
-      status: 500,
-      headers: { "content-type": "text/html; charset=utf-8" },
-    });
-  }
+export const startInstance = createStart(async () => {
+  const { getRequestMiddleware } = await import("@/lib/start-request-middleware.server");
+  return {
+    functionMiddleware: [attachSupabaseAuth, attachTenantContext],
+    requestMiddleware: getRequestMiddleware(),
+  };
 });
-
-const csrfMiddleware = createCsrfMiddleware({
-  filter: (ctx) => ctx.handlerType === "serverFn",
-});
-
-export const startInstance = createStart(() => ({
-  functionMiddleware: [attachSupabaseAuth, attachTenantContext],
-  requestMiddleware: [errorMiddleware, csrfMiddleware],
-}));
