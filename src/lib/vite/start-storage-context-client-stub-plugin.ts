@@ -30,6 +30,7 @@ export function startStorageContextClientStubPlugin(stubPath: string): Plugin {
       };
     },
     resolveId(source, _importer, options) {
+      if (this.environment.name !== "client") return null;
       if (options?.ssr === true) return null;
       if (source === STORAGE_CONTEXT || source.startsWith(`${STORAGE_CONTEXT}/`)) {
         return normalizedStub;
