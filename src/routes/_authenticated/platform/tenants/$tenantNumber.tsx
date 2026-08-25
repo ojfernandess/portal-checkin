@@ -30,6 +30,7 @@ import {
   platformGetTenant,
   platformListTenantMembers,
   platformRemoveTenantMember,
+  platformSaveTenantInboxConfig,
   platformSaveTenantPmsConfig,
   platformSaveTenantLogo,
   platformUpdateTenant,
@@ -37,6 +38,7 @@ import {
   type PlatformTenantMember,
   type PlatformTenantStatus,
 } from "@/lib/api/platform.functions";
+import { INBOX_MODULE_KEYS, type InboxModuleKey, type InboxModules } from "@/lib/inbox/modules";
 import { useI18n } from "@/lib/i18n/context";
 
 export const Route = createFileRoute("/_authenticated/platform/tenants/$tenantNumber")({
@@ -58,6 +60,14 @@ const TOKEN_FIELDS = [
   { key: "api", label: "API (fallback)" },
 ] as const;
 
+const INBOX_MODULE_LABEL_KEYS: Record<InboxModuleKey, string> = {
+  portfolio: "admin.inbox.modulePortfolio",
+  units: "admin.inbox.moduleUnits",
+  stays: "admin.inbox.moduleStays",
+  guests: "admin.inbox.moduleGuests",
+  readers: "admin.inbox.moduleReaders",
+};
+
 function PlatformTenantDetailPage() {
   const { tenantNumber: tenantNumberParam } = Route.useParams();
   const publicNumber = useMemo(() => Number(tenantNumberParam), [tenantNumberParam]);
@@ -68,6 +78,7 @@ function PlatformTenantDetailPage() {
   const updateFn = useServerFn(platformUpdateTenant);
   const featuresFn = useServerFn(platformUpdateTenantFeatures);
   const pmsFn = useServerFn(platformSaveTenantPmsConfig);
+  const inboxFn = useServerFn(platformSaveTenantInboxConfig);
   const saveLogoFn = useServerFn(platformSaveTenantLogo);
   const membersFn = useServerFn(platformListTenantMembers);
   const addMemberFn = useServerFn(platformAddTenantMember);
@@ -91,6 +102,19 @@ function PlatformTenantDetailPage() {
   const [pmsBaseUrl, setPmsBaseUrl] = useState("");
   const [pmsTokens, setPmsTokens] = useState<Record<string, string>>({});
   const [pmsMasked, setPmsMasked] = useState<Record<string, string>>({});
+
+  const [inboxClientId, setInboxClientId] = useState("");
+  const [inboxClientSecret, setInboxClientSecret] = useState("");
+  const [inboxBaseUrl, setInboxBaseUrl] = useState("");
+  const [inboxHasSecret, setInboxHasSecret] = useState(false);
+  const [inboxMaskedClientId, setInboxMaskedClientId] = useState<string | null>(null);
+  const [inboxModules, setInboxModules] = useState<InboxModules>({
+    portfolio: true,
+    units: true,
+    stays: true,
+    guests: true,
+    readers: false,
+  });
 
   const [members, setMembers] = useState<PlatformTenantMember[]>([]);
   const [memberEmail, setMemberEmail] = useState("");
@@ -124,6 +148,12 @@ function PlatformTenantDetailPage() {
     setPmsBaseUrl(detail.pms.baseUrl);
     setPmsTokens({});
     setPmsMasked(detail.pms.masked);
+    setInboxClientId("");
+    setInboxClientSecret("");
+    setInboxBaseUrl(detail.inbox.baseUrl);
+    setInboxHasSecret(detail.inbox.hasClientSecret);
+    setInboxMaskedClientId(detail.inbox.maskedClientId);
+    setInboxModules(detail.inbox.modules);
     setMembers(membersResult.members);
   }
 
@@ -201,6 +231,33 @@ function PlatformTenantDetailPage() {
     }
   }
 
+  async function handleSaveInbox() {
+    setSaving(true);
+    try {
+      await inboxFn({
+        data: {
+          publicNumber,
+          inboxClientId: inboxClientId.trim() || null,
+          inboxClientSecret: inboxClientSecret.trim() || undefined,
+          clearInboxClientSecret: inboxClientSecret === "__CLEAR__",
+          inboxBaseUrl: inboxBaseUrl.trim() || null,
+          inboxModules,
+        },
+      });
+      toast.success(t("platform.tenantDetail.inboxSaved"));
+      setInboxClientSecret("");
+      await load();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("errors.saveFailed"));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const inboxFeatureEnabled = features.some(
+    (feature) => feature.featureKey === "portaria_inbox" && feature.enabled,
+  );
+
   async function handleAddMember() {
     if (!memberEmail.trim()) {
       toast.error(t("platform.tenantDetail.memberEmailRequired"));
@@ -273,6 +330,7 @@ function PlatformTenantDetailPage() {
           <TabsTrigger value="general">{t("platform.tenantDetail.tabGeneral")}</TabsTrigger>
           <TabsTrigger value="features">{t("platform.tenantDetail.tabFeatures")}</TabsTrigger>
           <TabsTrigger value="pms">{t("platform.tenantDetail.tabPms")}</TabsTrigger>
+          <TabsTrigger value="inbox">{t("platform.tenantDetail.tabInbox")}</TabsTrigger>
           <TabsTrigger value="members">{t("platform.tenantDetail.tabMembers")}</TabsTrigger>
         </TabsList>
 
@@ -388,6 +446,81 @@ function PlatformTenantDetailPage() {
                 {saving ? t("common.loading") : t("common.save")}
               </Button>
             </PlatformCard>
+          </PlatformSection>
+        </TabsContent>
+
+        <TabsContent value="inbox">
+          <PlatformSection
+            title={t("platform.tenantDetail.inboxTitle")}
+            description={t("platform.tenantDetail.inboxHint")}
+          >
+            {!inboxFeatureEnabled ? (
+              <PlatformCard>
+                <p className="text-sm text-muted-foreground">{t("platform.tenantDetail.inboxFeatureRequired")}</p>
+              </PlatformCard>
+            ) : (
+              <PlatformCard className="space-y-6">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="inbox-client-id">{t("admin.inbox.clientId")}</Label>
+                    <Input
+                      id="inbox-client-id"
+                      value={inboxClientId}
+                      onChange={(event) => setInboxClientId(event.target.value)}
+                      placeholder={inboxMaskedClientId || t("admin.inbox.clientIdConfigured")}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="inbox-client-secret">{t("admin.inbox.clientSecret")}</Label>
+                    <Input
+                      id="inbox-client-secret"
+                      type="password"
+                      autoComplete="off"
+                      value={inboxClientSecret}
+                      onChange={(event) => setInboxClientSecret(event.target.value)}
+                      placeholder={inboxHasSecret ? t("admin.inbox.clientSecretKeep") : ""}
+                    />
+                    {inboxHasSecret ? (
+                      <Button type="button" variant="ghost" size="sm" onClick={() => setInboxClientSecret("__CLEAR__")}>
+                        {t("admin.inbox.clearSecret")}
+                      </Button>
+                    ) : null}
+                  </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="inbox-base-url">{t("admin.inbox.baseUrl")}</Label>
+                    <Input
+                      id="inbox-base-url"
+                      placeholder="https://inboxseg.com/api/v1/operator"
+                      value={inboxBaseUrl}
+                      onChange={(event) => setInboxBaseUrl(event.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-3 border-t border-border pt-4">
+                  <p className="text-sm font-medium">{t("admin.inbox.modulesTitle")}</p>
+                  <p className="text-xs text-muted-foreground">{t("platform.tenantDetail.inboxModulesHint")}</p>
+                  {INBOX_MODULE_KEYS.map((key) => (
+                    <div key={key} className="flex items-center justify-between gap-4">
+                      <div>
+                        <p className="font-medium">{t(INBOX_MODULE_LABEL_KEYS[key])}</p>
+                        <p className="text-xs text-muted-foreground">{t(`admin.inbox.moduleHint.${key}`)}</p>
+                      </div>
+                      <Switch
+                        checked={Boolean(inboxModules[key])}
+                        onCheckedChange={(checked) =>
+                          setInboxModules((current) => ({ ...current, [key]: checked }))
+                        }
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                <Button disabled={saving} onClick={() => void handleSaveInbox()}>
+                  {saving ? t("common.loading") : t("common.save")}
+                </Button>
+              </PlatformCard>
+            )}
           </PlatformSection>
         </TabsContent>
 

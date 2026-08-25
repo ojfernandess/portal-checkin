@@ -32,6 +32,7 @@ function toAdminAccount(data: Awaited<ReturnType<typeof adminMe>>): AdminAccount
     panelLogoUrl: data.panelLogoUrl,
     tenantId: data.tenantId,
     isPlatformAdmin: data.isPlatformAdmin,
+    inbox: data.inbox,
   };
 }
 

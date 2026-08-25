@@ -8,6 +8,7 @@ export const ADMIN_ONLY_PREFIXES = [
   "/admin/audit",
   "/admin/users",
   "/admin/security",
+  "/admin/inbox",
 ] as const;
 
 export function adminPathRequiresAdmin(pathname: string): boolean {

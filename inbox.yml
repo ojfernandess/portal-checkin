@@ -1,0 +1,725 @@
+openapi: 3.0.3
+info:
+  title: Inbox Operadora Short-stay API
+  version: 1.0.0
+  description: |
+    API REST para operadoras de short-stay integrarem sistemas de reservas, channel managers e automações.
+
+    **Autenticação:** obtenha um token em `POST /auth/token` com client_id e client_secret (credenciais
+    criadas em /operadora/integracao-api).
+    Envie `Authorization: Bearer {access_token}` em todas as requisições.
+
+    **Respostas:** envelope `{ "data": ... }` ou paginado `{ "data": [...], "meta": { current_page, per_page, total, last_page } }`.
+servers:
+  - url: /api/v1/operator
+security:
+  - bearerAuth: []
+paths:
+  /auth/token:
+    post:
+      summary: Obter token (client_credentials)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [grant_type, client_id, client_secret]
+              properties:
+                grant_type:
+                  type: string
+                  enum: [client_credentials]
+                client_id:
+                  type: string
+                  format: uuid
+                client_secret:
+                  type: string
+      responses:
+        '200':
+          description: Token emitido
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      access_token:
+                        type: string
+                      token_type:
+                        type: string
+                        example: Bearer
+                      expires_in:
+                        type: integer
+    delete:
+      summary: Revogar token atual
+      responses:
+        '200':
+          description: Token revogado
+  /enterprises:
+    get:
+      tags: [Portfólio]
+      summary: Listar condomínios do portfólio
+      responses:
+        '200':
+          description: OK
+  /managed-units:
+    get:
+      tags: [Unidades]
+      summary: Listar unidades geridas
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [pending, active, suspended, rejected]
+        - in: query
+          name: per_page
+          schema:
+            type: integer
+            maximum: 100
+      responses:
+        '200':
+          description: OK
+    post:
+      tags: [Unidades]
+      summary: Solicitar vínculo de unidade
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [access_secret, apartment_id]
+              properties:
+                access_secret:
+                  type: string
+                  description: Secret do condomínio (fornecido pela administração)
+                apartment_id:
+                  type: integer
+                display_name:
+                  type: string
+                auto_approve_guests:
+                  type: boolean
+                notes:
+                  type: string
+      responses:
+        '201':
+          description: Unidade criada (status pending)
+  /managed-units/apartment-options:
+    post:
+      tags: [Unidades]
+      summary: Listar unidades após validar secret do condomínio
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [access_secret]
+              properties:
+                access_secret:
+                  type: string
+      responses:
+        '200':
+          description: OK
+  /managed-units/{managed_unit}:
+    get:
+      tags: [Unidades]
+      summary: Detalhe da unidade
+      parameters:
+        - in: path
+          name: managed_unit
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: OK
+  /stays:
+    get:
+      tags: [Reservas]
+      summary: Listar reservas
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+        - in: query
+          name: from
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: to
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: per_page
+          schema:
+            type: integer
+            maximum: 100
+      responses:
+        '200':
+          description: OK
+    post:
+      tags: [Reservas]
+      summary: Criar reserva
+      description: |
+        Cria a reserva e o hóspede principal. Opcionalmente envie `photo` (multipart) ou `photo_base64`
+        (JSON) para concluir o check-in e liberar acesso nas leitoras sem link de autoatendimento.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [managed_unit_id, check_in_at, check_out_at, guest_name]
+              properties:
+                managed_unit_id:
+                  type: integer
+                check_in_at:
+                  type: string
+                  format: date-time
+                check_out_at:
+                  type: string
+                  format: date-time
+                guest_name:
+                  type: string
+                guest_email:
+                  type: string
+                guest_phone:
+                  type: string
+                external_id:
+                  type: string
+                external_uid:
+                  type: string
+                notes:
+                  type: string
+                guest_count:
+                  type: integer
+                photo_base64:
+                  type: string
+                  description: Imagem JPEG/PNG em base64 (opcional). Não use junto com multipart photo.
+          multipart/form-data:
+            schema:
+              type: object
+              required: [managed_unit_id, check_in_at, check_out_at, guest_name]
+              properties:
+                managed_unit_id:
+                  type: integer
+                check_in_at:
+                  type: string
+                  format: date-time
+                check_out_at:
+                  type: string
+                  format: date-time
+                guest_name:
+                  type: string
+                guest_email:
+                  type: string
+                guest_phone:
+                  type: string
+                photo:
+                  type: string
+                  format: binary
+                  description: Foto do hóspede principal (opcional, até 8 MB)
+      responses:
+        '201':
+          description: Reserva criada (inclui check_in_url)
+  /stays/{stay}:
+    get:
+      tags: [Reservas]
+      summary: Detalhe da reserva
+      parameters:
+        - in: path
+          name: stay
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: OK
+    patch:
+      tags: [Reservas]
+      summary: Atualizar reserva
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                check_in_at:
+                  type: string
+                  format: date-time
+                check_out_at:
+                  type: string
+                  format: date-time
+                status:
+                  type: string
+                notes:
+                  type: string
+                guest_count:
+                  type: integer
+                  minimum: 1
+                  maximum: 50
+      responses:
+        '200':
+          description: OK
+    delete:
+      tags: [Reservas]
+      summary: Cancelar reserva
+      responses:
+        '200':
+          description: OK
+  /stays/{stay}/cancel:
+    post:
+      tags: [Reservas]
+      summary: Cancelar reserva
+      description: |
+        Equivalente a `DELETE /stays/{stay}`. Prefira este endpoint quando o cliente HTTP
+        não suportar o método DELETE (ex.: alguns SDKs ou automações limitadas a GET/POST/PUT/PATCH).
+      parameters:
+        - in: path
+          name: stay
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: OK
+  /stays/{stay}/checkout:
+    post:
+      tags: [Reservas]
+      summary: Check-out e revogar acesso
+      parameters:
+        - in: path
+          name: stay
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: OK
+  /stays/{stay}/transfer-unit:
+    post:
+      tags: [Reservas]
+      summary: Transferir reserva para outra unidade
+      description: |
+        Move a reserva (confirmada ou com check-in) de uma unidade gerenciada para outra.
+        Hóspedes com foto na leitora têm o apartamento atualizado e a sincronização é reenfileirada
+        na unidade destino; a unidade anterior deixa de receber o acesso.
+      parameters:
+        - in: path
+          name: stay
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [from_managed_unit_id, to_managed_unit_id]
+              properties:
+                from_managed_unit_id:
+                  type: integer
+                  description: ID da unidade gerenciada atual da reserva
+                  example: 1
+                to_managed_unit_id:
+                  type: integer
+                  description: ID da unidade gerenciada destino
+                  example: 2
+      responses:
+        '200':
+          description: Reserva transferida (inclui check_in_url)
+        '422':
+          description: Unidade inválida, inativa ou reserva não transferível
+  /stays/{stay}/guests:
+    get:
+      tags: [Hóspedes]
+      summary: Listar hóspedes da reserva
+      responses:
+        '200':
+          description: OK
+    post:
+      tags: [Hóspedes]
+      summary: Adicionar hóspede
+      description: |
+        Cria hóspede adicional na reserva. Envie `photo` (multipart) ou `photo_base64` (JSON) para
+        concluir o check-in e provisionar acesso nas leitoras sem autoatendimento.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                email:
+                  type: string
+                phone:
+                  type: string
+                document:
+                  type: string
+                is_primary:
+                  type: boolean
+                photo_base64:
+                  type: string
+                  description: Imagem JPEG/PNG em base64 (opcional)
+          multipart/form-data:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                email:
+                  type: string
+                phone:
+                  type: string
+                document:
+                  type: string
+                is_primary:
+                  type: boolean
+                photo:
+                  type: string
+                  format: binary
+                  description: Foto do hóspede (opcional, até 8 MB)
+      responses:
+        '201':
+          description: Hóspede criado
+  /stays/{stay}/guests/{stayGuest}/photo:
+    post:
+      tags: [Hóspedes]
+      summary: Enviar foto de hóspede existente
+      description: |
+        Conclui o check-in de um hóspede já criado (sem foto). Use quando a reserva foi aberta
+        antes e a foto ficou disponível depois.
+      parameters:
+        - in: path
+          name: stay
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: stayGuest
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [photo_base64]
+              properties:
+                photo_base64:
+                  type: string
+          multipart/form-data:
+            schema:
+              type: object
+              required: [photo]
+              properties:
+                photo:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Check-in concluído
+        '422':
+          description: Hóspede já concluiu check-in ou imagem inválida
+  /stays/{stay}/guests/{stayGuest}:
+    delete:
+      tags: [Hóspedes]
+      summary: Remover hóspede
+      responses:
+        '200':
+          description: OK
+  /calendar-feeds:
+    get:
+      tags: [Calendários OTA]
+      summary: Listar feeds iCal
+      parameters:
+        - in: query
+          name: per_page
+          schema:
+            type: integer
+            maximum: 100
+      responses:
+        '200':
+          description: OK
+    post:
+      tags: [Calendários OTA]
+      summary: Cadastrar feed
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [managed_unit_id, provider, url]
+              properties:
+                managed_unit_id:
+                  type: integer
+                provider:
+                  type: string
+                  example: ical
+                url:
+                  type: string
+                  format: uri
+                active:
+                  type: boolean
+      responses:
+        '201':
+          description: Feed criado
+  /calendar-feeds/{calendar_feed}:
+    get:
+      tags: [Calendários OTA]
+      summary: Detalhe do feed
+      responses:
+        '200':
+          description: OK
+    patch:
+      tags: [Calendários OTA]
+      summary: Atualizar feed
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                provider:
+                  type: string
+                url:
+                  type: string
+                  format: uri
+                active:
+                  type: boolean
+      responses:
+        '200':
+          description: OK
+    delete:
+      tags: [Calendários OTA]
+      summary: Remover feed
+      responses:
+        '200':
+          description: OK
+  /calendar-feeds/{calendar_feed}/sync:
+    post:
+      tags: [Calendários OTA]
+      summary: Sincronizar feed manualmente
+      responses:
+        '200':
+          description: OK
+  /settlements:
+    get:
+      tags: [Financeiro]
+      summary: Listar lançamentos
+      parameters:
+        - in: query
+          name: type
+          schema:
+            type: string
+            enum: [revenue, cost, fee]
+        - in: query
+          name: from
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: to
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: per_page
+          schema:
+            type: integer
+            maximum: 100
+      responses:
+        '200':
+          description: OK
+    post:
+      tags: [Financeiro]
+      summary: Registrar lançamento
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type, amount, reference_date]
+              properties:
+                type:
+                  type: string
+                  enum: [revenue, cost, fee]
+                amount:
+                  type: number
+                description:
+                  type: string
+                reference_date:
+                  type: string
+                  format: date
+                stay_id:
+                  type: integer
+                managed_unit_id:
+                  type: integer
+      responses:
+        '201':
+          description: Lançamento criado
+  /settlements/{settlement}:
+    get:
+      tags: [Financeiro]
+      summary: Detalhe do lançamento
+      responses:
+        '200':
+          description: OK
+  /enterprises/{enterprise}/hardware-devices:
+    get:
+      tags: [Leitoras]
+      summary: Listar leitoras
+      parameters:
+        - in: path
+          name: enterprise
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: OK
+    post:
+      tags: [Leitoras]
+      summary: Cadastrar leitora
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, driver, qr_range_start, qr_range_end]
+              properties:
+                name:
+                  type: string
+                driver:
+                  type: string
+                reader_scope:
+                  type: string
+                  enum: [operator_entrance, operator_unit]
+                endpoint:
+                  type: string
+                credentials:
+                  type: string
+                qr_range_start:
+                  type: integer
+                qr_range_end:
+                  type: integer
+                access_apartment_ids:
+                  type: array
+                  items:
+                    type: integer
+                access_allow_residents:
+                  type: boolean
+                access_allow_visitors:
+                  type: boolean
+      responses:
+        '201':
+          description: Leitora criada
+  /enterprises/{enterprise}/hardware-devices/{hardwareDevice}:
+    get:
+      tags: [Leitoras]
+      summary: Detalhe da leitora
+      responses:
+        '200':
+          description: OK
+    patch:
+      tags: [Leitoras]
+      summary: Atualizar leitora
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                driver:
+                  type: string
+                reader_scope:
+                  type: string
+                  enum: [operator_entrance, operator_unit]
+                endpoint:
+                  type: string
+                credentials:
+                  type: string
+                qr_range_start:
+                  type: integer
+                qr_range_end:
+                  type: integer
+                access_apartment_ids:
+                  type: array
+                  items:
+                    type: integer
+                access_allow_residents:
+                  type: boolean
+                access_allow_visitors:
+                  type: boolean
+      responses:
+        '200':
+          description: OK
+    delete:
+      tags: [Leitoras]
+      summary: Remover leitora
+      responses:
+        '200':
+          description: OK
+  /enterprises/{enterprise}/hardware-devices/{hardwareDevice}/sync:
+    post:
+      tags: [Leitoras]
+      summary: Enfileirar sincronização
+      responses:
+        '200':
+          description: OK
+  /webhooks/{provider}:
+    post:
+      tags: [Webhooks]
+      summary: Upsert de reserva via channel manager
+      parameters:
+        - in: path
+          name: provider
+          schema:
+            type: string
+            example: airbnb
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [managed_unit_id, external_uid, check_in_at, check_out_at]
+              properties:
+                managed_unit_id:
+                  type: integer
+                external_uid:
+                  type: string
+                check_in_at:
+                  type: string
+                  format: date-time
+                check_out_at:
+                  type: string
+                  format: date-time
+                summary:
+                  type: string
+                cancelled:
+                  type: boolean
+      responses:
+        '200':
+          description: Reserva processada
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Token Bearer obtido via client_id/client_secret

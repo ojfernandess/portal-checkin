@@ -4,16 +4,9 @@ import {
   parseEstablishmentSettings,
   resolveInboxManagedUnitId,
 } from "@/lib/establishment-settings";
-import {
-  createInboxStay,
-  createInboxStayGuest,
-  createInboxStayWithPhotoMultipart,
-  getInboxStay,
-  isInboxConfigured,
-  uploadInboxStayGuestPhoto,
-  uploadInboxStayGuestPhotoMultipart,
-  type InboxStay,
-} from "@/lib/inbox.server";
+import type { InboxClient } from "@/lib/inbox/client.server";
+import type { CreateInboxStayInput, InboxStay } from "@/lib/inbox/types";
+import { resolveInboxClientForTenant, isPortariaInboxFeatureEnabled } from "@/lib/inbox/tenant.server";
 import { writeAuditLog } from "@/lib/audit";
 import { resolvePhotoForUpload, type ResolvedPhotoUpload } from "@/lib/s3.server";
 
@@ -222,12 +215,13 @@ function isInboxAlreadyCheckedInError(error: unknown): boolean {
 
 /** Conclui check-in na Inbox enviando foto (multipart → JSON). 422 "já concluído" é sucesso. */
 async function completeInboxGuestCheckin(
+  client: InboxClient,
   stayId: number,
   stayGuestId: number,
   photo: ResolvedPhotoUpload,
 ): Promise<void> {
   try {
-    await uploadInboxStayGuestPhotoMultipart(stayId, stayGuestId, photo);
+    await client.uploadStayGuestPhotoMultipart(stayId, stayGuestId, photo);
     return;
   } catch (multipartError) {
     if (isInboxAlreadyCheckedInError(multipartError)) {
@@ -237,7 +231,7 @@ async function completeInboxGuestCheckin(
   }
 
   try {
-    await uploadInboxStayGuestPhoto(stayId, stayGuestId, photo.base64);
+    await client.uploadStayGuestPhoto(stayId, stayGuestId, photo.base64);
   } catch (jsonError) {
     if (isInboxAlreadyCheckedInError(jsonError)) {
       return;
@@ -247,17 +241,18 @@ async function completeInboxGuestCheckin(
 }
 
 async function createInboxStayWithGuestPhoto(
-  stayInput: Parameters<typeof createInboxStay>[0],
+  client: InboxClient,
+  stayInput: CreateInboxStayInput,
   photo: ResolvedPhotoUpload,
 ): Promise<InboxStay> {
   try {
-    return await createInboxStayWithPhotoMultipart(stayInput, photo);
+    return await client.createStayWithPhotoMultipart(stayInput, photo);
   } catch (multipartError) {
     console.warn("[inbox-sync] stay multipart failed, trying JSON photo_base64:", multipartError);
   }
 
   try {
-    return await createInboxStay({
+    return await client.createStay({
       ...stayInput,
       photo_base64: photo.base64,
     });
@@ -265,13 +260,13 @@ async function createInboxStayWithGuestPhoto(
     console.warn("[inbox-sync] stay JSON photo failed, creating stay then uploading photo:", jsonError);
   }
 
-  const createdStay = await createInboxStay(stayInput);
+  const createdStay = await client.createStay(stayInput);
   const primaryGuest = findPrimaryStayGuest(createdStay);
   if (!primaryGuest?.id) {
     throw new Error("Reserva Inbox criada sem hóspede principal para envio de foto.");
   }
-  await completeInboxGuestCheckin(createdStay.id, primaryGuest.id, photo);
-  return getInboxStay(createdStay.id);
+  await completeInboxGuestCheckin(client, createdStay.id, primaryGuest.id, photo);
+  return client.getStay(createdStay.id);
 }
 
 /**
@@ -279,7 +274,15 @@ async function createInboxStayWithGuestPhoto(
  * Na Inbox, check-in concluído = foto enviada (POST /stays ou POST .../guests/{id}/photo).
  */
 export async function syncCheckinToInbox(input: SyncCheckinToInboxInput): Promise<void> {
-  if (!isInboxConfigured()) return;
+  const { resolveTenantIdForEstablishmentId } = await import("@/lib/tenant-pms.server");
+  const tenantId = await resolveTenantIdForEstablishmentId(input.establishmentId);
+  if (!tenantId) return;
+
+  const featureEnabled = await isPortariaInboxFeatureEnabled(tenantId);
+  if (!featureEnabled) return;
+
+  const client = await resolveInboxClientForTenant(tenantId);
+  if (!client) return;
 
   const settings = await loadEstablishmentSettings(input.establishmentId);
   if (!settings.inboxEnabled) return;
@@ -295,6 +298,7 @@ export async function syncCheckinToInbox(input: SyncCheckinToInboxInput): Promis
   if (!reservation) {
     console.warn("[inbox-sync] check-in not confirmed in PMS yet, skipping Inbox sync", localizer);
     await writeAuditLog({
+      tenantId,
       action: "inbox.sync.skipped",
       entityType: "reservation",
       entityId: localizer,
@@ -314,6 +318,7 @@ export async function syncCheckinToInbox(input: SyncCheckinToInboxInput): Promis
   if (!photo) {
     console.error("[inbox-sync] guest photo unavailable, cannot complete Inbox check-in", localizer);
     await writeAuditLog({
+      tenantId,
       action: "inbox.sync.failed",
       entityType: "reservation",
       entityId: localizer,
@@ -362,16 +367,14 @@ export async function syncCheckinToInbox(input: SyncCheckinToInboxInput): Promis
   };
 
   try {
-    let createdStay = await createInboxStayWithGuestPhoto(stayInput, photo);
+    let createdStay = await createInboxStayWithGuestPhoto(client, stayInput, photo);
     const stayId = createdStay.id;
 
-    // A criação com foto já conclui o check-in; a resposta às vezes não traz
-    // check_in_completed. Confirma no GET antes de reenviar a foto.
-    createdStay = await getInboxStay(stayId).catch(() => createdStay);
+    createdStay = await client.getStay(stayId).catch(() => createdStay);
     let primaryGuest = findPrimaryStayGuest(createdStay);
     if (primaryGuest?.id && !isInboxGuestCheckinCompleted(primaryGuest)) {
-      await completeInboxGuestCheckin(stayId, primaryGuest.id, photo);
-      createdStay = await getInboxStay(stayId);
+      await completeInboxGuestCheckin(client, stayId, primaryGuest.id, photo);
+      createdStay = await client.getStay(stayId);
       primaryGuest = findPrimaryStayGuest(createdStay);
     }
 
@@ -381,7 +384,7 @@ export async function syncCheckinToInbox(input: SyncCheckinToInboxInput): Promis
         url: dependent.profilePhotoUrl,
         id: (dependent as { profilePhotoId?: string | number }).profilePhotoId,
       });
-      await createInboxStayGuest(stayId, {
+      await client.createStayGuest(stayId, {
         name: dependent.name.trim(),
         email: dependent.email?.trim() || undefined,
         phone: dependent.mobilePhoneNumber?.trim() || undefined,
@@ -390,11 +393,12 @@ export async function syncCheckinToInbox(input: SyncCheckinToInboxInput): Promis
       });
     }
 
-    const refreshedStay = await getInboxStay(stayId);
+    const refreshedStay = await client.getStay(stayId);
     const refreshedPrimary = findPrimaryStayGuest(refreshedStay);
     const inboxCheckinCompleted = isInboxGuestCheckinCompleted(refreshedPrimary);
 
     await writeAuditLog({
+      tenantId,
       action: inboxCheckinCompleted ? "inbox.sync.success" : "inbox.sync.partial",
       entityType: "reservation",
       entityId: localizer,
@@ -421,6 +425,7 @@ export async function syncCheckinToInbox(input: SyncCheckinToInboxInput): Promis
     const message = error instanceof Error ? error.message : String(error);
     console.error("[inbox-sync]", message);
     await writeAuditLog({
+      tenantId,
       action: "inbox.sync.failed",
       entityType: "reservation",
       entityId: localizer,

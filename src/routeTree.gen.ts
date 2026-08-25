@@ -20,14 +20,23 @@ import { Route as AuthenticatedAdminAuditRouteImport } from './routes/_authentic
 import { Route as AuthenticatedAdminBrandingRouteImport } from './routes/_authenticated/admin/branding'
 import { Route as AuthenticatedAdminCheckinsRouteImport } from './routes/_authenticated/admin/checkins'
 import { Route as AuthenticatedAdminDashboardRouteImport } from './routes/_authenticated/admin/dashboard'
+import { Route as AuthenticatedAdminInboxRouteRouteImport } from './routes/_authenticated/admin/inbox/route'
 import { Route as AuthenticatedAdminSecurityRouteImport } from './routes/_authenticated/admin/security'
 import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin/users'
 import { Route as AuthenticatedPlatformAdminsRouteImport } from './routes/_authenticated/platform/admins'
 import { Route as AuthenticatedPlatformDashboardRouteImport } from './routes/_authenticated/platform/dashboard'
 import { Route as AuthenticatedAdminEstablishmentsIndexRouteImport } from './routes/_authenticated/admin/establishments/index'
 import { Route as AuthenticatedAdminEstablishmentsEstablishmentIdRouteImport } from './routes/_authenticated/admin/establishments/$establishmentId'
+import { Route as AuthenticatedAdminInboxIndexRouteImport } from './routes/_authenticated/admin/inbox/index'
+import { Route as AuthenticatedAdminInboxPortfolioRouteImport } from './routes/_authenticated/admin/inbox/portfolio'
 import { Route as AuthenticatedPlatformTenantsIndexRouteImport } from './routes/_authenticated/platform/tenants/index'
 import { Route as AuthenticatedPlatformTenantsTenantNumberRouteImport } from './routes/_authenticated/platform/tenants/$tenantNumber'
+import { Route as AuthenticatedAdminInboxReadersIndexRouteImport } from './routes/_authenticated/admin/inbox/readers/index'
+import { Route as AuthenticatedAdminInboxReadersDeviceIdRouteImport } from './routes/_authenticated/admin/inbox/readers/$deviceId'
+import { Route as AuthenticatedAdminInboxStaysIndexRouteImport } from './routes/_authenticated/admin/inbox/stays/index'
+import { Route as AuthenticatedAdminInboxStaysStayIdRouteImport } from './routes/_authenticated/admin/inbox/stays/$stayId'
+import { Route as AuthenticatedAdminInboxUnitsIndexRouteImport } from './routes/_authenticated/admin/inbox/units/index'
+import { Route as AuthenticatedAdminInboxUnitsUnitIdRouteImport } from './routes/_authenticated/admin/inbox/units/$unitId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -87,6 +96,12 @@ const AuthenticatedAdminDashboardRoute =
     path: '/dashboard',
     getParentRoute: () => AuthenticatedAdminRouteRoute,
   } as any)
+const AuthenticatedAdminInboxRouteRoute =
+  AuthenticatedAdminInboxRouteRouteImport.update({
+    id: '/inbox',
+    path: '/inbox',
+    getParentRoute: () => AuthenticatedAdminRouteRoute,
+  } as any)
 const AuthenticatedAdminSecurityRoute =
   AuthenticatedAdminSecurityRouteImport.update({
     id: '/security',
@@ -122,6 +137,18 @@ const AuthenticatedAdminEstablishmentsEstablishmentIdRoute =
     path: '/establishments/$establishmentId',
     getParentRoute: () => AuthenticatedAdminRouteRoute,
   } as any)
+const AuthenticatedAdminInboxIndexRoute =
+  AuthenticatedAdminInboxIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedAdminInboxRouteRoute,
+  } as any)
+const AuthenticatedAdminInboxPortfolioRoute =
+  AuthenticatedAdminInboxPortfolioRouteImport.update({
+    id: '/portfolio',
+    path: '/portfolio',
+    getParentRoute: () => AuthenticatedAdminInboxRouteRoute,
+  } as any)
 const AuthenticatedPlatformTenantsIndexRoute =
   AuthenticatedPlatformTenantsIndexRouteImport.update({
     id: '/tenants/',
@@ -134,6 +161,42 @@ const AuthenticatedPlatformTenantsTenantNumberRoute =
     path: '/tenants/$tenantNumber',
     getParentRoute: () => AuthenticatedPlatformRouteRoute,
   } as any)
+const AuthenticatedAdminInboxReadersIndexRoute =
+  AuthenticatedAdminInboxReadersIndexRouteImport.update({
+    id: '/readers/',
+    path: '/readers/',
+    getParentRoute: () => AuthenticatedAdminInboxRouteRoute,
+  } as any)
+const AuthenticatedAdminInboxReadersDeviceIdRoute =
+  AuthenticatedAdminInboxReadersDeviceIdRouteImport.update({
+    id: '/readers/$deviceId',
+    path: '/readers/$deviceId',
+    getParentRoute: () => AuthenticatedAdminInboxRouteRoute,
+  } as any)
+const AuthenticatedAdminInboxStaysIndexRoute =
+  AuthenticatedAdminInboxStaysIndexRouteImport.update({
+    id: '/stays/',
+    path: '/stays/',
+    getParentRoute: () => AuthenticatedAdminInboxRouteRoute,
+  } as any)
+const AuthenticatedAdminInboxStaysStayIdRoute =
+  AuthenticatedAdminInboxStaysStayIdRouteImport.update({
+    id: '/stays/$stayId',
+    path: '/stays/$stayId',
+    getParentRoute: () => AuthenticatedAdminInboxRouteRoute,
+  } as any)
+const AuthenticatedAdminInboxUnitsIndexRoute =
+  AuthenticatedAdminInboxUnitsIndexRouteImport.update({
+    id: '/units/',
+    path: '/units/',
+    getParentRoute: () => AuthenticatedAdminInboxRouteRoute,
+  } as any)
+const AuthenticatedAdminInboxUnitsUnitIdRoute =
+  AuthenticatedAdminInboxUnitsUnitIdRouteImport.update({
+    id: '/units/$unitId',
+    path: '/units/$unitId',
+    getParentRoute: () => AuthenticatedAdminInboxRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -142,6 +205,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AuthenticatedAdminRouteRouteWithChildren
   '/platform': typeof AuthenticatedPlatformRouteRouteWithChildren
   '/auth/$slug': typeof AuthSlugRoute
+  '/admin/inbox': typeof AuthenticatedAdminInboxRouteRouteWithChildren
   '/admin/audit': typeof AuthenticatedAdminAuditRoute
   '/admin/branding': typeof AuthenticatedAdminBrandingRoute
   '/admin/checkins': typeof AuthenticatedAdminCheckinsRoute
@@ -151,9 +215,17 @@ export interface FileRoutesByFullPath {
   '/platform/admins': typeof AuthenticatedPlatformAdminsRoute
   '/platform/dashboard': typeof AuthenticatedPlatformDashboardRoute
   '/admin/establishments/$establishmentId': typeof AuthenticatedAdminEstablishmentsEstablishmentIdRoute
+  '/admin/inbox/portfolio': typeof AuthenticatedAdminInboxPortfolioRoute
   '/platform/tenants/$tenantNumber': typeof AuthenticatedPlatformTenantsTenantNumberRoute
   '/admin/establishments/': typeof AuthenticatedAdminEstablishmentsIndexRoute
+  '/admin/inbox/': typeof AuthenticatedAdminInboxIndexRoute
   '/platform/tenants/': typeof AuthenticatedPlatformTenantsIndexRoute
+  '/admin/inbox/readers/$deviceId': typeof AuthenticatedAdminInboxReadersDeviceIdRoute
+  '/admin/inbox/stays/$stayId': typeof AuthenticatedAdminInboxStaysStayIdRoute
+  '/admin/inbox/units/$unitId': typeof AuthenticatedAdminInboxUnitsUnitIdRoute
+  '/admin/inbox/readers/': typeof AuthenticatedAdminInboxReadersIndexRoute
+  '/admin/inbox/stays/': typeof AuthenticatedAdminInboxStaysIndexRoute
+  '/admin/inbox/units/': typeof AuthenticatedAdminInboxUnitsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -171,9 +243,17 @@ export interface FileRoutesByTo {
   '/platform/admins': typeof AuthenticatedPlatformAdminsRoute
   '/platform/dashboard': typeof AuthenticatedPlatformDashboardRoute
   '/admin/establishments/$establishmentId': typeof AuthenticatedAdminEstablishmentsEstablishmentIdRoute
+  '/admin/inbox/portfolio': typeof AuthenticatedAdminInboxPortfolioRoute
   '/platform/tenants/$tenantNumber': typeof AuthenticatedPlatformTenantsTenantNumberRoute
   '/admin/establishments': typeof AuthenticatedAdminEstablishmentsIndexRoute
+  '/admin/inbox': typeof AuthenticatedAdminInboxIndexRoute
   '/platform/tenants': typeof AuthenticatedPlatformTenantsIndexRoute
+  '/admin/inbox/readers/$deviceId': typeof AuthenticatedAdminInboxReadersDeviceIdRoute
+  '/admin/inbox/stays/$stayId': typeof AuthenticatedAdminInboxStaysStayIdRoute
+  '/admin/inbox/units/$unitId': typeof AuthenticatedAdminInboxUnitsUnitIdRoute
+  '/admin/inbox/readers': typeof AuthenticatedAdminInboxReadersIndexRoute
+  '/admin/inbox/stays': typeof AuthenticatedAdminInboxStaysIndexRoute
+  '/admin/inbox/units': typeof AuthenticatedAdminInboxUnitsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -184,6 +264,7 @@ export interface FileRoutesById {
   '/_authenticated/admin': typeof AuthenticatedAdminRouteRouteWithChildren
   '/_authenticated/platform': typeof AuthenticatedPlatformRouteRouteWithChildren
   '/auth/$slug': typeof AuthSlugRoute
+  '/_authenticated/admin/inbox': typeof AuthenticatedAdminInboxRouteRouteWithChildren
   '/_authenticated/admin/audit': typeof AuthenticatedAdminAuditRoute
   '/_authenticated/admin/branding': typeof AuthenticatedAdminBrandingRoute
   '/_authenticated/admin/checkins': typeof AuthenticatedAdminCheckinsRoute
@@ -193,9 +274,17 @@ export interface FileRoutesById {
   '/_authenticated/platform/admins': typeof AuthenticatedPlatformAdminsRoute
   '/_authenticated/platform/dashboard': typeof AuthenticatedPlatformDashboardRoute
   '/_authenticated/admin/establishments/$establishmentId': typeof AuthenticatedAdminEstablishmentsEstablishmentIdRoute
+  '/_authenticated/admin/inbox/portfolio': typeof AuthenticatedAdminInboxPortfolioRoute
   '/_authenticated/platform/tenants/$tenantNumber': typeof AuthenticatedPlatformTenantsTenantNumberRoute
   '/_authenticated/admin/establishments/': typeof AuthenticatedAdminEstablishmentsIndexRoute
+  '/_authenticated/admin/inbox/': typeof AuthenticatedAdminInboxIndexRoute
   '/_authenticated/platform/tenants/': typeof AuthenticatedPlatformTenantsIndexRoute
+  '/_authenticated/admin/inbox/readers/$deviceId': typeof AuthenticatedAdminInboxReadersDeviceIdRoute
+  '/_authenticated/admin/inbox/stays/$stayId': typeof AuthenticatedAdminInboxStaysStayIdRoute
+  '/_authenticated/admin/inbox/units/$unitId': typeof AuthenticatedAdminInboxUnitsUnitIdRoute
+  '/_authenticated/admin/inbox/readers/': typeof AuthenticatedAdminInboxReadersIndexRoute
+  '/_authenticated/admin/inbox/stays/': typeof AuthenticatedAdminInboxStaysIndexRoute
+  '/_authenticated/admin/inbox/units/': typeof AuthenticatedAdminInboxUnitsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -206,6 +295,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/platform'
     | '/auth/$slug'
+    | '/admin/inbox'
     | '/admin/audit'
     | '/admin/branding'
     | '/admin/checkins'
@@ -215,9 +305,17 @@ export interface FileRouteTypes {
     | '/platform/admins'
     | '/platform/dashboard'
     | '/admin/establishments/$establishmentId'
+    | '/admin/inbox/portfolio'
     | '/platform/tenants/$tenantNumber'
     | '/admin/establishments/'
+    | '/admin/inbox/'
     | '/platform/tenants/'
+    | '/admin/inbox/readers/$deviceId'
+    | '/admin/inbox/stays/$stayId'
+    | '/admin/inbox/units/$unitId'
+    | '/admin/inbox/readers/'
+    | '/admin/inbox/stays/'
+    | '/admin/inbox/units/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -235,9 +333,17 @@ export interface FileRouteTypes {
     | '/platform/admins'
     | '/platform/dashboard'
     | '/admin/establishments/$establishmentId'
+    | '/admin/inbox/portfolio'
     | '/platform/tenants/$tenantNumber'
     | '/admin/establishments'
+    | '/admin/inbox'
     | '/platform/tenants'
+    | '/admin/inbox/readers/$deviceId'
+    | '/admin/inbox/stays/$stayId'
+    | '/admin/inbox/units/$unitId'
+    | '/admin/inbox/readers'
+    | '/admin/inbox/stays'
+    | '/admin/inbox/units'
   id:
     | '__root__'
     | '/'
@@ -247,6 +353,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin'
     | '/_authenticated/platform'
     | '/auth/$slug'
+    | '/_authenticated/admin/inbox'
     | '/_authenticated/admin/audit'
     | '/_authenticated/admin/branding'
     | '/_authenticated/admin/checkins'
@@ -256,9 +363,17 @@ export interface FileRouteTypes {
     | '/_authenticated/platform/admins'
     | '/_authenticated/platform/dashboard'
     | '/_authenticated/admin/establishments/$establishmentId'
+    | '/_authenticated/admin/inbox/portfolio'
     | '/_authenticated/platform/tenants/$tenantNumber'
     | '/_authenticated/admin/establishments/'
+    | '/_authenticated/admin/inbox/'
     | '/_authenticated/platform/tenants/'
+    | '/_authenticated/admin/inbox/readers/$deviceId'
+    | '/_authenticated/admin/inbox/stays/$stayId'
+    | '/_authenticated/admin/inbox/units/$unitId'
+    | '/_authenticated/admin/inbox/readers/'
+    | '/_authenticated/admin/inbox/stays/'
+    | '/_authenticated/admin/inbox/units/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -347,6 +462,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminDashboardRouteImport
       parentRoute: typeof AuthenticatedAdminRouteRoute
     }
+    '/_authenticated/admin/inbox': {
+      id: '/_authenticated/admin/inbox'
+      path: '/inbox'
+      fullPath: '/admin/inbox'
+      preLoaderRoute: typeof AuthenticatedAdminInboxRouteRouteImport
+      parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
     '/_authenticated/admin/security': {
       id: '/_authenticated/admin/security'
       path: '/security'
@@ -389,6 +511,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminEstablishmentsEstablishmentIdRouteImport
       parentRoute: typeof AuthenticatedAdminRouteRoute
     }
+    '/_authenticated/admin/inbox/': {
+      id: '/_authenticated/admin/inbox/'
+      path: '/'
+      fullPath: '/admin/inbox/'
+      preLoaderRoute: typeof AuthenticatedAdminInboxIndexRouteImport
+      parentRoute: typeof AuthenticatedAdminInboxRouteRoute
+    }
+    '/_authenticated/admin/inbox/portfolio': {
+      id: '/_authenticated/admin/inbox/portfolio'
+      path: '/portfolio'
+      fullPath: '/admin/inbox/portfolio'
+      preLoaderRoute: typeof AuthenticatedAdminInboxPortfolioRouteImport
+      parentRoute: typeof AuthenticatedAdminInboxRouteRoute
+    }
     '/_authenticated/platform/tenants/': {
       id: '/_authenticated/platform/tenants/'
       path: '/tenants'
@@ -403,10 +539,88 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPlatformTenantsTenantNumberRouteImport
       parentRoute: typeof AuthenticatedPlatformRouteRoute
     }
+    '/_authenticated/admin/inbox/readers/': {
+      id: '/_authenticated/admin/inbox/readers/'
+      path: '/readers'
+      fullPath: '/admin/inbox/readers/'
+      preLoaderRoute: typeof AuthenticatedAdminInboxReadersIndexRouteImport
+      parentRoute: typeof AuthenticatedAdminInboxRouteRoute
+    }
+    '/_authenticated/admin/inbox/readers/$deviceId': {
+      id: '/_authenticated/admin/inbox/readers/$deviceId'
+      path: '/readers/$deviceId'
+      fullPath: '/admin/inbox/readers/$deviceId'
+      preLoaderRoute: typeof AuthenticatedAdminInboxReadersDeviceIdRouteImport
+      parentRoute: typeof AuthenticatedAdminInboxRouteRoute
+    }
+    '/_authenticated/admin/inbox/stays/': {
+      id: '/_authenticated/admin/inbox/stays/'
+      path: '/stays'
+      fullPath: '/admin/inbox/stays/'
+      preLoaderRoute: typeof AuthenticatedAdminInboxStaysIndexRouteImport
+      parentRoute: typeof AuthenticatedAdminInboxRouteRoute
+    }
+    '/_authenticated/admin/inbox/stays/$stayId': {
+      id: '/_authenticated/admin/inbox/stays/$stayId'
+      path: '/stays/$stayId'
+      fullPath: '/admin/inbox/stays/$stayId'
+      preLoaderRoute: typeof AuthenticatedAdminInboxStaysStayIdRouteImport
+      parentRoute: typeof AuthenticatedAdminInboxRouteRoute
+    }
+    '/_authenticated/admin/inbox/units/': {
+      id: '/_authenticated/admin/inbox/units/'
+      path: '/units'
+      fullPath: '/admin/inbox/units/'
+      preLoaderRoute: typeof AuthenticatedAdminInboxUnitsIndexRouteImport
+      parentRoute: typeof AuthenticatedAdminInboxRouteRoute
+    }
+    '/_authenticated/admin/inbox/units/$unitId': {
+      id: '/_authenticated/admin/inbox/units/$unitId'
+      path: '/units/$unitId'
+      fullPath: '/admin/inbox/units/$unitId'
+      preLoaderRoute: typeof AuthenticatedAdminInboxUnitsUnitIdRouteImport
+      parentRoute: typeof AuthenticatedAdminInboxRouteRoute
+    }
   }
 }
 
+interface AuthenticatedAdminInboxRouteRouteChildren {
+  AuthenticatedAdminInboxPortfolioRoute: typeof AuthenticatedAdminInboxPortfolioRoute
+  AuthenticatedAdminInboxIndexRoute: typeof AuthenticatedAdminInboxIndexRoute
+  AuthenticatedAdminInboxReadersDeviceIdRoute: typeof AuthenticatedAdminInboxReadersDeviceIdRoute
+  AuthenticatedAdminInboxStaysStayIdRoute: typeof AuthenticatedAdminInboxStaysStayIdRoute
+  AuthenticatedAdminInboxUnitsUnitIdRoute: typeof AuthenticatedAdminInboxUnitsUnitIdRoute
+  AuthenticatedAdminInboxReadersIndexRoute: typeof AuthenticatedAdminInboxReadersIndexRoute
+  AuthenticatedAdminInboxStaysIndexRoute: typeof AuthenticatedAdminInboxStaysIndexRoute
+  AuthenticatedAdminInboxUnitsIndexRoute: typeof AuthenticatedAdminInboxUnitsIndexRoute
+}
+
+const AuthenticatedAdminInboxRouteRouteChildren: AuthenticatedAdminInboxRouteRouteChildren =
+  {
+    AuthenticatedAdminInboxPortfolioRoute:
+      AuthenticatedAdminInboxPortfolioRoute,
+    AuthenticatedAdminInboxIndexRoute: AuthenticatedAdminInboxIndexRoute,
+    AuthenticatedAdminInboxReadersDeviceIdRoute:
+      AuthenticatedAdminInboxReadersDeviceIdRoute,
+    AuthenticatedAdminInboxStaysStayIdRoute:
+      AuthenticatedAdminInboxStaysStayIdRoute,
+    AuthenticatedAdminInboxUnitsUnitIdRoute:
+      AuthenticatedAdminInboxUnitsUnitIdRoute,
+    AuthenticatedAdminInboxReadersIndexRoute:
+      AuthenticatedAdminInboxReadersIndexRoute,
+    AuthenticatedAdminInboxStaysIndexRoute:
+      AuthenticatedAdminInboxStaysIndexRoute,
+    AuthenticatedAdminInboxUnitsIndexRoute:
+      AuthenticatedAdminInboxUnitsIndexRoute,
+  }
+
+const AuthenticatedAdminInboxRouteRouteWithChildren =
+  AuthenticatedAdminInboxRouteRoute._addFileChildren(
+    AuthenticatedAdminInboxRouteRouteChildren,
+  )
+
 interface AuthenticatedAdminRouteRouteChildren {
+  AuthenticatedAdminInboxRouteRoute: typeof AuthenticatedAdminInboxRouteRouteWithChildren
   AuthenticatedAdminAuditRoute: typeof AuthenticatedAdminAuditRoute
   AuthenticatedAdminBrandingRoute: typeof AuthenticatedAdminBrandingRoute
   AuthenticatedAdminCheckinsRoute: typeof AuthenticatedAdminCheckinsRoute
@@ -419,6 +633,8 @@ interface AuthenticatedAdminRouteRouteChildren {
 
 const AuthenticatedAdminRouteRouteChildren: AuthenticatedAdminRouteRouteChildren =
   {
+    AuthenticatedAdminInboxRouteRoute:
+      AuthenticatedAdminInboxRouteRouteWithChildren,
     AuthenticatedAdminAuditRoute: AuthenticatedAdminAuditRoute,
     AuthenticatedAdminBrandingRoute: AuthenticatedAdminBrandingRoute,
     AuthenticatedAdminCheckinsRoute: AuthenticatedAdminCheckinsRoute,

@@ -17,6 +17,8 @@ import type { Reservation } from "./types";
 import type { TecHospitalityTokenScope } from "./techospitality.server";
 import { mapCheckinRecordRow, type CheckinRecordRow } from "@/lib/checkin-records";
 import { buildIlikeContains } from "@/lib/security";
+import { normalizeInboxPaginated } from "@/lib/inbox/client.server";
+import { loadTenantInboxContext, resolveInboxClientForTenant } from "@/lib/inbox/tenant.server";
 
 export type { CheckinRecordRow };
 
@@ -395,7 +397,9 @@ export const adminMe = createServerFn({ method: "GET" })
     ]);
 
     const { parseTenantSettings } = await import("@/lib/tenant-settings");
+    const { loadTenantInboxContext } = await import("@/lib/inbox/tenant.server");
     const tenantSettings = parseTenantSettings(tenant?.settings ?? null);
+    const inbox = await loadTenantInboxContext(tenantId);
 
     const role = (tenantRole ?? "reception") as StaffRole;
 
@@ -409,6 +413,12 @@ export const adminMe = createServerFn({ method: "GET" })
       tenantSlug: tenant?.slug ?? "",
       panelLogoUrl: tenantSettings.panelLogoUrl,
       isPlatformAdmin,
+      inbox: {
+        featureEnabled: inbox.featureEnabled,
+        configured: inbox.configured,
+        modules: inbox.modules,
+        baseUrl: inbox.baseUrl,
+      },
     };
   });
 
@@ -1343,14 +1353,39 @@ export const adminSaveSettings = createServerFn({ method: "POST" })
 
 export const adminListInboxManagedUnits = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth, requireTenantContext])
-  .handler(async ({ context }) => {
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        status: z.string().optional(),
+        page: z.number().int().min(1).optional(),
+        perPage: z.number().int().min(1).max(100).optional(),
+      })
+      .optional()
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
     await assertAdmin(context);
-    const { isInboxConfigured, listInboxManagedUnits } = await import("@/lib/inbox.server");
-    if (!isInboxConfigured()) {
-      return { configured: false as const, units: [] as const };
+    const { tenantId } = context as AdminHandlerContext;
+    const ctx = await loadTenantInboxContext(tenantId);
+    if (!ctx.featureEnabled || !ctx.configured) {
+      return { configured: false as const, units: [] as const, items: [] as const, meta: null };
     }
-    const units = await listInboxManagedUnits();
-    return { configured: true as const, units };
+    const client = await resolveInboxClientForTenant(tenantId);
+    if (!client) {
+      return { configured: false as const, units: [] as const, items: [] as const, meta: null };
+    }
+    const result = await client.listManagedUnits({
+      status: data?.status ?? "active",
+      page: data?.page,
+      per_page: data?.perPage ?? 200,
+    });
+    const normalized = normalizeInboxPaginated(result);
+    return {
+      configured: true as const,
+      units: normalized.items,
+      items: normalized.items,
+      meta: normalized.meta,
+    };
   });
 
 export const adminGetAppSettings = createServerFn({ method: "POST" })

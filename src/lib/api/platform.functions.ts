@@ -278,7 +278,9 @@ export const platformGetTenant = createServerFn({ method: "POST" })
     const pmsConfig = normalizeTenantPmsConfig(pmsRow?.config);
     const tokens = pmsConfig.tokens ?? {};
     const { parseTenantSettings } = await import("@/lib/tenant-settings");
+    const { loadTenantInboxContext } = await import("@/lib/inbox/tenant.server");
     const branding = parseTenantSettings(tenant.settings);
+    const inbox = await loadTenantInboxContext(tenantUuid);
 
     return {
       tenant: {
@@ -318,6 +320,14 @@ export const platformGetTenant = createServerFn({ method: "POST" })
         },
         hasConfig: Boolean(pmsRow),
       } satisfies PlatformPmsConfigView,
+      inbox: {
+        featureEnabled: inbox.featureEnabled,
+        configured: inbox.configured,
+        baseUrl: inbox.baseUrl,
+        maskedClientId: inbox.maskedClientId,
+        hasClientSecret: inbox.hasClientSecret,
+        modules: inbox.modules,
+      },
     };
   });
 
@@ -495,6 +505,60 @@ export const platformSaveTenantPmsConfig = createServerFn({ method: "POST" })
     });
 
     return { ok: true as const };
+  });
+
+export const platformSaveTenantInboxConfig = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth, requirePlatformAdmin])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        publicNumber: tenantPublicNumberSchema,
+        inboxClientId: z.string().max(128).nullable().optional(),
+        inboxClientSecret: z.string().max(512).nullable().optional(),
+        clearInboxClientSecret: z.boolean().optional(),
+        inboxBaseUrl: z.string().max(512).nullable().optional(),
+        inboxModules: z
+          .object({
+            portfolio: z.boolean().optional(),
+            units: z.boolean().optional(),
+            stays: z.boolean().optional(),
+            guests: z.boolean().optional(),
+            readers: z.boolean().optional(),
+          })
+          .optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const tenantUuid = await resolveTenantUuidByPublicNumber(data.publicNumber);
+    const { saveTenantInboxSettings, loadTenantInboxContext } = await import("@/lib/inbox/tenant.server");
+
+    const feature = await loadTenantInboxContext(tenantUuid);
+    if (!feature.featureEnabled) {
+      throw new Error("Habilite a feature Portaria Inbox antes de configurar credenciais e módulos.");
+    }
+
+    const refreshed = await saveTenantInboxSettings(tenantUuid, {
+      inboxClientId: data.inboxClientId,
+      inboxClientSecret: data.inboxClientSecret,
+      clearInboxClientSecret: data.clearInboxClientSecret,
+      inboxBaseUrl: data.inboxBaseUrl,
+      inboxModules: data.inboxModules,
+    });
+
+    await writeAuditLog({
+      userId: context.userId,
+      tenantId: tenantUuid,
+      action: "platform.tenant.inbox",
+      entityType: "tenants",
+      entityId: tenantUuid,
+      newData: {
+        configured: refreshed.configured,
+        modules: refreshed.modules,
+      },
+    });
+
+    return { ok: true as const, inbox: refreshed };
   });
 
 export const platformSaveTenantLogo = createServerFn({ method: "POST" })

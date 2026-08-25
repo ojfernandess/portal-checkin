@@ -12,6 +12,11 @@ import {
   Shield,
   Users,
   Palette,
+  DoorOpen,
+  Building,
+  CalendarDays,
+  UserRound,
+  ScanFace,
 } from "lucide-react";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -26,6 +31,8 @@ import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 
+import type { InboxModules } from "@/lib/inbox/modules";
+
 export type AdminAccount = {
   email: string;
   role: string;
@@ -35,9 +42,17 @@ export type AdminAccount = {
   tenantSlug?: string;
   panelLogoUrl?: string | null;
   isPlatformAdmin?: boolean;
+  inbox?: {
+    featureEnabled: boolean;
+    configured: boolean;
+    modules: InboxModules;
+    baseUrl: string;
+  };
 };
 
-export { useAdminAccount, useAdminAccountActions, useAdminTenantScope } from "@/components/admin/AdminAccountProvider";
+export { useAdminAccountActions, useAdminTenantScope } from "@/components/admin/AdminAccountProvider";
+import { useAdminAccount } from "@/components/admin/AdminAccountProvider";
+export { useAdminAccount };
 export { AdminPage } from "@/components/admin/AdminPage";
 
 type Breadcrumb = {
@@ -71,6 +86,7 @@ type Props = {
 
 function navIsActive(pathname: string, to: string): boolean {
   if (to === "/admin/dashboard") return pathname === to;
+  if (to === "/admin/inbox") return pathname === to;
   return pathname === to || pathname.startsWith(`${to}/`);
 }
 
@@ -181,6 +197,27 @@ export function AdminShell({
   const initials = displayName.slice(0, 2).toUpperCase();
   const resolvedMobileTitle = mobileTitle ?? title ?? t("admin.panel");
 
+  const inboxEnabled = Boolean(account?.inbox?.featureEnabled && isAdmin);
+  const inboxModules = account?.inbox?.modules;
+
+  const inboxNavItems: NavItem[] = inboxEnabled
+    ? [
+        { to: "/admin/inbox", label: t("admin.inbox.navOverview"), icon: LayoutDashboard },
+        ...(inboxModules?.portfolio
+          ? [{ to: "/admin/inbox/portfolio", label: t("admin.inbox.navPortfolio"), icon: Building }]
+          : []),
+        ...(inboxModules?.units
+          ? [{ to: "/admin/inbox/units", label: t("admin.inbox.navUnits"), icon: DoorOpen }]
+          : []),
+        ...(inboxModules?.stays
+          ? [{ to: "/admin/inbox/stays", label: t("admin.inbox.navStays"), icon: CalendarDays }]
+          : []),
+        ...(inboxModules?.readers
+          ? [{ to: "/admin/inbox/readers", label: t("admin.inbox.navReaders"), icon: ScanFace }]
+          : []),
+      ]
+    : [];
+
   const navGroups: NavGroup[] = [
     {
       label: t("admin.navGroupOperation"),
@@ -191,6 +228,14 @@ export function AdminShell({
         { to: "/admin/branding", label: t("admin.branding.nav"), icon: Palette, adminOnly: true },
       ],
     },
+    ...(inboxNavItems.length > 0
+      ? [
+          {
+            label: t("admin.inbox.navGroup"),
+            items: inboxNavItems,
+          },
+        ]
+      : []),
     {
       label: t("admin.navGroupControl"),
       items: [
