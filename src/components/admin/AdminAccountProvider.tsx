@@ -56,6 +56,19 @@ function buildOptimisticAccount(
     tenantSlug: selected.slug,
     panelLogoUrl: null,
     isPlatformAdmin: current?.isPlatformAdmin,
+    // Placeholder until adminMe refreshes — nav stays hidden until feature is confirmed.
+    inbox: {
+      featureEnabled: false,
+      configured: false,
+      modules: {
+        portfolio: false,
+        units: false,
+        stays: false,
+        guests: false,
+        readers: false,
+      },
+      baseUrl: "",
+    },
   };
 }
 

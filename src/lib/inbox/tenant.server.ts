@@ -66,14 +66,19 @@ export function parseTenantInboxConfig(settings: {
 }
 
 export async function isPortariaInboxFeatureEnabled(tenantId: string): Promise<boolean> {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data } = await supabaseAdmin
-    .from("tenant_features")
-    .select("enabled")
-    .eq("tenant_id", tenantId)
-    .eq("feature_key", "portaria_inbox")
-    .maybeSingle();
-  return data?.enabled === true;
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await supabaseAdmin
+      .from("tenant_features")
+      .select("enabled")
+      .eq("tenant_id", tenantId)
+      .eq("feature_key", "portaria_inbox")
+      .maybeSingle();
+    if (error) return false;
+    return data?.enabled === true;
+  } catch {
+    return false;
+  }
 }
 
 export async function loadTenantInboxContext(tenantId: string): Promise<TenantInboxContext> {
