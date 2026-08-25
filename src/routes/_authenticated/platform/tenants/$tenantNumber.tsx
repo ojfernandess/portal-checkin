@@ -38,7 +38,7 @@ import {
   type PlatformTenantMember,
   type PlatformTenantStatus,
 } from "@/lib/api/platform.functions";
-import { INBOX_MODULE_KEYS, type InboxModuleKey, type InboxModules } from "@/lib/inbox/modules";
+import { INBOX_MODULE_KEYS, DEFAULT_INBOX_MODULES, type InboxModuleKey, type InboxModules } from "@/lib/inbox/modules";
 import { useI18n } from "@/lib/i18n/context";
 
 export const Route = createFileRoute("/_authenticated/platform/tenants/$tenantNumber")({
@@ -126,7 +126,67 @@ function PlatformTenantDetailPage() {
     return buildTenantLoginUrl(slug, origin);
   }, [slug]);
 
-  async function load() {
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchTenant() {
+      if (!Number.isInteger(publicNumber) || publicNumber <= 0) {
+        throw new Error(t("platform.tenantDetail.loadError"));
+      }
+
+      setLoading(true);
+      setError(null);
+      setInboxClientId("");
+      setInboxClientSecret("");
+      setInboxBaseUrl("");
+      setInboxHasSecret(false);
+      setInboxMaskedClientId(null);
+      setInboxModules({ ...DEFAULT_INBOX_MODULES });
+
+      const [detail, membersResult] = await Promise.all([
+        getFn({ data: { publicNumber } }),
+        membersFn({ data: { publicNumber } }),
+      ]);
+
+      if (cancelled) return;
+
+      setDisplayNumber(detail.tenant.publicNumber);
+      setName(detail.tenant.name);
+      setSlug(detail.tenant.slug);
+      setLegalName(detail.tenant.legalName ?? "");
+      setTaxId(detail.tenant.taxId ?? "");
+      setStatus(detail.tenant.status);
+      setPanelLogoUrl(detail.tenant.panelLogoUrl ?? null);
+      setFeatures(detail.features);
+      setPmsEnabled(detail.pms.enabled);
+      setPmsBaseUrl(detail.pms.baseUrl);
+      setPmsTokens({});
+      setPmsMasked(detail.pms.masked);
+      setInboxClientId("");
+      setInboxClientSecret("");
+      setInboxBaseUrl(detail.inbox.baseUrl);
+      setInboxHasSecret(detail.inbox.hasClientSecret);
+      setInboxMaskedClientId(detail.inbox.maskedClientId);
+      setInboxModules(detail.inbox.modules);
+      setMembers(membersResult.members);
+    }
+
+    void fetchTenant()
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : t("platform.tenantDetail.loadError"));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [getFn, membersFn, publicNumber, t]);
+
+  async function load(): Promise<void> {
     if (!Number.isInteger(publicNumber) || publicNumber <= 0) {
       throw new Error(t("platform.tenantDetail.loadError"));
     }
@@ -156,13 +216,6 @@ function PlatformTenantDetailPage() {
     setInboxModules(detail.inbox.modules);
     setMembers(membersResult.members);
   }
-
-  useEffect(() => {
-    void load()
-      .catch((err) => setError(err instanceof Error ? err.message : t("platform.tenantDetail.loadError")))
-      .finally(() => setLoading(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [publicNumber]);
 
   async function handleSaveLogo() {
     setSaving(true);
@@ -203,6 +256,7 @@ function PlatformTenantDetailPage() {
     try {
       await featuresFn({ data: { publicNumber, features } });
       toast.success(t("platform.tenantDetail.featuresSaved"));
+      await load();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t("errors.saveFailed"));
     } finally {

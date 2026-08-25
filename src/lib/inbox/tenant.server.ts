@@ -4,10 +4,8 @@ import {
   type InboxModules,
 } from "@/lib/inbox/modules";
 import {
-  createInboxClientFromEnv,
   createInboxClient,
   type InboxClient,
-  type InboxCredentials,
 } from "@/lib/inbox/client.server";
 
 const DEFAULT_INBOX_BASE_URL = "https://inboxseg.com/api/v1/operator";
@@ -27,22 +25,6 @@ export type TenantInboxContext = {
   baseUrl: string;
 };
 
-function readEnv(name: string): string | undefined {
-  const raw =
-    process.env[name] ??
-    (globalThis as { __env__?: Record<string, string | undefined> }).__env__?.[name];
-  if (raw == null) return undefined;
-  const trimmed = String(raw).trim();
-  if (!trimmed) return undefined;
-  if (
-    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
-    (trimmed.startsWith("'") && trimmed.endsWith("'"))
-  ) {
-    return trimmed.slice(1, -1).trim() || undefined;
-  }
-  return trimmed;
-}
-
 export function maskInboxSecret(value: string | null | undefined): string {
   if (!value) return "";
   if (value.length <= 4) return "****";
@@ -54,12 +36,9 @@ export function parseTenantInboxConfig(settings: {
   inboxClientSecret?: string | null;
   inboxBaseUrl?: string | null;
 }): TenantInboxConfig | null {
-  const envClientId = readEnv("INBOX_CLIENT_ID");
-  const envClientSecret = readEnv("INBOX_CLIENT_SECRET");
-  const clientId = (settings.inboxClientId?.trim() || envClientId || "").trim();
-  const clientSecret = (settings.inboxClientSecret?.trim() || envClientSecret || "").trim();
-  const baseUrl =
-    (settings.inboxBaseUrl?.trim() || readEnv("INBOX_BASE_URL") || DEFAULT_INBOX_BASE_URL).trim();
+  const clientId = (settings.inboxClientId?.trim() || "").trim();
+  const clientSecret = (settings.inboxClientSecret?.trim() || "").trim();
+  const baseUrl = (settings.inboxBaseUrl?.trim() || DEFAULT_INBOX_BASE_URL).trim();
 
   if (!clientId || !clientSecret) return null;
   return { clientId, clientSecret, baseUrl };
@@ -99,8 +78,8 @@ export async function loadTenantInboxContext(tenantId: string): Promise<TenantIn
     configured: config != null,
     modules,
     maskedClientId: config ? maskInboxSecret(config.clientId) : null,
-    hasClientSecret: Boolean(config?.clientSecret),
-    baseUrl: config?.baseUrl ?? DEFAULT_INBOX_BASE_URL,
+    hasClientSecret: Boolean(settings.inboxClientSecret?.trim()),
+    baseUrl: settings.inboxBaseUrl?.trim() || DEFAULT_INBOX_BASE_URL,
   };
 }
 
@@ -118,7 +97,7 @@ export async function resolveInboxClientForTenant(tenantId: string): Promise<Inb
   if (config) {
     return createInboxClient(config);
   }
-  return createInboxClientFromEnv();
+  return null;
 }
 
 export async function assertInboxModuleAccess(
