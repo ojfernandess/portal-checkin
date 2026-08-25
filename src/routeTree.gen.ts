@@ -14,13 +14,20 @@ import { Route as LocalizerRouteImport } from './routes/$localizer'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedAdminRouteRouteImport } from './routes/_authenticated/admin/route'
+import { Route as AuthenticatedPlatformRouteRouteImport } from './routes/_authenticated/platform/route'
+import { Route as AuthSlugRouteImport } from './routes/auth.$slug'
 import { Route as AuthenticatedAdminAuditRouteImport } from './routes/_authenticated/admin/audit'
+import { Route as AuthenticatedAdminBrandingRouteImport } from './routes/_authenticated/admin/branding'
 import { Route as AuthenticatedAdminCheckinsRouteImport } from './routes/_authenticated/admin/checkins'
 import { Route as AuthenticatedAdminDashboardRouteImport } from './routes/_authenticated/admin/dashboard'
 import { Route as AuthenticatedAdminSecurityRouteImport } from './routes/_authenticated/admin/security'
 import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin/users'
+import { Route as AuthenticatedPlatformAdminsRouteImport } from './routes/_authenticated/platform/admins'
+import { Route as AuthenticatedPlatformDashboardRouteImport } from './routes/_authenticated/platform/dashboard'
 import { Route as AuthenticatedAdminEstablishmentsIndexRouteImport } from './routes/_authenticated/admin/establishments/index'
 import { Route as AuthenticatedAdminEstablishmentsEstablishmentIdRouteImport } from './routes/_authenticated/admin/establishments/$establishmentId'
+import { Route as AuthenticatedPlatformTenantsIndexRouteImport } from './routes/_authenticated/platform/tenants/index'
+import { Route as AuthenticatedPlatformTenantsTenantNumberRouteImport } from './routes/_authenticated/platform/tenants/$tenantNumber'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -46,11 +53,28 @@ const AuthenticatedAdminRouteRoute = AuthenticatedAdminRouteRouteImport.update({
   path: '/admin',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedPlatformRouteRoute =
+  AuthenticatedPlatformRouteRouteImport.update({
+    id: '/platform',
+    path: '/platform',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthSlugRoute = AuthSlugRouteImport.update({
+  id: '/$slug',
+  path: '/$slug',
+  getParentRoute: () => AuthRoute,
+} as any)
 const AuthenticatedAdminAuditRoute = AuthenticatedAdminAuditRouteImport.update({
   id: '/audit',
   path: '/audit',
   getParentRoute: () => AuthenticatedAdminRouteRoute,
 } as any)
+const AuthenticatedAdminBrandingRoute =
+  AuthenticatedAdminBrandingRouteImport.update({
+    id: '/branding',
+    path: '/branding',
+    getParentRoute: () => AuthenticatedAdminRouteRoute,
+  } as any)
 const AuthenticatedAdminCheckinsRoute =
   AuthenticatedAdminCheckinsRouteImport.update({
     id: '/checkins',
@@ -74,6 +98,18 @@ const AuthenticatedAdminUsersRoute = AuthenticatedAdminUsersRouteImport.update({
   path: '/users',
   getParentRoute: () => AuthenticatedAdminRouteRoute,
 } as any)
+const AuthenticatedPlatformAdminsRoute =
+  AuthenticatedPlatformAdminsRouteImport.update({
+    id: '/admins',
+    path: '/admins',
+    getParentRoute: () => AuthenticatedPlatformRouteRoute,
+  } as any)
+const AuthenticatedPlatformDashboardRoute =
+  AuthenticatedPlatformDashboardRouteImport.update({
+    id: '/dashboard',
+    path: '/dashboard',
+    getParentRoute: () => AuthenticatedPlatformRouteRoute,
+  } as any)
 const AuthenticatedAdminEstablishmentsIndexRoute =
   AuthenticatedAdminEstablishmentsIndexRouteImport.update({
     id: '/establishments/',
@@ -86,47 +122,80 @@ const AuthenticatedAdminEstablishmentsEstablishmentIdRoute =
     path: '/establishments/$establishmentId',
     getParentRoute: () => AuthenticatedAdminRouteRoute,
   } as any)
+const AuthenticatedPlatformTenantsIndexRoute =
+  AuthenticatedPlatformTenantsIndexRouteImport.update({
+    id: '/tenants/',
+    path: '/tenants/',
+    getParentRoute: () => AuthenticatedPlatformRouteRoute,
+  } as any)
+const AuthenticatedPlatformTenantsTenantNumberRoute =
+  AuthenticatedPlatformTenantsTenantNumberRouteImport.update({
+    id: '/tenants/$tenantNumber',
+    path: '/tenants/$tenantNumber',
+    getParentRoute: () => AuthenticatedPlatformRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/$localizer': typeof LocalizerRoute
-  '/auth': typeof AuthRoute
+  '/auth': typeof AuthRouteWithChildren
   '/admin': typeof AuthenticatedAdminRouteRouteWithChildren
+  '/platform': typeof AuthenticatedPlatformRouteRouteWithChildren
+  '/auth/$slug': typeof AuthSlugRoute
   '/admin/audit': typeof AuthenticatedAdminAuditRoute
+  '/admin/branding': typeof AuthenticatedAdminBrandingRoute
   '/admin/checkins': typeof AuthenticatedAdminCheckinsRoute
   '/admin/dashboard': typeof AuthenticatedAdminDashboardRoute
   '/admin/security': typeof AuthenticatedAdminSecurityRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
+  '/platform/admins': typeof AuthenticatedPlatformAdminsRoute
+  '/platform/dashboard': typeof AuthenticatedPlatformDashboardRoute
   '/admin/establishments/$establishmentId': typeof AuthenticatedAdminEstablishmentsEstablishmentIdRoute
+  '/platform/tenants/$tenantNumber': typeof AuthenticatedPlatformTenantsTenantNumberRoute
   '/admin/establishments/': typeof AuthenticatedAdminEstablishmentsIndexRoute
+  '/platform/tenants/': typeof AuthenticatedPlatformTenantsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/$localizer': typeof LocalizerRoute
-  '/auth': typeof AuthRoute
+  '/auth': typeof AuthRouteWithChildren
   '/admin': typeof AuthenticatedAdminRouteRouteWithChildren
+  '/platform': typeof AuthenticatedPlatformRouteRouteWithChildren
+  '/auth/$slug': typeof AuthSlugRoute
   '/admin/audit': typeof AuthenticatedAdminAuditRoute
+  '/admin/branding': typeof AuthenticatedAdminBrandingRoute
   '/admin/checkins': typeof AuthenticatedAdminCheckinsRoute
   '/admin/dashboard': typeof AuthenticatedAdminDashboardRoute
   '/admin/security': typeof AuthenticatedAdminSecurityRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
+  '/platform/admins': typeof AuthenticatedPlatformAdminsRoute
+  '/platform/dashboard': typeof AuthenticatedPlatformDashboardRoute
   '/admin/establishments/$establishmentId': typeof AuthenticatedAdminEstablishmentsEstablishmentIdRoute
+  '/platform/tenants/$tenantNumber': typeof AuthenticatedPlatformTenantsTenantNumberRoute
   '/admin/establishments': typeof AuthenticatedAdminEstablishmentsIndexRoute
+  '/platform/tenants': typeof AuthenticatedPlatformTenantsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/$localizer': typeof LocalizerRoute
-  '/auth': typeof AuthRoute
+  '/auth': typeof AuthRouteWithChildren
   '/_authenticated/admin': typeof AuthenticatedAdminRouteRouteWithChildren
+  '/_authenticated/platform': typeof AuthenticatedPlatformRouteRouteWithChildren
+  '/auth/$slug': typeof AuthSlugRoute
   '/_authenticated/admin/audit': typeof AuthenticatedAdminAuditRoute
+  '/_authenticated/admin/branding': typeof AuthenticatedAdminBrandingRoute
   '/_authenticated/admin/checkins': typeof AuthenticatedAdminCheckinsRoute
   '/_authenticated/admin/dashboard': typeof AuthenticatedAdminDashboardRoute
   '/_authenticated/admin/security': typeof AuthenticatedAdminSecurityRoute
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
+  '/_authenticated/platform/admins': typeof AuthenticatedPlatformAdminsRoute
+  '/_authenticated/platform/dashboard': typeof AuthenticatedPlatformDashboardRoute
   '/_authenticated/admin/establishments/$establishmentId': typeof AuthenticatedAdminEstablishmentsEstablishmentIdRoute
+  '/_authenticated/platform/tenants/$tenantNumber': typeof AuthenticatedPlatformTenantsTenantNumberRoute
   '/_authenticated/admin/establishments/': typeof AuthenticatedAdminEstablishmentsIndexRoute
+  '/_authenticated/platform/tenants/': typeof AuthenticatedPlatformTenantsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -135,26 +204,40 @@ export interface FileRouteTypes {
     | '/$localizer'
     | '/auth'
     | '/admin'
+    | '/platform'
+    | '/auth/$slug'
     | '/admin/audit'
+    | '/admin/branding'
     | '/admin/checkins'
     | '/admin/dashboard'
     | '/admin/security'
     | '/admin/users'
+    | '/platform/admins'
+    | '/platform/dashboard'
     | '/admin/establishments/$establishmentId'
+    | '/platform/tenants/$tenantNumber'
     | '/admin/establishments/'
+    | '/platform/tenants/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/$localizer'
     | '/auth'
     | '/admin'
+    | '/platform'
+    | '/auth/$slug'
     | '/admin/audit'
+    | '/admin/branding'
     | '/admin/checkins'
     | '/admin/dashboard'
     | '/admin/security'
     | '/admin/users'
+    | '/platform/admins'
+    | '/platform/dashboard'
     | '/admin/establishments/$establishmentId'
+    | '/platform/tenants/$tenantNumber'
     | '/admin/establishments'
+    | '/platform/tenants'
   id:
     | '__root__'
     | '/'
@@ -162,20 +245,27 @@ export interface FileRouteTypes {
     | '/$localizer'
     | '/auth'
     | '/_authenticated/admin'
+    | '/_authenticated/platform'
+    | '/auth/$slug'
     | '/_authenticated/admin/audit'
+    | '/_authenticated/admin/branding'
     | '/_authenticated/admin/checkins'
     | '/_authenticated/admin/dashboard'
     | '/_authenticated/admin/security'
     | '/_authenticated/admin/users'
+    | '/_authenticated/platform/admins'
+    | '/_authenticated/platform/dashboard'
     | '/_authenticated/admin/establishments/$establishmentId'
+    | '/_authenticated/platform/tenants/$tenantNumber'
     | '/_authenticated/admin/establishments/'
+    | '/_authenticated/platform/tenants/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   LocalizerRoute: typeof LocalizerRoute
-  AuthRoute: typeof AuthRoute
+  AuthRoute: typeof AuthRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
@@ -215,11 +305,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminRouteRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/platform': {
+      id: '/_authenticated/platform'
+      path: '/platform'
+      fullPath: '/platform'
+      preLoaderRoute: typeof AuthenticatedPlatformRouteRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/auth/$slug': {
+      id: '/auth/$slug'
+      path: '/$slug'
+      fullPath: '/auth/$slug'
+      preLoaderRoute: typeof AuthSlugRouteImport
+      parentRoute: typeof AuthRoute
+    }
     '/_authenticated/admin/audit': {
       id: '/_authenticated/admin/audit'
       path: '/audit'
       fullPath: '/admin/audit'
       preLoaderRoute: typeof AuthenticatedAdminAuditRouteImport
+      parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
+    '/_authenticated/admin/branding': {
+      id: '/_authenticated/admin/branding'
+      path: '/branding'
+      fullPath: '/admin/branding'
+      preLoaderRoute: typeof AuthenticatedAdminBrandingRouteImport
       parentRoute: typeof AuthenticatedAdminRouteRoute
     }
     '/_authenticated/admin/checkins': {
@@ -250,6 +361,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminUsersRouteImport
       parentRoute: typeof AuthenticatedAdminRouteRoute
     }
+    '/_authenticated/platform/admins': {
+      id: '/_authenticated/platform/admins'
+      path: '/admins'
+      fullPath: '/platform/admins'
+      preLoaderRoute: typeof AuthenticatedPlatformAdminsRouteImport
+      parentRoute: typeof AuthenticatedPlatformRouteRoute
+    }
+    '/_authenticated/platform/dashboard': {
+      id: '/_authenticated/platform/dashboard'
+      path: '/dashboard'
+      fullPath: '/platform/dashboard'
+      preLoaderRoute: typeof AuthenticatedPlatformDashboardRouteImport
+      parentRoute: typeof AuthenticatedPlatformRouteRoute
+    }
     '/_authenticated/admin/establishments/': {
       id: '/_authenticated/admin/establishments/'
       path: '/establishments'
@@ -264,11 +389,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminEstablishmentsEstablishmentIdRouteImport
       parentRoute: typeof AuthenticatedAdminRouteRoute
     }
+    '/_authenticated/platform/tenants/': {
+      id: '/_authenticated/platform/tenants/'
+      path: '/tenants'
+      fullPath: '/platform/tenants/'
+      preLoaderRoute: typeof AuthenticatedPlatformTenantsIndexRouteImport
+      parentRoute: typeof AuthenticatedPlatformRouteRoute
+    }
+    '/_authenticated/platform/tenants/$tenantNumber': {
+      id: '/_authenticated/platform/tenants/$tenantNumber'
+      path: '/tenants/$tenantNumber'
+      fullPath: '/platform/tenants/$tenantNumber'
+      preLoaderRoute: typeof AuthenticatedPlatformTenantsTenantNumberRouteImport
+      parentRoute: typeof AuthenticatedPlatformRouteRoute
+    }
   }
 }
 
 interface AuthenticatedAdminRouteRouteChildren {
   AuthenticatedAdminAuditRoute: typeof AuthenticatedAdminAuditRoute
+  AuthenticatedAdminBrandingRoute: typeof AuthenticatedAdminBrandingRoute
   AuthenticatedAdminCheckinsRoute: typeof AuthenticatedAdminCheckinsRoute
   AuthenticatedAdminDashboardRoute: typeof AuthenticatedAdminDashboardRoute
   AuthenticatedAdminSecurityRoute: typeof AuthenticatedAdminSecurityRoute
@@ -280,6 +420,7 @@ interface AuthenticatedAdminRouteRouteChildren {
 const AuthenticatedAdminRouteRouteChildren: AuthenticatedAdminRouteRouteChildren =
   {
     AuthenticatedAdminAuditRoute: AuthenticatedAdminAuditRoute,
+    AuthenticatedAdminBrandingRoute: AuthenticatedAdminBrandingRoute,
     AuthenticatedAdminCheckinsRoute: AuthenticatedAdminCheckinsRoute,
     AuthenticatedAdminDashboardRoute: AuthenticatedAdminDashboardRoute,
     AuthenticatedAdminSecurityRoute: AuthenticatedAdminSecurityRoute,
@@ -295,22 +436,56 @@ const AuthenticatedAdminRouteRouteWithChildren =
     AuthenticatedAdminRouteRouteChildren,
   )
 
+interface AuthenticatedPlatformRouteRouteChildren {
+  AuthenticatedPlatformAdminsRoute: typeof AuthenticatedPlatformAdminsRoute
+  AuthenticatedPlatformDashboardRoute: typeof AuthenticatedPlatformDashboardRoute
+  AuthenticatedPlatformTenantsTenantNumberRoute: typeof AuthenticatedPlatformTenantsTenantNumberRoute
+  AuthenticatedPlatformTenantsIndexRoute: typeof AuthenticatedPlatformTenantsIndexRoute
+}
+
+const AuthenticatedPlatformRouteRouteChildren: AuthenticatedPlatformRouteRouteChildren =
+  {
+    AuthenticatedPlatformAdminsRoute: AuthenticatedPlatformAdminsRoute,
+    AuthenticatedPlatformDashboardRoute: AuthenticatedPlatformDashboardRoute,
+    AuthenticatedPlatformTenantsTenantNumberRoute:
+      AuthenticatedPlatformTenantsTenantNumberRoute,
+    AuthenticatedPlatformTenantsIndexRoute:
+      AuthenticatedPlatformTenantsIndexRoute,
+  }
+
+const AuthenticatedPlatformRouteRouteWithChildren =
+  AuthenticatedPlatformRouteRoute._addFileChildren(
+    AuthenticatedPlatformRouteRouteChildren,
+  )
+
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminRouteRoute: typeof AuthenticatedAdminRouteRouteWithChildren
+  AuthenticatedPlatformRouteRoute: typeof AuthenticatedPlatformRouteRouteWithChildren
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminRouteRoute: AuthenticatedAdminRouteRouteWithChildren,
+  AuthenticatedPlatformRouteRoute: AuthenticatedPlatformRouteRouteWithChildren,
 }
 
 const AuthenticatedRouteRouteWithChildren =
   AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
 
+interface AuthRouteChildren {
+  AuthSlugRoute: typeof AuthSlugRoute
+}
+
+const AuthRouteChildren: AuthRouteChildren = {
+  AuthSlugRoute: AuthSlugRoute,
+}
+
+const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   LocalizerRoute: LocalizerRoute,
-  AuthRoute: AuthRoute,
+  AuthRoute: AuthRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

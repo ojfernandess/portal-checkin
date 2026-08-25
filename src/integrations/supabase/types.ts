@@ -59,6 +59,204 @@ export type Database = {
         }
         Relationships: []
       }
+      tenants: {
+        Row: {
+          id: string
+          public_number: number
+          name: string
+          slug: string
+          legal_name: string | null
+          tax_id: string | null
+          status: Database["public"]["Enums"]["tenant_status"]
+          settings: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          public_number?: number
+          name: string
+          slug: string
+          legal_name?: string | null
+          tax_id?: string | null
+          status?: Database["public"]["Enums"]["tenant_status"]
+          settings?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          public_number?: number
+          name?: string
+          slug?: string
+          legal_name?: string | null
+          tax_id?: string | null
+          status?: Database["public"]["Enums"]["tenant_status"]
+          settings?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      tenant_memberships: {
+        Row: {
+          id: string
+          tenant_id: string
+          user_id: string
+          role: Database["public"]["Enums"]["app_role"]
+          status: Database["public"]["Enums"]["membership_status"]
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          user_id: string
+          role: Database["public"]["Enums"]["app_role"]
+          status?: Database["public"]["Enums"]["membership_status"]
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          user_id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          status?: Database["public"]["Enums"]["membership_status"]
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      platform_admins: {
+        Row: {
+          user_id: string
+          created_at: string
+          created_by: string | null
+        }
+        Insert: {
+          user_id: string
+          created_at?: string
+          created_by?: string | null
+        }
+        Update: {
+          user_id?: string
+          created_at?: string
+          created_by?: string | null
+        }
+        Relationships: []
+      }
+      platform_integrations: {
+        Row: {
+          id: string
+          integration_type: string
+          name: string
+          description: string | null
+          enabled: boolean
+          created_at: string
+        }
+        Insert: {
+          id: string
+          integration_type: string
+          name: string
+          description?: string | null
+          enabled?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          integration_type?: string
+          name?: string
+          description?: string | null
+          enabled?: boolean
+          created_at?: string
+        }
+        Relationships: []
+      }
+      tenant_pms_configs: {
+        Row: {
+          id: string
+          tenant_id: string
+          provider: string
+          config: Json
+          enabled: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          provider: string
+          config?: Json
+          enabled?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          provider?: string
+          config?: Json
+          enabled?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      tenant_portaria_configs: {
+        Row: {
+          id: string
+          tenant_id: string
+          provider: string
+          config: Json
+          enabled: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          provider: string
+          config?: Json
+          enabled?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          provider?: string
+          config?: Json
+          enabled?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      tenant_features: {
+        Row: {
+          tenant_id: string
+          feature_key: string
+          enabled: boolean
+          config: Json
+          updated_at: string
+        }
+        Insert: {
+          tenant_id: string
+          feature_key: string
+          enabled?: boolean
+          config?: Json
+          updated_at?: string
+        }
+        Update: {
+          tenant_id?: string
+          feature_key?: string
+          enabled?: boolean
+          config?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
       establishments: {
         Row: {
           establishment_id: string
@@ -67,6 +265,7 @@ export type Database = {
           created_by: string | null
           created_at: string
           updated_at: string
+          tenant_id: string
         }
         Insert: {
           establishment_id: string
@@ -75,6 +274,7 @@ export type Database = {
           created_by?: string | null
           created_at?: string
           updated_at?: string
+          tenant_id: string
         }
         Update: {
           establishment_id?: string
@@ -83,6 +283,7 @@ export type Database = {
           created_by?: string | null
           created_at?: string
           updated_at?: string
+          tenant_id?: string
         }
         Relationships: []
       }
@@ -94,6 +295,7 @@ export type Database = {
           version: number
           updated_by: string | null
           updated_at: string
+          tenant_id: string
         }
         Insert: {
           establishment_id: string
@@ -102,6 +304,7 @@ export type Database = {
           version?: number
           updated_by?: string | null
           updated_at?: string
+          tenant_id: string
         }
         Update: {
           establishment_id?: string
@@ -110,6 +313,7 @@ export type Database = {
           version?: number
           updated_by?: string | null
           updated_at?: string
+          tenant_id?: string
         }
         Relationships: []
       }
@@ -121,6 +325,7 @@ export type Database = {
           version: number
           edited_by: string | null
           created_at: string
+          tenant_id: string
         }
         Insert: {
           id?: string
@@ -129,6 +334,7 @@ export type Database = {
           version: number
           edited_by?: string | null
           created_at?: string
+          tenant_id: string
         }
         Update: {
           id?: string
@@ -137,6 +343,7 @@ export type Database = {
           version?: number
           edited_by?: string | null
           created_at?: string
+          tenant_id?: string
         }
         Relationships: []
       }
@@ -148,6 +355,7 @@ export type Database = {
           whatsapp: string | null
           updated_by: string | null
           updated_at: string
+          tenant_id: string
         }
         Insert: {
           establishment_id: string
@@ -156,6 +364,7 @@ export type Database = {
           whatsapp?: string | null
           updated_by?: string | null
           updated_at?: string
+          tenant_id: string
         }
         Update: {
           establishment_id?: string
@@ -164,6 +373,7 @@ export type Database = {
           whatsapp?: string | null
           updated_by?: string | null
           updated_at?: string
+          tenant_id?: string
         }
         Relationships: []
       }
@@ -173,18 +383,21 @@ export type Database = {
           settings: Json
           updated_by: string | null
           updated_at: string
+          tenant_id: string
         }
         Insert: {
           establishment_id: string
           settings?: Json
           updated_by?: string | null
           updated_at?: string
+          tenant_id: string
         }
         Update: {
           establishment_id?: string
           settings?: Json
           updated_by?: string | null
           updated_at?: string
+          tenant_id?: string
         }
         Relationships: []
       }
@@ -220,6 +433,7 @@ export type Database = {
           step: string
           sort_order: number
           created_at: string
+          tenant_id: string
         }
         Insert: {
           id?: string
@@ -231,6 +445,7 @@ export type Database = {
           step?: string
           sort_order?: number
           created_at?: string
+          tenant_id: string
         }
         Update: {
           id?: string
@@ -242,6 +457,7 @@ export type Database = {
           step?: string
           sort_order?: number
           created_at?: string
+          tenant_id?: string
         }
         Relationships: []
       }
@@ -250,16 +466,19 @@ export type Database = {
           id: string
           user_id: string
           establishment_id: string
+          tenant_id: string
         }
         Insert: {
           id?: string
           user_id: string
           establishment_id: string
+          tenant_id: string
         }
         Update: {
           id?: string
           user_id?: string
           establishment_id?: string
+          tenant_id?: string
         }
         Relationships: []
       }
@@ -276,6 +495,7 @@ export type Database = {
           ip_address: string | null
           user_agent: string | null
           created_at: string
+          tenant_id: string | null
         }
         Insert: {
           id?: string
@@ -289,6 +509,7 @@ export type Database = {
           ip_address?: string | null
           user_agent?: string | null
           created_at?: string
+          tenant_id?: string | null
         }
         Update: {
           id?: string
@@ -302,6 +523,7 @@ export type Database = {
           ip_address?: string | null
           user_agent?: string | null
           created_at?: string
+          tenant_id?: string | null
         }
         Relationships: []
       }
@@ -328,6 +550,7 @@ export type Database = {
           started_at: string | null
           checked_in_at: string
           created_at: string
+          tenant_id: string
         }
         Insert: {
           id?: string
@@ -351,6 +574,7 @@ export type Database = {
           started_at?: string | null
           checked_in_at?: string
           created_at?: string
+          tenant_id: string
         }
         Update: {
           id?: string
@@ -374,6 +598,7 @@ export type Database = {
           started_at?: string | null
           checked_in_at?: string
           created_at?: string
+          tenant_id?: string
         }
         Relationships: []
       }
@@ -387,6 +612,7 @@ export type Database = {
           completed_at: string | null
           checkin_record_id: string | null
           created_at: string
+          tenant_id: string
         }
         Insert: {
           id?: string
@@ -397,6 +623,7 @@ export type Database = {
           completed_at?: string | null
           checkin_record_id?: string | null
           created_at?: string
+          tenant_id: string
         }
         Update: {
           id?: string
@@ -407,6 +634,7 @@ export type Database = {
           completed_at?: string | null
           checkin_record_id?: string | null
           created_at?: string
+          tenant_id?: string
         }
         Relationships: []
       }
@@ -440,9 +668,46 @@ export type Database = {
         }
         Returns: boolean
       }
+      can_access_tenant_row: {
+        Args: {
+          _tenant_id: string
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      has_tenant_membership: {
+        Args: {
+          _tenant_id: string
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      has_tenant_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _tenant_id: string
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      is_platform_admin: {
+        Args: {
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      is_tenant_admin: {
+        Args: {
+          _tenant_id: string
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "admin" | "reception"
+      membership_status: "active" | "inactive" | "invited"
+      tenant_status: "active" | "inactive" | "suspended"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -571,6 +836,8 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "reception"],
+      membership_status: ["active", "inactive", "invited"],
+      tenant_status: ["active", "inactive", "suspended"],
     },
   },
 } as const

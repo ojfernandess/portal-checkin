@@ -4,15 +4,24 @@ type BrandLogoProps = {
   className?: string;
   imageClassName?: string;
   variant?: "default" | "white";
+  src?: string | null;
+  alt?: string;
 };
 
-export function BrandLogo({ className, imageClassName, variant = "default" }: BrandLogoProps) {
-  const src = variant === "white" ? "/logo-branco.png" : "/logo-DRuOXAi_.svg";
+export function BrandLogo({
+  className,
+  imageClassName,
+  variant = "default",
+  src,
+  alt = "Audaar",
+}: BrandLogoProps) {
+  const defaultSrc = variant === "white" ? "/logo-branco.png" : "/logo-DRuOXAi_.svg";
+  const resolvedSrc = src?.trim() || defaultSrc;
 
   return (
     <img
-      src={src}
-      alt="Audaar"
+      src={resolvedSrc}
+      alt={alt}
       className={cn("h-auto w-auto max-w-[320px] object-contain", className, imageClassName)}
       decoding="async"
     />

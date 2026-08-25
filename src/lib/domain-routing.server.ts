@@ -70,8 +70,11 @@ function shouldBypassRouting(request: Request, pathname: string): boolean {
 
 function isAdminPath(pathname: string): boolean {
   if (pathname === "/auth") return true;
+  if (pathname.startsWith("/auth/")) return true;
   if (pathname === "/admin") return true;
   if (pathname.startsWith("/admin/")) return true;
+  if (pathname === "/platform") return true;
+  if (pathname.startsWith("/platform/")) return true;
   return false;
 }
 

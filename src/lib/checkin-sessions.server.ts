@@ -19,7 +19,9 @@ export type StartCheckinSessionInput = {
 
 export async function startCheckinSession(input: StartCheckinSessionInput): Promise<string> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { resolveTenantIdForEstablishment } = await import("@/lib/tenant.server");
   const localizer = input.localizer.trim().toUpperCase();
+  const tenantId = await resolveTenantIdForEstablishment(input.establishmentId);
 
   const { data, error } = await supabaseAdmin
     .from("checkin_sessions")
@@ -27,6 +29,7 @@ export async function startCheckinSession(input: StartCheckinSessionInput): Prom
       localizer,
       reservation_id: input.reservationId ?? null,
       establishment_id: input.establishmentId ?? null,
+      tenant_id: tenantId,
       started_at: new Date().toISOString(),
     })
     .select("id")

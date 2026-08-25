@@ -152,20 +152,29 @@ async function loadCheckinRecordGuest(checkinRecordId?: string | null): Promise<
   return (data?.main_guest as MainGuest | null) ?? null;
 }
 
-async function fetchReservationByLocalizer(localizer: string): Promise<Reservation | null> {
+async function fetchReservationByLocalizer(
+  localizer: string,
+  establishmentId?: string | null,
+): Promise<Reservation | null> {
   const { apiFetch, unwrap } = await import("@/lib/api/techospitality.server");
   const { normalizeReservationPayload } = await import("@/lib/api/reservation-normalizer");
+  const { resolveTenantIdForEstablishmentId } = await import("@/lib/tenant-pms.server");
+  const tenantId = await resolveTenantIdForEstablishmentId(establishmentId);
   const payload = await apiFetch<unknown>(
     `/api/reservations/localizer/${encodeURIComponent(localizer.toUpperCase())}`,
+    { tenantId },
   );
   const raw = unwrap<unknown>(payload);
   return normalizeReservationPayload(Array.isArray(raw) ? raw[0] : raw);
 }
 
-async function waitForConfirmedReservation(localizer: string): Promise<Reservation | null> {
+async function waitForConfirmedReservation(
+  localizer: string,
+  establishmentId?: string | null,
+): Promise<Reservation | null> {
   for (let attempt = 0; attempt < CONFIRMATION_POLL_ATTEMPTS; attempt += 1) {
     try {
-      const reservation = await fetchReservationByLocalizer(localizer);
+      const reservation = await fetchReservationByLocalizer(localizer, establishmentId);
       if (reservation && isCheckinConfirmedForInbox(reservation)) {
         return reservation;
       }
@@ -282,7 +291,7 @@ export async function syncCheckinToInbox(input: SyncCheckinToInboxInput): Promis
   }
 
   const localizer = input.localizer.toUpperCase();
-  const reservation = await waitForConfirmedReservation(localizer);
+  const reservation = await waitForConfirmedReservation(localizer, input.establishmentId);
   if (!reservation) {
     console.warn("[inbox-sync] check-in not confirmed in PMS yet, skipping Inbox sync", localizer);
     await writeAuditLog({

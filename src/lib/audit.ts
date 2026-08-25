@@ -4,6 +4,7 @@ import { getClientIp } from "./rate-limit";
 export type AuditEntry = {
   userId?: string;
   userEmail?: string;
+  tenantId?: string;
   action: string;
   entityType: string;
   entityId?: string;
@@ -20,6 +21,7 @@ export async function writeAuditLog(entry: AuditEntry): Promise<void> {
     await supabaseAdmin.from("audit_logs").insert({
       user_id: entry.userId ?? null,
       user_email: entry.userEmail ?? null,
+      tenant_id: entry.tenantId ?? null,
       action: entry.action,
       entity_type: entry.entityType,
       entity_id: entry.entityId ?? null,

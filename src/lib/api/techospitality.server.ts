@@ -21,6 +21,16 @@ function getBaseUrl(): string {
   return readEnv("TECHOSPITALITY_BASE_URL") || DEFAULT_BASE_URL;
 }
 
+async function resolveBaseUrl(tenantId?: string): Promise<string> {
+  if (tenantId) {
+    const { loadTenantPmsSettings, resolveTenantPmsBaseUrl } = await import("@/lib/tenant-pms.server");
+    const settings = await loadTenantPmsSettings(tenantId);
+    const tenantBaseUrl = resolveTenantPmsBaseUrl(settings?.config ?? null);
+    if (tenantBaseUrl) return tenantBaseUrl;
+  }
+  return getBaseUrl();
+}
+
 /** Tokens vkr_* devem ir em x-api-key; JWT em Authorization Bearer. */
 function applyAuthHeaders(headers: Record<string, string>, token: string): void {
   if (token.startsWith("vkr_")) {
@@ -47,6 +57,8 @@ type ApiOptions = {
   tokenScope?: TecHospitalityTokenScope;
   /** Variável de ambiente com token dedicado ao endpoint (ex.: TECHOSPITALITY_CHECKOUTS_TOKEN). */
   tokenEnv?: string;
+  /** Resolve tokens PMS a partir de tenant_pms_configs antes do fallback .env */
+  tenantId?: string;
 };
 
 /**
@@ -68,6 +80,36 @@ export function resolveTokenScope(path: string): TecHospitalityTokenScope {
 
 /**
  * Resolve o Bearer token para um path ou scope.
+ * Ordem: tenant_pms_configs → tokenEnv → token do grupo → TECHOSPITALITY_API_TOKEN.
+ */
+export async function resolveApiTokenAsync(
+  pathOrScope: string,
+  options: { tenantId?: string; tokenEnv?: string } = {},
+): Promise<string | undefined> {
+  const scope =
+    pathOrScope === "admin" || pathOrScope === "hub" || pathOrScope === "reservations"
+      ? pathOrScope
+      : resolveTokenScope(pathOrScope);
+
+  if (options.tenantId) {
+    const { loadTenantPmsSettings, resolveTenantPmsToken } = await import("@/lib/tenant-pms.server");
+    const settings = await loadTenantPmsSettings(options.tenantId);
+    if (settings?.enabled !== false) {
+      const tenantToken = resolveTenantPmsToken(settings?.config ?? null, scope, options.tokenEnv);
+      if (tenantToken) return tenantToken;
+    }
+  }
+
+  if (options.tokenEnv) {
+    const dedicated = readEnv(options.tokenEnv);
+    if (dedicated) return dedicated;
+  }
+
+  return resolveApiToken(scope);
+}
+
+/**
+ * Resolve o Bearer token para um path ou scope (somente variáveis de ambiente).
  * Ordem: token do grupo → TECHOSPITALITY_API_TOKEN (fallback global).
  */
 export function resolveApiToken(pathOrScope: string): string | undefined {
@@ -88,8 +130,10 @@ export function resolveApiToken(pathOrScope: string): string | undefined {
  */
 export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promise<T> {
   const scope = options.tokenScope ?? resolveTokenScope(path);
-  const dedicatedToken = options.tokenEnv ? readEnv(options.tokenEnv) : undefined;
-  const token = dedicatedToken ?? resolveApiToken(scope);
+  const token = await resolveApiTokenAsync(scope, {
+    tenantId: options.tenantId,
+    tokenEnv: options.tokenEnv,
+  });
 
   if (!token) {
     const vars = [
@@ -106,7 +150,7 @@ export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promi
     );
   }
 
-  const url = new URL(path, getBaseUrl());
+  const url = new URL(path, await resolveBaseUrl(options.tenantId));
   if (options.query) {
     for (const [key, value] of Object.entries(options.query)) {
       if (value !== undefined && value !== "") url.searchParams.set(key, value);

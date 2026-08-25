@@ -1,4 +1,5 @@
 import type { Dependent, EmbraturForm, MainGuest, Reservation } from "@/lib/api/types";
+import { resolveTenantIdForEstablishment } from "@/lib/tenant.server";
 
 export type CheckinRecordRow = {
   id: string;
@@ -53,6 +54,8 @@ export async function saveCheckinRecord(input: SaveCheckinRecordInput): Promise<
       input.startedAt ??
       (await resolveCheckinStartedAt(input.checkinSessionId ?? undefined, localizer));
 
+    const tenantId = await resolveTenantIdForEstablishment(input.establishmentId);
+
     const { data, error } = await supabaseAdmin
       .from("checkin_records")
       .insert({
@@ -60,6 +63,7 @@ export async function saveCheckinRecord(input: SaveCheckinRecordInput): Promise<
         reservation_id: input.reservationId ?? null,
         establishment_id: input.establishmentId ?? null,
         establishment_name: input.establishmentName ?? null,
+        tenant_id: tenantId,
         guest_name: String(guest.name ?? "Hóspede"),
         guest_email: guest.email ?? null,
         guest_document: guest.documentNumber ?? null,

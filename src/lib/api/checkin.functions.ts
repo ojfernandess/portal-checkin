@@ -3,6 +3,7 @@ import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { writeAuditLog } from "@/lib/audit";
 import { saveCheckinRecord } from "@/lib/checkin-records";
+import { resolveTenantIdForEstablishmentId } from "@/lib/tenant-pms.server";
 import { assertRateLimitAllowed, enforceRateLimit, getClientIp, recordRateLimitHit } from "@/lib/rate-limit";
 import { cloneDefaultSections, parseTermsContent, flattenTermsSections } from "@/lib/establishment-terms";
 import { onlyDigits } from "@/lib/validators";
@@ -306,16 +307,46 @@ function parseMediaUpload(payload: unknown, type: "profile" | "document"): Media
   };
 }
 
-async function fetchReservationByLocalizer(localizer: string): Promise<Reservation | null> {
+async function resolveCheckinTenantId(establishmentId?: string | null): Promise<string> {
+  return resolveTenantIdForEstablishmentId(establishmentId);
+}
+
+async function fetchReservationByLocalizer(
+  localizer: string,
+  establishmentIdHint?: string | null,
+): Promise<Reservation | null> {
   const { apiFetch, unwrap } = await import("./techospitality.server");
+  const { resolveReservationEstablishmentId } = await import("@/lib/establishment-registry.server");
+
+  let tenantId = await resolveCheckinTenantId(establishmentIdHint);
   const payload = await apiFetch<unknown>(
     `/api/reservations/localizer/${encodeURIComponent(localizer.toUpperCase())}`,
+    { tenantId },
   );
   const raw = unwrap<unknown>(payload);
-  if (Array.isArray(raw)) {
-    return normalizeReservationPayload(raw[0]);
+  const reservation = Array.isArray(raw)
+    ? normalizeReservationPayload(raw[0])
+    : normalizeReservationPayload(raw);
+
+  if (reservation && !establishmentIdHint) {
+    const establishmentId = resolveReservationEstablishmentId(reservation);
+    if (establishmentId) {
+      const resolvedTenantId = await resolveCheckinTenantId(String(establishmentId));
+      if (resolvedTenantId !== tenantId) {
+        tenantId = resolvedTenantId;
+        const retryPayload = await apiFetch<unknown>(
+          `/api/reservations/localizer/${encodeURIComponent(localizer.toUpperCase())}`,
+          { tenantId },
+        );
+        const retryRaw = unwrap<unknown>(retryPayload);
+        return Array.isArray(retryRaw)
+          ? normalizeReservationPayload(retryRaw[0])
+          : normalizeReservationPayload(retryRaw);
+      }
+    }
   }
-  return normalizeReservationPayload(raw);
+
+  return reservation;
 }
 
 function clientIpBucket(prefix: string): string {
@@ -463,7 +494,10 @@ export const getEstablishmentSettings = createServerFn({ method: "POST" })
     return parseEstablishmentSettings(row?.settings ?? null);
   });
 
-async function lookupGuestBirthDateByIdentity(reservation: Reservation): Promise<string | null> {
+async function lookupGuestBirthDateByIdentity(
+  reservation: Reservation,
+  tenantId: string,
+): Promise<string | null> {
   const { apiFetch, unwrap } = await import("./techospitality.server");
   const doc = reservation.mainGuest?.documentNumber ?? reservation.responsible?.documentNumber;
   const email = reservation.mainGuest?.email ?? reservation.responsible?.email;
@@ -481,7 +515,10 @@ async function lookupGuestBirthDateByIdentity(reservation: Reservation): Promise
 
   for (const query of attempts) {
     try {
-      const payload = await apiFetch<unknown>("/api/reservations/hub/main-guest/lookup", { query });
+      const payload = await apiFetch<unknown>("/api/reservations/hub/main-guest/lookup", {
+        query,
+        tenantId,
+      });
       const guest = parseLookupGuest(unwrap<unknown>(payload));
       if (guest?.birthDate?.trim()) return guest.birthDate.trim();
     } catch {
@@ -527,7 +564,10 @@ async function resolveMainGuestBirthDateForReaccess(localizer: string): Promise<
   }
 
   if (reservation) {
-    return lookupGuestBirthDateByIdentity(reservation);
+    const { resolveReservationEstablishmentId } = await import("@/lib/establishment-registry.server");
+    const establishmentId = resolveReservationEstablishmentId(reservation);
+    const tenantId = await resolveCheckinTenantId(establishmentId ? String(establishmentId) : null);
+    return lookupGuestBirthDateByIdentity(reservation, tenantId);
   }
 
   return null;
@@ -654,6 +694,7 @@ export const lookupGuest = createServerFn({ method: "POST" })
     await enforceRateLimit(clientIpBucket("guest-lookup"), { maxRequests: 20 });
     const { assertRegisteredEstablishmentAccess } = await import("@/lib/establishment-registry.server");
     await assertRegisteredEstablishmentAccess(data.establishmentId);
+    const tenantId = await resolveCheckinTenantId(data.establishmentId);
     const { apiFetch, unwrap } = await import("./techospitality.server");
     const query: Record<string, string> =
       "email" in data
@@ -667,6 +708,7 @@ export const lookupGuest = createServerFn({ method: "POST" })
     try {
       const payload = await apiFetch<unknown>("/api/reservations/hub/main-guest/lookup", {
         query,
+        tenantId,
       });
       const parsed = unwrap<unknown>(payload);
       return parseLookupGuestWithPhotos(parsed);
@@ -709,12 +751,14 @@ export const uploadCheckinMedia = createServerFn({ method: "POST" })
     await enforceRateLimit(clientIpBucket("media-upload"), { maxRequests: 40 });
     const { assertRegisteredEstablishmentAccess } = await import("@/lib/establishment-registry.server");
     await assertRegisteredEstablishmentAccess(data.establishmentId);
+    const tenantId = await resolveCheckinTenantId(data.establishmentId);
     const { apiFetch, unwrap } = await import("./techospitality.server");
     const payload = await apiFetch<unknown>(
       `/api/reservations/hub/${encodeURIComponent(data.reservationId)}/checkin/media`,
       {
         method: "POST",
         body: { data: stripDataUrl(data.data), type: data.type },
+        tenantId,
       },
     );
     const result = unwrap<unknown>(payload);
@@ -725,8 +769,9 @@ export const uploadCheckinMedia = createServerFn({ method: "POST" })
   });
 
 export const getEmbraturReference = createServerFn({ method: "GET" }).handler(async () => {
+  const tenantId = await resolveCheckinTenantId(null);
   const { apiFetch, unwrap } = await import("./techospitality.server");
-  const payload = await apiFetch<unknown>("/api/reservations/hub/embratur-reference");
+  const payload = await apiFetch<unknown>("/api/reservations/hub/embratur-reference", { tenantId });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return unwrap<Record<string, any>>(payload);
 });
@@ -927,12 +972,17 @@ export const getCompletedCheckinContext = createServerFn({ method: "POST" })
         const documentNumber = mainGuest.documentNumber?.trim();
         const email = mainGuest.email?.trim();
         if (documentNumber || email) {
+          const establishmentId = resolveReservationEstablishmentId(reservation);
+          const tenantId = await resolveCheckinTenantId(
+            establishmentId ? String(establishmentId) : null,
+          );
           const { apiFetch } = await import("./techospitality.server");
           const query: Record<string, string> = {};
           if (documentNumber) query.documentNumber = documentNumber;
           if (email) query.email = email;
           const payload = await apiFetch<unknown>("/api/reservations/hub/main-guest/lookup", {
             query,
+            tenantId,
           });
           const lookedUp = await parseLookupGuestWithPhotos(payload);
           if (lookedUp) {
@@ -1028,6 +1078,14 @@ export const submitCheckin = createServerFn({ method: "POST" })
           (data.reservationSnapshot as Reservation | undefined) ?? null,
         ),
     );
+    const resolvedEstablishmentIdForTenant =
+      data.establishmentId ??
+      resolveReservationEstablishmentId(
+        (data.reservationSnapshot as Reservation | undefined) ?? null,
+      );
+    const tenantId = await resolveCheckinTenantId(
+      resolvedEstablishmentIdForTenant ? String(resolvedEstablishmentIdForTenant) : null,
+    );
     const { apiFetch, unwrap } = await import("./techospitality.server");
     const labels = buildCheckinErrorLabelsPt();
     const mainGuestInput = data.mainGuest as MainGuest;
@@ -1113,7 +1171,7 @@ export const submitCheckin = createServerFn({ method: "POST" })
     }
     const payload = await apiFetch<unknown>(
       `/api/reservations/hub/${encodeURIComponent(data.reservationId)}/checkin`,
-      { method: "POST", body },
+      { method: "POST", body, tenantId },
     );
     const result = unwrap<Record<string, unknown>>(payload);
 
@@ -1154,6 +1212,7 @@ export const submitCheckin = createServerFn({ method: "POST" })
 
     if (data.extraFields && Object.keys(data.extraFields).length > 0) {
       await writeAuditLog({
+        tenantId,
         action: "checkin.extra_fields",
         entityType: "reservation",
         entityId: data.reservationId,
@@ -1167,6 +1226,7 @@ export const submitCheckin = createServerFn({ method: "POST" })
 
     if (purpose === "companions") {
       await writeAuditLog({
+        tenantId,
         action: "checkin.companions_update",
         entityType: "reservation",
         entityId: data.reservationId,

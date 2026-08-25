@@ -5,18 +5,23 @@ import {
   Building2,
   ChevronRight,
   ClipboardList,
+  Globe2,
   LayoutDashboard,
   LogOut,
   Menu,
   ScrollText,
   Shield,
   Users,
+  Palette,
 } from "lucide-react";
-import { BrandLogo } from "@/components/BrandLogo";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { supabase } from "@/integrations/supabase/client";
 import { adminMe } from "@/lib/api/admin.functions";
+import { platformMe } from "@/lib/api/platform.functions";
+import { TenantSelector } from "@/components/admin/TenantSelector";
+import { TenantPanelBrand } from "@/components/admin/TenantPanelBrand";
+import { clearStoredActiveTenantId } from "@/lib/tenant-context";
 import { useI18n } from "@/lib/i18n/context";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -27,6 +32,8 @@ export type AdminAccount = {
   email: string;
   role: string;
   fullName: string | null;
+  tenantName?: string;
+  panelLogoUrl?: string | null;
 };
 
 export function useAdminAccount() {
@@ -34,9 +41,24 @@ export function useAdminAccount() {
   const [account, setAccount] = useState<AdminAccount | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
     void me()
-      .then((data) => setAccount({ email: data.email, role: data.role, fullName: data.fullName }))
-      .catch(() => setAccount(null));
+      .then((data) => {
+        if (cancelled) return;
+        setAccount({
+          email: data.email,
+          role: data.role,
+          fullName: data.fullName,
+          tenantName: data.tenantName,
+          panelLogoUrl: data.panelLogoUrl,
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setAccount(null);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [me]);
 
   return account;
@@ -52,6 +74,7 @@ type NavItem = {
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   adminOnly?: boolean;
+  platformOnly?: boolean;
 };
 
 type NavGroup = {
@@ -153,9 +176,25 @@ export function AdminShell({
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const { t } = useI18n();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
   const isAdmin = account?.role === "admin";
 
+  useEffect(() => {
+    let cancelled = false;
+    void platformMe()
+      .then((data) => {
+        if (!cancelled) setIsPlatformAdmin(data.isPlatformAdmin);
+      })
+      .catch(() => {
+        if (!cancelled) setIsPlatformAdmin(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   async function signOut() {
+    clearStoredActiveTenantId();
     await supabase.auth.signOut();
     navigate({ to: "/auth", replace: true });
   }
@@ -172,11 +211,13 @@ export function AdminShell({
         { to: "/admin/dashboard", label: t("admin.dashboard"), icon: LayoutDashboard },
         { to: "/admin/checkins", label: t("admin.checkins"), icon: ClipboardList },
         { to: "/admin/establishments", label: t("admin.establishments"), icon: Building2, adminOnly: true },
+        { to: "/admin/branding", label: t("admin.branding.nav"), icon: Palette, adminOnly: true },
       ],
     },
     {
       label: t("admin.navGroupControl"),
       items: [
+        { to: "/platform/dashboard", label: t("admin.superAdminLink"), icon: Globe2, platformOnly: true },
         { to: "/admin/security", label: t("admin.security"), icon: Shield, adminOnly: true },
         { to: "/admin/audit", label: t("admin.audit"), icon: ScrollText, adminOnly: true },
         { to: "/admin/users", label: t("admin.users"), icon: Users, adminOnly: true },
@@ -185,17 +226,29 @@ export function AdminShell({
   ]
     .map((group) => ({
       ...group,
-      items: group.items.filter((item) => !item.adminOnly || isAdmin),
+      items: group.items.filter(
+        (item) =>
+          (!item.adminOnly || isAdmin) &&
+          (!item.platformOnly || isPlatformAdmin),
+      ),
     }))
     .filter((group) => group.items.length > 0);
 
   const sidebar = (
     <div className="flex h-full min-h-0 flex-col bg-[#1B3A57] text-white">
       <div className="border-b border-white/10 px-4 py-5">
-        <BrandLogo variant="white" className="max-h-9" />
+        <div className="flex min-h-10 items-center justify-center px-1">
+          <TenantPanelBrand
+            tenantName={account?.tenantName ?? t("admin.panel")}
+            logoUrl={account?.panelLogoUrl}
+          />
+        </div>
         <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/55">
           {t("admin.panel")}
         </p>
+        <div className="mt-4">
+          <TenantSelector />
+        </div>
       </div>
 
       <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-4" aria-label={t("admin.navLabel")}>
@@ -261,7 +314,8 @@ export function AdminShell({
             <p className="truncate text-sm font-semibold">{resolvedMobileTitle}</p>
             {!hidePageHeader && (subtitle || account) ? (
               <p className="truncate text-xs text-muted-foreground">
-                {subtitle ?? `${displayName} · ${roleLabel}`}
+                {subtitle ??
+                  `${displayName}${account?.tenantName ? ` · ${account.tenantName}` : ""} · ${roleLabel}`}
               </p>
             ) : null}
           </div>
@@ -304,7 +358,8 @@ export function AdminShell({
                     {title ? <h1 className="truncate text-xl font-semibold">{title}</h1> : null}
                     {subtitle || account ? (
                       <p className="truncate text-xs text-muted-foreground">
-                        {subtitle ?? `${displayName} · ${roleLabel}`}
+                        {subtitle ??
+                          `${displayName}${account?.tenantName ? ` · ${account.tenantName}` : ""} · ${roleLabel}`}
                       </p>
                     ) : null}
                   </div>

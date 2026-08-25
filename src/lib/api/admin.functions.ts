@@ -8,6 +8,10 @@ import {
   type TermsSection,
 } from "@/lib/establishment-terms";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireTenantContext, type TenantContext } from "@/integrations/supabase/tenant-middleware";
+import { assertEstablishmentInTenant, assertCheckinRecordInTenant, feedRowEstablishmentId, loadTenantEstablishmentIds, rowBelongsToTenantEstablishments } from "@/lib/tenant.server";
+import { resolveReservationEstablishmentId } from "@/lib/establishment-registry.server";
+import { DEFAULT_TENANT_ID } from "@/lib/tenant.constants";
 import { normalizeReservationPayload } from "./reservation-normalizer";
 import type { Reservation } from "./types";
 import type { TecHospitalityTokenScope } from "./techospitality.server";
@@ -16,7 +20,57 @@ import { buildIlikeContains } from "@/lib/security";
 
 export type { CheckinRecordRow };
 
+async function filterReservationsForTenant(
+  reservations: Reservation[],
+  tenantId: string,
+): Promise<Reservation[]> {
+  const establishmentIds = await loadTenantEstablishmentIds(tenantId);
+  if (establishmentIds.size === 0) return [];
+
+  return reservations.filter((reservation) =>
+    rowBelongsToTenantEstablishments(resolveReservationEstablishmentId(reservation), establishmentIds),
+  );
+}
+
+async function reservationBelongsToTenant(
+  reservation: Reservation | null | undefined,
+  tenantId: string,
+): Promise<boolean> {
+  if (!reservation) return false;
+  const establishmentIds = await loadTenantEstablishmentIds(tenantId);
+  return rowBelongsToTenantEstablishments(
+    resolveReservationEstablishmentId(reservation),
+    establishmentIds,
+  );
+}
+
+function filterFeedRowsForTenant<T extends Record<string, unknown>>(
+  rows: T[],
+  establishmentIds: Set<string>,
+): T[] {
+  return rows.filter((row) => {
+    const establishmentId = feedRowEstablishmentId(row);
+    if (!establishmentId) return true;
+    return establishmentIds.has(establishmentId);
+  });
+}
+
 export type StaffRole = "admin" | "reception";
+
+export type TenantSummary = {
+  id: string;
+  name: string;
+  slug: string;
+  role: StaffRole;
+};
+
+type AdminHandlerContext = {
+  supabase: {
+    from: (table: string) => unknown;
+    rpc: (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: Error | null }>;
+  };
+  userId: string;
+} & TenantContext;
 
 function readDashboardEnv(name: string): string | undefined {
   const raw =
@@ -67,34 +121,37 @@ function formatAdminApiError(error: unknown, tokenEnv?: string): Error {
 async function fetchAdminDashboardApi(
   path: string,
   tokenEnv: string,
+  tenantId: string,
   options: { query?: Record<string, string | undefined> } = {},
 ): Promise<unknown> {
-  const { apiFetch, resolveApiToken } = await import("./techospitality.server");
+  const { apiFetch } = await import("./techospitality.server");
 
   if (readDashboardEnv(tokenEnv)) {
     try {
-      return await apiFetch<unknown>(path, { ...options, tokenEnv });
+      return await apiFetch<unknown>(path, { ...options, tokenEnv, tenantId });
     } catch (error) {
       throw formatAdminApiError(error, tokenEnv);
     }
   }
 
-  return fetchAdminReservationsApi(path, options, tokenEnv);
+  return fetchAdminReservationsApi(path, tenantId, options, tokenEnv);
 }
 
 async function fetchAdminReservationsApi(
   path: string,
+  tenantId: string,
   options: { query?: Record<string, string | undefined> } = {},
   tokenHint?: string,
 ): Promise<unknown> {
-  const { apiFetch, resolveApiToken } = await import("./techospitality.server");
+  const { apiFetch, resolveApiTokenAsync } = await import("./techospitality.server");
   const scopes: TecHospitalityTokenScope[] = ["reservations", "admin"];
   let lastError: Error | null = null;
 
   for (const tokenScope of scopes) {
-    if (!resolveApiToken(tokenScope)) continue;
+    const token = await resolveApiTokenAsync(tokenScope, { tenantId, tokenEnv: tokenHint });
+    if (!token) continue;
     try {
-      return await apiFetch<unknown>(path, { ...options, tokenScope });
+      return await apiFetch<unknown>(path, { ...options, tokenScope, tenantId });
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
       const message = lastError.message.toLowerCase();
@@ -111,7 +168,7 @@ async function fetchAdminReservationsApi(
   }
 
   try {
-    return await apiFetch<unknown>(path, options);
+    return await apiFetch<unknown>(path, { ...options, tenantId });
   } catch (error) {
     if (lastError) {
       throw formatAdminApiError(lastError, tokenHint);
@@ -255,72 +312,215 @@ export const adminBootstrapStatus = createServerFn({ method: "GET" }).handler(as
   return { needsBootstrap: (count ?? 0) === 0 };
 });
 
-/** Current signed-in staff member: profile + role. */
-export const adminMe = createServerFn({ method: "GET" })
+/** Tenants the signed-in user can access in the admin panel. */
+export const adminMyTenants = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
+  .handler(async ({ context }): Promise<{ tenants: TenantSummary[]; isPlatformAdmin: boolean }> => {
     const { supabase, userId } = context;
-    await assertStaff(context);
-    const [{ data: profile }, { data: roles }] = await Promise.all([
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: isPlatformAdmin, error: platformError } = await supabase.rpc("is_platform_admin", {
+      _user_id: userId,
+    });
+    if (platformError) throw new Error(platformError.message);
+
+    if (isPlatformAdmin) {
+      const { data: rows, error } = await supabaseAdmin
+        .from("tenants")
+        .select("id, name, slug")
+        .eq("status", "active")
+        .order("name", { ascending: true });
+
+      if (error) throw new Error(error.message);
+
+      return {
+        isPlatformAdmin: true,
+        tenants: (rows ?? []).map((row) => ({
+          id: row.id,
+          name: row.name,
+          slug: row.slug,
+          role: "admin" as const,
+        })),
+      };
+    }
+
+    const { data: membershipRows, error } = await supabaseAdmin
+      .from("tenant_memberships")
+      .select("tenant_id, role")
+      .eq("user_id", userId)
+      .eq("status", "active");
+
+    if (error) throw new Error(error.message);
+
+    let resolvedMemberships = membershipRows ?? [];
+
+    const tenantIds = resolvedMemberships.map((row) => row.tenant_id);
+    if (tenantIds.length === 0) {
+      return { tenants: [], isPlatformAdmin: false };
+    }
+
+    const { data: tenantRows, error: tenantError } = await supabaseAdmin
+      .from("tenants")
+      .select("id, name, slug, status")
+      .in("id", tenantIds)
+      .eq("status", "active")
+      .order("name", { ascending: true });
+
+    if (tenantError) throw new Error(tenantError.message);
+
+    const roleByTenant = new Map(
+      resolvedMemberships.map((row) => [row.tenant_id, row.role as StaffRole]),
+    );
+
+    const tenants = (tenantRows ?? []).map((tenant) => ({
+      id: tenant.id,
+      name: tenant.name,
+      slug: tenant.slug,
+      role: roleByTenant.get(tenant.id) ?? ("reception" as const),
+    }));
+
+    return { tenants, isPlatformAdmin: false };
+  });
+
+/** Current signed-in staff member: profile + role in the active tenant. */
+export const adminMe = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth, requireTenantContext])
+  .handler(async ({ context }) => {
+    const { supabase, userId, tenantId, tenantRole, isPlatformAdmin } = context as AdminHandlerContext;
+    await assertStaff(context as AdminHandlerContext);
+
+    const [{ data: profile }, { data: tenant }] = await Promise.all([
       supabase.from("profiles").select("id, email, full_name").eq("id", userId).maybeSingle(),
-      supabase.from("user_roles").select("role").eq("user_id", userId),
+      supabase.from("tenants").select("id, name, slug, settings").eq("id", tenantId).maybeSingle(),
     ]);
-    const isAdmin = (roles ?? []).some((r) => r.role === "admin");
+
+    const { parseTenantSettings } = await import("@/lib/tenant-settings");
+    const tenantSettings = parseTenantSettings(tenant?.settings ?? null);
+
+    const role = (tenantRole ?? "reception") as StaffRole;
+
     return {
       userId,
       email: profile?.email ?? "",
       fullName: profile?.full_name ?? null,
-      role: (isAdmin ? "admin" : "reception") as StaffRole,
+      role,
+      tenantId,
+      tenantName: tenant?.name ?? "",
+      tenantSlug: tenant?.slug ?? "",
+      panelLogoUrl: tenantSettings.panelLogoUrl,
+      isPlatformAdmin,
     };
   });
 
-async function assertAdmin(context: { supabase: any; userId: string }) {
-  const { data, error } = await context.supabase.rpc("has_role", {
-    _user_id: context.userId,
-    _role: "admin",
+export const adminGetTenantBranding = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth, requireTenantContext])
+  .handler(async ({ context }) => {
+    const { tenantId } = context as AdminHandlerContext;
+    await assertAdmin(context as AdminHandlerContext);
+    const { loadTenantSettings } = await import("@/lib/tenant-branding.server");
+    const settings = await loadTenantSettings(tenantId);
+    return { settings };
   });
-  if (error) throw new Error(error.message);
-  if (!data) throw new Error("Apenas administradores podem realizar esta ação.");
+
+export const adminSaveTenantLogo = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth, requireTenantContext])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        panelLogoUrl: z.string().max(1_200_000).nullable(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const adminContext = context as AdminHandlerContext;
+    await assertAdmin(adminContext);
+    const { tenantId, userId } = adminContext;
+    const { parseTenantSettings, MAX_TENANT_LOGO_BYTES } = await import("@/lib/tenant-settings");
+    const { saveTenantSettings } = await import("@/lib/tenant-branding.server");
+
+    const panelLogoUrl = parseTenantSettings({ panelLogoUrl: data.panelLogoUrl }).panelLogoUrl;
+    if (
+      data.panelLogoUrl &&
+      data.panelLogoUrl.startsWith("data:") &&
+      data.panelLogoUrl.length > MAX_TENANT_LOGO_BYTES * 1.4
+    ) {
+      throw new Error("Imagem muito grande. Use arquivos de até 400 KB.");
+    }
+
+    const settings = await saveTenantSettings(tenantId, { panelLogoUrl });
+
+    await writeAuditLog({
+      userId,
+      tenantId,
+      action: "tenant.branding.logo",
+      entityType: "tenants",
+      entityId: tenantId,
+      newData: { hasLogo: Boolean(settings.panelLogoUrl) },
+    });
+
+    return { ok: true as const, settings };
+  });
+
+async function assertAdmin(context: AdminHandlerContext) {
+  if (context.isPlatformAdmin) return;
+  if (context.tenantRole !== "admin") {
+    throw new Error("Apenas administradores podem realizar esta ação.");
+  }
 }
 
-async function assertStaff(context: { supabase: any; userId: string }) {
-  const { data, error } = await context.supabase
-    .from("user_roles")
-    .select("role")
-    .eq("user_id", context.userId)
-    .limit(1);
-  if (error) throw new Error(error.message);
-  if (!data?.length) throw new Error("Acesso negado: perfil de equipe não encontrado.");
+async function assertStaff(context: AdminHandlerContext) {
+  if (context.isPlatformAdmin) return;
+  if (!context.tenantRole) {
+    throw new Error("Acesso negado: perfil de equipe não encontrado.");
+  }
 }
 
 export const adminListStaff = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireTenantContext])
   .handler(async ({ context }): Promise<{ staff: StaffMember[] }> => {
-    await assertAdmin(context);
-    const { data: profiles, error } = await context.supabase
+    await assertAdmin(context as AdminHandlerContext);
+    const { tenantId } = context as AdminHandlerContext;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: memberships, error } = await supabaseAdmin
+      .from("tenant_memberships")
+      .select("user_id, role, created_at")
+      .eq("tenant_id", tenantId)
+      .eq("status", "active")
+      .order("created_at", { ascending: true });
+
+    if (error) throw new Error(error.message);
+
+    const userIds = (memberships ?? []).map((row) => row.user_id);
+    if (userIds.length === 0) {
+      return { staff: [] };
+    }
+
+    const { data: profiles, error: profileError } = await supabaseAdmin
       .from("profiles")
       .select("id, email, full_name, created_at")
+      .in("id", userIds)
       .order("created_at", { ascending: true });
-    if (error) throw new Error(error.message);
-    const { data: roles } = await context.supabase.from("user_roles").select("user_id, role");
-    const roleByUser = new Map<string, StaffRole>();
-    for (const r of roles ?? []) {
-      if (r.role === "admin") roleByUser.set(r.user_id, "admin");
-      else if (!roleByUser.has(r.user_id)) roleByUser.set(r.user_id, "reception");
-    }
+
+    if (profileError) throw new Error(profileError.message);
+
+    const roleByUser = new Map(
+      (memberships ?? []).map((row) => [row.user_id, row.role as StaffRole]),
+    );
+
     return {
-      staff: (profiles ?? []).map((p) => ({
-        id: p.id,
-        email: p.email,
-        fullName: p.full_name,
-        role: roleByUser.get(p.id) ?? "reception",
-        createdAt: p.created_at,
+      staff: (profiles ?? []).map((profile) => ({
+        id: profile.id,
+        email: profile.email,
+        fullName: profile.full_name,
+        role: roleByUser.get(profile.id) ?? "reception",
+        createdAt: profile.created_at,
       })),
     };
   });
 
 export const adminCreateStaff = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireTenantContext])
   .inputValidator((input: unknown) =>
     z
       .object({
@@ -332,8 +532,47 @@ export const adminCreateStaff = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
-    await assertAdmin(context);
+    const adminContext = context as AdminHandlerContext;
+    await assertAdmin(adminContext);
+    const { tenantId } = adminContext;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const normalizedEmail = data.email.trim().toLowerCase();
+    const { data: existingProfile } = await supabaseAdmin
+      .from("profiles")
+      .select("id")
+      .ilike("email", normalizedEmail)
+      .maybeSingle();
+
+    if (existingProfile?.id) {
+      const { error: membershipError } = await supabaseAdmin.from("tenant_memberships").upsert(
+        {
+          tenant_id: tenantId,
+          user_id: existingProfile.id,
+          role: data.role,
+          status: "active",
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "tenant_id,user_id" },
+      );
+      if (membershipError) throw new Error(membershipError.message);
+
+      if (tenantId !== DEFAULT_TENANT_ID) {
+        await supabaseAdmin
+          .from("tenant_memberships")
+          .delete()
+          .eq("tenant_id", DEFAULT_TENANT_ID)
+          .eq("user_id", existingProfile.id);
+      }
+
+      await supabaseAdmin
+        .from("profiles")
+        .update({ full_name: data.fullName })
+        .eq("id", existingProfile.id);
+
+      return { ok: true as const, invitedExisting: true as const };
+    }
+
     const { data: created, error } = await supabaseAdmin.auth.admin.createUser({
       email: data.email,
       password: data.password,
@@ -347,30 +586,60 @@ export const adminCreateStaff = createServerFn({ method: "POST" })
       .update({ full_name: data.fullName })
       .eq("id", created.user.id);
 
-    if (data.role === "admin") {
+    await supabaseAdmin.from("tenant_memberships").upsert(
+      {
+        tenant_id: tenantId,
+        user_id: created.user.id,
+        role: data.role,
+        status: "active",
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "tenant_id,user_id" },
+    );
+
+    if (tenantId !== DEFAULT_TENANT_ID) {
       await supabaseAdmin
-        .from("user_roles")
-        .upsert({ user_id: created.user.id, role: "admin" }, { onConflict: "user_id,role" });
-      await supabaseAdmin
-        .from("user_roles")
+        .from("tenant_memberships")
         .delete()
-        .eq("user_id", created.user.id)
-        .eq("role", "reception");
+        .eq("tenant_id", DEFAULT_TENANT_ID)
+        .eq("user_id", created.user.id);
     }
-    return { ok: true as const };
+
+    return { ok: true as const, invitedExisting: false as const };
   });
 
 export const adminDeleteStaff = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireTenantContext])
   .inputValidator((input: unknown) => z.object({ userId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
-    await assertAdmin(context);
-    if (data.userId === context.userId) throw new Error("Você não pode remover a própria conta.");
+    const adminContext = context as AdminHandlerContext;
+    await assertAdmin(adminContext);
+    if (data.userId === adminContext.userId) throw new Error("Você não pode remover a própria conta.");
+
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await supabaseAdmin.auth.admin.deleteUser(data.userId);
-    if (error) throw new Error(error.message);
+    const { tenantId } = adminContext;
+
+    const { error: membershipError } = await supabaseAdmin
+      .from("tenant_memberships")
+      .delete()
+      .eq("tenant_id", tenantId)
+      .eq("user_id", data.userId);
+    if (membershipError) throw new Error(membershipError.message);
+
+    const { count, error: countError } = await supabaseAdmin
+      .from("tenant_memberships")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", data.userId);
+    if (countError) throw new Error(countError.message);
+
+    if ((count ?? 0) === 0) {
+      const { error } = await supabaseAdmin.auth.admin.deleteUser(data.userId);
+      if (error) throw new Error(error.message);
+    }
+
     await writeAuditLog({
-      userId: context.userId,
+      userId: adminContext.userId,
+      tenantId,
       action: "staff.delete",
       entityType: "user",
       entityId: data.userId,
@@ -404,6 +673,7 @@ async function upsertEstablishmentContact(
     phone?: string | null;
     whatsapp?: string | null;
     updatedBy: string;
+    tenantId: string;
   },
 ) {
   const phone = data.phone?.trim() || null;
@@ -418,6 +688,7 @@ async function upsertEstablishmentContact(
       whatsapp,
       updated_by: data.updatedBy,
       updated_at: new Date().toISOString(),
+      tenant_id: data.tenantId,
     },
     { onConflict: "establishment_id" },
   );
@@ -436,14 +707,26 @@ export type ExtraField = {
 };
 
 export const adminListEstablishments = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireTenantContext])
   .handler(async ({ context }): Promise<{ establishments: EstablishmentSummary[] }> => {
-    await assertAdmin(context);
+    const adminContext = context as AdminHandlerContext;
+    await assertAdmin(adminContext);
+    const { tenantId } = adminContext;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const [{ data, error }, { data: contacts }, { data: termsRows }] = await Promise.all([
-      supabaseAdmin.from("establishments").select("establishment_id, name").order("name", { ascending: true }),
-      supabaseAdmin.from("establishment_contacts").select("establishment_id, phone, whatsapp"),
-      supabaseAdmin.from("establishment_terms").select("establishment_id, version"),
+      supabaseAdmin
+        .from("establishments")
+        .select("establishment_id, name")
+        .eq("tenant_id", tenantId)
+        .order("name", { ascending: true }),
+      supabaseAdmin
+        .from("establishment_contacts")
+        .select("establishment_id, phone, whatsapp")
+        .eq("tenant_id", tenantId),
+      supabaseAdmin
+        .from("establishment_terms")
+        .select("establishment_id, version")
+        .eq("tenant_id", tenantId),
     ]);
     if (error) throw new Error(error.message);
 
@@ -471,17 +754,21 @@ export const adminListEstablishments = createServerFn({ method: "GET" })
   });
 
 export const adminGetEstablishment = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireTenantContext])
   .inputValidator((input: unknown) =>
     z.object({ establishmentId: z.string().trim().min(1).max(64) }).parse(input),
   )
   .handler(async ({ data, context }) => {
-    await assertAdmin(context);
+    const adminContext = context as AdminHandlerContext;
+    await assertAdmin(adminContext);
+    const { tenantId } = adminContext;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await assertEstablishmentInTenant(data.establishmentId, tenantId);
     const { data: row, error } = await supabaseAdmin
       .from("establishments")
       .select("*")
       .eq("establishment_id", data.establishmentId)
+      .eq("tenant_id", tenantId)
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!row) return null;
@@ -495,7 +782,7 @@ export const adminGetEstablishment = createServerFn({ method: "POST" })
   });
 
 export const adminCreateEstablishment = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireTenantContext])
   .inputValidator((input: unknown) =>
     z
       .object({
@@ -508,15 +795,18 @@ export const adminCreateEstablishment = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
-    await assertAdmin(context);
+    const adminContext = context as AdminHandlerContext;
+    await assertAdmin(adminContext);
+    const { tenantId, userId } = adminContext;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const email = await getStaffEmail(context);
+    const email = await getStaffEmail(adminContext);
 
     const { error } = await supabaseAdmin.from("establishments").insert({
       establishment_id: data.establishmentId,
       name: data.name,
       notes: data.notes ?? null,
-      created_by: context.userId,
+      created_by: userId,
+      tenant_id: tenantId,
       updated_at: new Date().toISOString(),
     });
     if (error) {
@@ -529,12 +819,14 @@ export const adminCreateEstablishment = createServerFn({ method: "POST" })
       establishmentName: data.name,
       phone: data.phone,
       whatsapp: data.whatsapp,
-      updatedBy: context.userId,
+      updatedBy: userId,
+      tenantId,
     });
 
     await writeAuditLog({
-      userId: context.userId,
+      userId,
       userEmail: email,
+      tenantId,
       action: "establishment.create",
       entityType: "establishments",
       entityId: data.establishmentId,
@@ -545,7 +837,7 @@ export const adminCreateEstablishment = createServerFn({ method: "POST" })
   });
 
 export const adminUpdateEstablishment = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireTenantContext])
   .inputValidator((input: unknown) =>
     z
       .object({
@@ -556,14 +848,18 @@ export const adminUpdateEstablishment = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
-    await assertAdmin(context);
+    const adminContext = context as AdminHandlerContext;
+    await assertAdmin(adminContext);
+    const { tenantId, userId } = adminContext;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const email = await getStaffEmail(context);
+    const email = await getStaffEmail(adminContext);
 
+    await assertEstablishmentInTenant(data.establishmentId, tenantId);
     const { data: existing } = await supabaseAdmin
       .from("establishments")
       .select("*")
       .eq("establishment_id", data.establishmentId)
+      .eq("tenant_id", tenantId)
       .maybeSingle();
     if (!existing) throw new Error("Estabelecimento não encontrado.");
 
@@ -574,12 +870,14 @@ export const adminUpdateEstablishment = createServerFn({ method: "POST" })
         notes: data.notes ?? null,
         updated_at: new Date().toISOString(),
       })
-      .eq("establishment_id", data.establishmentId);
+      .eq("establishment_id", data.establishmentId)
+      .eq("tenant_id", tenantId);
     if (error) throw new Error(error.message);
 
     await writeAuditLog({
-      userId: context.userId,
+      userId,
       userEmail: email,
+      tenantId,
       action: "establishment.update",
       entityType: "establishments",
       entityId: data.establishmentId,
@@ -591,30 +889,36 @@ export const adminUpdateEstablishment = createServerFn({ method: "POST" })
   });
 
 export const adminDeleteEstablishment = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireTenantContext])
   .inputValidator((input: unknown) =>
     z.object({ establishmentId: z.string().trim().min(1).max(64) }).parse(input),
   )
   .handler(async ({ data, context }) => {
-    await assertAdmin(context);
+    const adminContext = context as AdminHandlerContext;
+    await assertAdmin(adminContext);
+    const { tenantId, userId } = adminContext;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const email = await getStaffEmail(context);
+    const email = await getStaffEmail(adminContext);
 
+    await assertEstablishmentInTenant(data.establishmentId, tenantId);
     const { data: existing } = await supabaseAdmin
       .from("establishments")
       .select("*")
       .eq("establishment_id", data.establishmentId)
+      .eq("tenant_id", tenantId)
       .maybeSingle();
 
     const { error } = await supabaseAdmin
       .from("establishments")
       .delete()
-      .eq("establishment_id", data.establishmentId);
+      .eq("establishment_id", data.establishmentId)
+      .eq("tenant_id", tenantId);
     if (error) throw new Error(error.message);
 
     await writeAuditLog({
-      userId: context.userId,
+      userId,
       userEmail: email,
+      tenantId,
       action: "establishment.delete",
       entityType: "establishments",
       entityId: data.establishmentId,
@@ -626,15 +930,18 @@ export const adminDeleteEstablishment = createServerFn({ method: "POST" })
 
 /** Busca establishmentId e nome a partir de um localizador/reserva (API TecHospitality). */
 export const adminResolveEstablishmentFromLocalizer = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireTenantContext])
   .inputValidator((input: unknown) =>
     z.object({ localizer: z.string().trim().min(3).max(40) }).parse(input),
   )
   .handler(async ({ data, context }) => {
-    await assertAdmin(context);
+    const adminContext = context as AdminHandlerContext;
+    await assertAdmin(adminContext);
+    const { tenantId } = adminContext;
     const { apiFetch, unwrap } = await import("./techospitality.server");
     const payload = await apiFetch<unknown>(
       `/api/reservations/localizer/${encodeURIComponent(data.localizer.toUpperCase())}`,
+      { tenantId },
     );
     const reservation = unwrap<Reservation | Reservation[]>(payload);
     const row = Array.isArray(reservation) ? reservation[0] : reservation;
@@ -649,17 +956,21 @@ export const adminResolveEstablishmentFromLocalizer = createServerFn({ method: "
   });
 
 export const adminGetTerms = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireTenantContext])
   .inputValidator((input: unknown) =>
     z.object({ establishmentId: z.string().trim().min(1).max(64) }).parse(input),
   )
   .handler(async ({ data, context }) => {
-    await assertAdmin(context);
+    const adminContext = context as AdminHandlerContext;
+    await assertAdmin(adminContext);
+    const { tenantId } = adminContext;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await assertEstablishmentInTenant(data.establishmentId, tenantId);
     const { data: row } = await supabaseAdmin
       .from("establishment_terms")
       .select("*")
       .eq("establishment_id", data.establishmentId)
+      .eq("tenant_id", tenantId)
       .maybeSingle();
 
     const parsed = parseTermsContent(row?.content);
@@ -669,6 +980,7 @@ export const adminGetTerms = createServerFn({ method: "POST" })
       .from("establishment_terms_history")
       .select("id, version, created_at, edited_by")
       .eq("establishment_id", data.establishmentId)
+      .eq("tenant_id", tenantId)
       .order("version", { ascending: false })
       .limit(10);
 
@@ -700,6 +1012,7 @@ async function persistEstablishmentTerms(
     establishmentName?: string;
     sections: TermsSection[];
     userId: string;
+    tenantId: string;
   },
 ) {
   const content = normalizeSectionsForSave(data.sections);
@@ -708,6 +1021,7 @@ async function persistEstablishmentTerms(
     .from("establishment_terms")
     .select("content, version")
     .eq("establishment_id", data.establishmentId)
+    .eq("tenant_id", data.tenantId)
     .maybeSingle();
 
   const nextVersion = (existing?.version ?? 0) + 1;
@@ -718,6 +1032,7 @@ async function persistEstablishmentTerms(
       content: existing.content,
       version: existing.version,
       edited_by: data.userId,
+      tenant_id: data.tenantId,
     });
   }
 
@@ -729,6 +1044,7 @@ async function persistEstablishmentTerms(
       version: nextVersion,
       updated_by: data.userId,
       updated_at: new Date().toISOString(),
+      tenant_id: data.tenantId,
     },
     { onConflict: "establishment_id" },
   );
@@ -738,7 +1054,7 @@ async function persistEstablishmentTerms(
 }
 
 export const adminSaveTerms = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireTenantContext])
   .inputValidator((input: unknown) =>
     z
       .object({
@@ -749,20 +1065,25 @@ export const adminSaveTerms = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
-    await assertAdmin(context);
+    const adminContext = context as AdminHandlerContext;
+    await assertAdmin(adminContext);
+    const { tenantId, userId } = adminContext;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const email = await getStaffEmail(context);
+    const email = await getStaffEmail(adminContext);
 
+    await assertEstablishmentInTenant(data.establishmentId, tenantId);
     const { nextVersion, existing } = await persistEstablishmentTerms(supabaseAdmin, {
       establishmentId: data.establishmentId,
       establishmentName: data.establishmentName,
       sections: data.sections,
-      userId: context.userId,
+      userId,
+      tenantId,
     });
 
     await writeAuditLog({
-      userId: context.userId,
+      userId,
       userEmail: email,
+      tenantId,
       action: "terms.update",
       entityType: "establishment_terms",
       entityId: data.establishmentId,
@@ -774,7 +1095,7 @@ export const adminSaveTerms = createServerFn({ method: "POST" })
   });
 
 export const adminGetTermsHistoryEntry = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireTenantContext])
   .inputValidator((input: unknown) =>
     z
       .object({
@@ -784,15 +1105,18 @@ export const adminGetTermsHistoryEntry = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
-    await assertAdmin(context);
+    const adminContext = context as AdminHandlerContext;
+    await assertAdmin(adminContext);
+    const { tenantId } = adminContext;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await assertEstablishmentInTenant(data.establishmentId, tenantId);
     const { data: row, error } = await supabaseAdmin
       .from("establishment_terms_history")
-      .select("content, version, establishment_id")
+      .select("content, version, establishment_id, tenant_id")
       .eq("id", data.historyId)
       .maybeSingle();
     if (error) throw new Error(error.message);
-    if (!row || row.establishment_id !== data.establishmentId) {
+    if (!row || row.establishment_id !== data.establishmentId || row.tenant_id !== tenantId) {
       throw new Error("Versão não encontrada.");
     }
 
@@ -803,17 +1127,21 @@ export const adminGetTermsHistoryEntry = createServerFn({ method: "POST" })
   });
 
 export const adminGetContact = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireTenantContext])
   .inputValidator((input: unknown) =>
     z.object({ establishmentId: z.string().trim().min(1).max(64) }).parse(input),
   )
   .handler(async ({ data, context }) => {
-    await assertAdmin(context);
+    const adminContext = context as AdminHandlerContext;
+    await assertAdmin(adminContext);
+    const { tenantId } = adminContext;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await assertEstablishmentInTenant(data.establishmentId, tenantId);
     const { data: row } = await supabaseAdmin
       .from("establishment_contacts")
       .select("*")
       .eq("establishment_id", data.establishmentId)
+      .eq("tenant_id", tenantId)
       .maybeSingle();
     return {
       phone: row?.phone ?? "",
@@ -823,7 +1151,7 @@ export const adminGetContact = createServerFn({ method: "POST" })
   });
 
 export const adminSaveContact = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireTenantContext])
   .inputValidator((input: unknown) =>
     z
       .object({
@@ -835,14 +1163,18 @@ export const adminSaveContact = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
-    await assertAdmin(context);
+    const adminContext = context as AdminHandlerContext;
+    await assertAdmin(adminContext);
+    const { tenantId, userId } = adminContext;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const email = await getStaffEmail(context);
+    const email = await getStaffEmail(adminContext);
 
+    await assertEstablishmentInTenant(data.establishmentId, tenantId);
     const { data: existing } = await supabaseAdmin
       .from("establishment_contacts")
       .select("*")
       .eq("establishment_id", data.establishmentId)
+      .eq("tenant_id", tenantId)
       .maybeSingle();
 
     const phone = data.phone?.trim() || null;
@@ -854,16 +1186,18 @@ export const adminSaveContact = createServerFn({ method: "POST" })
         establishment_name: data.establishmentName ?? null,
         phone,
         whatsapp,
-        updated_by: context.userId,
+        updated_by: userId,
         updated_at: new Date().toISOString(),
+        tenant_id: tenantId,
       },
       { onConflict: "establishment_id" },
     );
     if (error) throw new Error(error.message);
 
     await writeAuditLog({
-      userId: context.userId,
+      userId,
       userEmail: email,
+      tenantId,
       action: "contact.update",
       entityType: "establishment_contacts",
       entityId: data.establishmentId,
@@ -875,18 +1209,22 @@ export const adminSaveContact = createServerFn({ method: "POST" })
   });
 
 export const adminGetSettings = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireTenantContext])
   .inputValidator((input: unknown) =>
     z.object({ establishmentId: z.string().trim().min(1).max(64) }).parse(input),
   )
   .handler(async ({ data, context }) => {
-    await assertAdmin(context);
+    const adminContext = context as AdminHandlerContext;
+    await assertAdmin(adminContext);
+    const { tenantId } = adminContext;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { parseEstablishmentSettings } = await import("@/lib/establishment-settings");
+    await assertEstablishmentInTenant(data.establishmentId, tenantId);
     const { data: row } = await supabaseAdmin
       .from("establishment_settings")
       .select("settings, updated_at")
       .eq("establishment_id", data.establishmentId)
+      .eq("tenant_id", tenantId)
       .maybeSingle();
     return {
       settings: parseEstablishmentSettings(row?.settings ?? null),
@@ -895,7 +1233,7 @@ export const adminGetSettings = createServerFn({ method: "POST" })
   });
 
 export const adminSaveSettings = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireTenantContext])
   .inputValidator((input: unknown) =>
     z
       .object({
@@ -929,16 +1267,20 @@ export const adminSaveSettings = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
-    await assertAdmin(context);
+    const adminContext = context as AdminHandlerContext;
+    await assertAdmin(adminContext);
+    const { tenantId, userId } = adminContext;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { parseEstablishmentSettings, MAX_SUCCESS_PAGE_PHOTO_BYTES, sanitizeUsefulInfoItems } =
       await import("@/lib/establishment-settings");
-    const email = await getStaffEmail(context);
+    const email = await getStaffEmail(adminContext);
 
+    await assertEstablishmentInTenant(data.establishmentId, tenantId);
     const { data: existing } = await supabaseAdmin
       .from("establishment_settings")
       .select("*")
       .eq("establishment_id", data.establishmentId)
+      .eq("tenant_id", tenantId)
       .maybeSingle();
 
     const parsedExisting = parseEstablishmentSettings(existing?.settings ?? null);
@@ -977,16 +1319,18 @@ export const adminSaveSettings = createServerFn({ method: "POST" })
       {
         establishment_id: data.establishmentId,
         settings,
-        updated_by: context.userId,
+        updated_by: userId,
         updated_at: new Date().toISOString(),
+        tenant_id: tenantId,
       },
       { onConflict: "establishment_id" },
     );
     if (error) throw new Error(error.message);
 
     await writeAuditLog({
-      userId: context.userId,
+      userId,
       userEmail: email,
+      tenantId,
       action: "settings.update",
       entityType: "establishment_settings",
       entityId: data.establishmentId,
@@ -998,7 +1342,7 @@ export const adminSaveSettings = createServerFn({ method: "POST" })
   });
 
 export const adminListInboxManagedUnits = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireTenantContext])
   .handler(async ({ context }) => {
     await assertAdmin(context);
     const { isInboxConfigured, listInboxManagedUnits } = await import("@/lib/inbox.server");
@@ -1010,7 +1354,7 @@ export const adminListInboxManagedUnits = createServerFn({ method: "POST" })
   });
 
 export const adminGetAppSettings = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireTenantContext])
   .handler(async ({ context }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -1027,7 +1371,7 @@ export const adminGetAppSettings = createServerFn({ method: "POST" })
   });
 
 export const adminSaveAppSettings = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireTenantContext])
   .inputValidator((input: unknown) =>
     z
       .object({
@@ -1036,10 +1380,12 @@ export const adminSaveAppSettings = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
-    await assertAdmin(context);
+    const adminContext = context as AdminHandlerContext;
+    await assertAdmin(adminContext);
+    const { tenantId, userId } = adminContext;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { parseAppSettings } = await import("@/lib/app-settings");
-    const email = await getStaffEmail(context);
+    const email = await getStaffEmail(adminContext);
 
     const { data: existing } = await supabaseAdmin
       .from("app_settings")
@@ -1056,7 +1402,7 @@ export const adminSaveAppSettings = createServerFn({ method: "POST" })
       {
         id: "global",
         settings,
-        updated_by: context.userId,
+        updated_by: userId,
         updated_at: new Date().toISOString(),
       },
       { onConflict: "id" },
@@ -1064,8 +1410,9 @@ export const adminSaveAppSettings = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
 
     await writeAuditLog({
-      userId: context.userId,
+      userId,
       userEmail: email,
+      tenantId,
       action: "app_settings.update",
       entityType: "app_settings",
       entityId: "global",
@@ -1077,17 +1424,21 @@ export const adminSaveAppSettings = createServerFn({ method: "POST" })
   });
 
 export const adminListExtraFields = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireTenantContext])
   .inputValidator((input: unknown) =>
     z.object({ establishmentId: z.string().trim().min(1).max(64) }).parse(input),
   )
   .handler(async ({ data, context }): Promise<{ fields: ExtraField[] }> => {
-    await assertAdmin(context);
+    const adminContext = context as AdminHandlerContext;
+    await assertAdmin(adminContext);
+    const { tenantId } = adminContext;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await assertEstablishmentInTenant(data.establishmentId, tenantId);
     const { data: rows } = await supabaseAdmin
       .from("establishment_extra_fields")
       .select("*")
       .eq("establishment_id", data.establishmentId)
+      .eq("tenant_id", tenantId)
       .order("sort_order", { ascending: true });
 
     return {
@@ -1105,7 +1456,7 @@ export const adminListExtraFields = createServerFn({ method: "POST" })
   });
 
 export const adminSaveExtraField = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireTenantContext])
   .inputValidator((input: unknown) =>
     z
       .object({
@@ -1121,8 +1472,12 @@ export const adminSaveExtraField = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
-    await assertAdmin(context);
+    const adminContext = context as AdminHandlerContext;
+    await assertAdmin(adminContext);
+    const { tenantId, userId } = adminContext;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    await assertEstablishmentInTenant(data.establishmentId, tenantId);
     const payload = {
       establishment_id: data.establishmentId,
       label: data.label,
@@ -1131,13 +1486,15 @@ export const adminSaveExtraField = createServerFn({ method: "POST" })
       options: data.options ?? null,
       step: data.step,
       sort_order: data.sortOrder,
+      tenant_id: tenantId,
     };
 
     if (data.id) {
       const { error } = await supabaseAdmin
         .from("establishment_extra_fields")
         .update(payload)
-        .eq("id", data.id);
+        .eq("id", data.id)
+        .eq("tenant_id", tenantId);
       if (error) throw new Error(error.message);
     } else {
       const { error } = await supabaseAdmin.from("establishment_extra_fields").insert(payload);
@@ -1145,7 +1502,8 @@ export const adminSaveExtraField = createServerFn({ method: "POST" })
     }
 
     await writeAuditLog({
-      userId: context.userId,
+      userId,
+      tenantId,
       action: data.id ? "extra_field.update" : "extra_field.create",
       entityType: "establishment_extra_fields",
       entityId: data.establishmentId,
@@ -1156,18 +1514,22 @@ export const adminSaveExtraField = createServerFn({ method: "POST" })
   });
 
 export const adminDeleteExtraField = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireTenantContext])
   .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
-    await assertAdmin(context);
+    const adminContext = context as AdminHandlerContext;
+    await assertAdmin(adminContext);
+    const { tenantId, userId } = adminContext;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin
       .from("establishment_extra_fields")
       .delete()
-      .eq("id", data.id);
+      .eq("id", data.id)
+      .eq("tenant_id", tenantId);
     if (error) throw new Error(error.message);
     await writeAuditLog({
-      userId: context.userId,
+      userId,
+      tenantId,
       action: "extra_field.delete",
       entityType: "establishment_extra_fields",
       entityId: data.id,
@@ -1176,7 +1538,7 @@ export const adminDeleteExtraField = createServerFn({ method: "POST" })
   });
 
 export const adminListAuditLogs = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireTenantContext])
   .inputValidator((input: unknown) =>
     z
       .object({
@@ -1186,11 +1548,15 @@ export const adminListAuditLogs = createServerFn({ method: "POST" })
       .parse(input ?? {}),
   )
   .handler(async ({ data, context }) => {
-    await assertAdmin(context);
+    const adminContext = context as AdminHandlerContext;
+    await assertAdmin(adminContext);
+    const { tenantId } = adminContext;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await assertEstablishmentInTenant(data.establishmentId, tenantId);
     let query = supabaseAdmin
       .from("audit_logs")
       .select("*")
+      .eq("tenant_id", tenantId)
       .order("created_at", { ascending: false })
       .limit(data.limit);
     if (data.action) query = query.ilike("action", buildIlikeContains(data.action));
@@ -1200,12 +1566,13 @@ export const adminListAuditLogs = createServerFn({ method: "POST" })
   });
 
 export const adminDashboardPortalStats = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireTenantContext])
   .inputValidator((input: unknown) =>
     z.object({ date: z.string().trim().max(20).optional() }).parse(input ?? {}),
   )
   .handler(async ({ data, context }) => {
-    await assertStaff(context);
+    await assertStaff(context as AdminHandlerContext);
+    const { tenantId } = context as AdminHandlerContext;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const selectedDate = data.date || new Date().toISOString().slice(0, 10);
     const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
@@ -1213,6 +1580,7 @@ export const adminDashboardPortalStats = createServerFn({ method: "POST" })
     const { data: rows, error } = await supabaseAdmin
       .from("checkin_records")
       .select("id, localizer, guest_name, establishment_name, checked_in_at, started_at")
+      .eq("tenant_id", tenantId)
       .order("checked_in_at", { ascending: false })
       .limit(500);
 
@@ -1302,7 +1670,7 @@ export const adminDashboardPortalStats = createServerFn({ method: "POST" })
   });
 
 export const adminDashboardCheckouts = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireTenantContext])
   .inputValidator((input: unknown) =>
     z
       .object({
@@ -1311,10 +1679,13 @@ export const adminDashboardCheckouts = createServerFn({ method: "POST" })
       .parse(input ?? {}),
   )
   .handler(async ({ data, context }) => {
-    await assertStaff(context);
+    const adminContext = context as AdminHandlerContext;
+    await assertStaff(adminContext);
+    const { tenantId } = adminContext;
+    const establishmentIds = await loadTenantEstablishmentIds(tenantId);
     const today = todayIso();
     const limit = data.limit ?? dashboardFeedLimit();
-    const payload = await fetchAdminDashboardApi(checkoutsApiPath(), CHECKOUTS_TOKEN_ENV, {
+    const payload = await fetchAdminDashboardApi(checkoutsApiPath(), CHECKOUTS_TOKEN_ENV, tenantId, {
       query: {
         limit: String(limit),
         date: today,
@@ -1323,7 +1694,10 @@ export const adminDashboardCheckouts = createServerFn({ method: "POST" })
       },
     });
     const parsed = parseDashboardFeed<CheckoutFeedRow>(payload);
-    const rows = parsed.data.filter((row) => normalizeFeedDate(row.checkoutDate) === today);
+    const rows = filterFeedRowsForTenant(
+      parsed.data.filter((row) => normalizeFeedDate(row.checkoutDate) === today),
+      establishmentIds,
+    );
     return {
       ...parsed,
       date: today,
@@ -1334,7 +1708,7 @@ export const adminDashboardCheckouts = createServerFn({ method: "POST" })
   });
 
 export const adminDashboardCreatedReservations = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireTenantContext])
   .inputValidator((input: unknown) =>
     z
       .object({
@@ -1343,7 +1717,10 @@ export const adminDashboardCreatedReservations = createServerFn({ method: "POST"
       .parse(input ?? {}),
   )
   .handler(async ({ data, context }) => {
-    await assertStaff(context);
+    const adminContext = context as AdminHandlerContext;
+    await assertStaff(adminContext);
+    const { tenantId } = adminContext;
+    const establishmentIds = await loadTenantEstablishmentIds(tenantId);
     const today = todayIso();
     const tomorrow = addDaysIso(today, 1);
     const startDate = monthStartIso(today);
@@ -1355,18 +1732,21 @@ export const adminDashboardCreatedReservations = createServerFn({ method: "POST"
       endDate,
     };
 
-    const payload = await fetchAdminDashboardApi(createdApiPath(), CREATED_TOKEN_ENV, { query });
+    const payload = await fetchAdminDashboardApi(createdApiPath(), CREATED_TOKEN_ENV, tenantId, { query });
     const parsed = parseDashboardFeed<CreatedFeedRow>(payload);
-    const rows = parsed.data
-      .filter((row) => {
-        const checkin = normalizeFeedDate(row.checkinDate ?? row.reservationDate);
-        return checkin === today || checkin === tomorrow;
-      })
-      .sort((a, b) => {
-        const aDate = normalizeFeedDate(a.checkinDate ?? a.reservationDate) ?? "";
-        const bDate = normalizeFeedDate(b.checkinDate ?? b.reservationDate) ?? "";
-        return aDate.localeCompare(bDate);
-      });
+    const rows = filterFeedRowsForTenant(
+      parsed.data
+        .filter((row) => {
+          const checkin = normalizeFeedDate(row.checkinDate ?? row.reservationDate);
+          return checkin === today || checkin === tomorrow;
+        })
+        .sort((a, b) => {
+          const aDate = normalizeFeedDate(a.checkinDate ?? a.reservationDate) ?? "";
+          const bDate = normalizeFeedDate(b.checkinDate ?? b.reservationDate) ?? "";
+          return aDate.localeCompare(bDate);
+        }),
+      establishmentIds,
+    );
 
     return {
       ...parsed,
@@ -1379,16 +1759,20 @@ export const adminDashboardCreatedReservations = createServerFn({ method: "POST"
 
 /** @deprecated Use adminDashboardPortalStats + feed endpoints */
 export const adminDashboardStats = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireTenantContext])
   .inputValidator((input: unknown) =>
     z.object({ date: z.string().trim().max(20).optional() }).parse(input ?? {}),
   )
   .handler(async ({ data, context }) => {
-    await assertStaff(context);
-    const payload = await fetchAdminReservationsApi("/api/reservations", {
-      query: data.date ? { date: data.date } : {},
-    });
-    const reservations = normalizeReservationRows(payload);
+    const adminContext = context as AdminHandlerContext;
+    await assertStaff(adminContext);
+    const { tenantId } = adminContext;
+    const payload = await fetchAdminReservationsApi(
+      "/api/reservations",
+      tenantId,
+      { query: data.date ? { date: data.date } : {} },
+    );
+    const reservations = await filterReservationsForTenant(normalizeReservationRows(payload), tenantId);
 
     const today = new Date().toISOString().slice(0, 10);
     const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
@@ -1423,7 +1807,7 @@ export const adminDashboardStats = createServerFn({ method: "POST" })
   });
 
 export const adminListReservations = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireTenantContext])
   .inputValidator((input: unknown) =>
     z
       .object({
@@ -1434,18 +1818,22 @@ export const adminListReservations = createServerFn({ method: "POST" })
       .parse(input ?? {}),
   )
   .handler(async ({ data, context }) => {
-    await assertStaff(context);
+    const adminContext = context as AdminHandlerContext;
+    await assertStaff(adminContext);
+    const { tenantId } = adminContext;
     if (data.localizer) {
       const payload = await fetchAdminReservationsApi(
         `/api/reservations/localizer/${encodeURIComponent(data.localizer)}`,
+        tenantId,
       );
-      return { reservations: normalizeReservationRows(payload) };
+      const reservations = await filterReservationsForTenant(normalizeReservationRows(payload), tenantId);
+      return { reservations };
     }
 
     const query: Record<string, string> = {};
     if (data.date) query["date"] = data.date;
-    const payload = await fetchAdminReservationsApi("/api/reservations", { query });
-    let reservations = normalizeReservationRows(payload);
+    const payload = await fetchAdminReservationsApi("/api/reservations", tenantId, { query });
+    let reservations = await filterReservationsForTenant(normalizeReservationRows(payload), tenantId);
 
     if (data.status === "done") {
       reservations = reservations.filter(
@@ -1461,21 +1849,28 @@ export const adminListReservations = createServerFn({ method: "POST" })
   });
 
 export const adminGetReservation = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireTenantContext])
   .inputValidator((input: unknown) =>
     z.object({ localizer: z.string().trim().min(1).max(40) }).parse(input),
   )
   .handler(async ({ data, context }) => {
-    await assertStaff(context);
+    const adminContext = context as AdminHandlerContext;
+    await assertStaff(adminContext);
+    const { tenantId } = adminContext;
     const payload = await fetchAdminReservationsApi(
       `/api/reservations/localizer/${encodeURIComponent(data.localizer)}`,
+      tenantId,
     );
     const reservations = normalizeReservationRows(payload);
-    return { reservation: reservations[0] ?? null };
+    const reservation = reservations[0] ?? null;
+    if (!(await reservationBelongsToTenant(reservation, tenantId))) {
+      return { reservation: null };
+    }
+    return { reservation };
   });
 
 export const adminListCheckinRecords = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireTenantContext])
   .inputValidator((input: unknown) =>
     z
       .object({
@@ -1486,12 +1881,15 @@ export const adminListCheckinRecords = createServerFn({ method: "POST" })
       .parse(input ?? {}),
   )
   .handler(async ({ data, context }): Promise<{ records: CheckinRecordRow[] }> => {
-    await assertStaff(context);
+    const adminContext = context as AdminHandlerContext;
+    await assertStaff(adminContext);
+    const { tenantId } = adminContext;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     let query = supabaseAdmin
       .from("checkin_records")
       .select("*")
+      .eq("tenant_id", tenantId)
       .order("checked_in_at", { ascending: false })
       .limit(200);
 
@@ -1518,21 +1916,19 @@ export const adminListCheckinRecords = createServerFn({ method: "POST" })
   });
 
 export const adminGetCheckinRecord = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireTenantContext])
   .inputValidator((input: unknown) =>
     z.object({ id: z.string().uuid() }).parse(input),
   )
   .handler(async ({ data, context }): Promise<{ record: CheckinRecordRow | null }> => {
-    await assertStaff(context);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: row, error } = await supabaseAdmin
-      .from("checkin_records")
-      .select("*")
-      .eq("id", data.id)
-      .maybeSingle();
+    const adminContext = context as AdminHandlerContext;
+    await assertStaff(adminContext);
+    const { tenantId } = adminContext;
 
-    if (error) throw new Error(error.message);
-    if (!row) return { record: null };
-
-    return { record: mapCheckinRecordRow(row as Record<string, unknown>) };
+    try {
+      const row = await assertCheckinRecordInTenant(data.id, tenantId);
+      return { record: mapCheckinRecordRow(row) };
+    } catch {
+      return { record: null };
+    }
   });
