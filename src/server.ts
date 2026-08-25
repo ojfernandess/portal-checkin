@@ -1,5 +1,6 @@
 import "./lib/error-capture";
 
+import { buildInfoResponse } from "./lib/build-info.server";
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
 import { applyDomainRouting } from "./lib/domain-routing.server";
@@ -48,6 +49,11 @@ function isH3SwallowedErrorBody(body: string): boolean {
 
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
+    const { pathname } = new URL(request.url);
+    if (pathname === "/api/build-info") {
+      return applySecurityHeaders(buildInfoResponse());
+    }
+
     const domainRoute = applyDomainRouting(request);
     if (domainRoute) return applySecurityHeaders(domainRoute);
 

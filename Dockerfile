@@ -13,25 +13,35 @@ RUN npm install --no-audit --no-fund
 
 FROM base AS build
 RUN npm install -g npm@11.6.1
-COPY --from=deps /app/node_modules ./node_modules
-COPY . .
+# Easypanel: pass GIT_COMMIT on each deploy to invalidate Docker layer cache.
+ARG GIT_COMMIT=unknown
+ARG BUILD_DATE=unknown
 ARG VITE_SUPABASE_PROJECT_ID
 ARG VITE_SUPABASE_URL
 ARG VITE_SUPABASE_PUBLISHABLE_KEY
+ENV GIT_COMMIT=$GIT_COMMIT
+ENV BUILD_DATE=$BUILD_DATE
 ENV VITE_SUPABASE_PROJECT_ID=$VITE_SUPABASE_PROJECT_ID
 ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL
 ENV VITE_SUPABASE_PUBLISHABLE_KEY=$VITE_SUPABASE_PUBLISHABLE_KEY
 ENV NITRO_PRESET=node-server
+RUN echo "Building commit ${GIT_COMMIT} at ${BUILD_DATE}"
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
 RUN npm run build
 
 FROM node:22-alpine AS runner
 WORKDIR /app
 RUN apk add --no-cache libc6-compat
+ARG GIT_COMMIT=unknown
+ARG BUILD_DATE=unknown
 ENV NODE_ENV=production
 ENV HOST=0.0.0.0
 ENV PORT=3000
 ENV NITRO_HOST=0.0.0.0
 ENV NITRO_PORT=3000
+ENV APP_BUILD_COMMIT=$GIT_COMMIT
+ENV APP_BUILD_DATE=$BUILD_DATE
 
 COPY --from=build /app/.output ./.output
 COPY --from=build /app/package.json ./package.json

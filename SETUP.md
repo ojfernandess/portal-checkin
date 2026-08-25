@@ -140,12 +140,15 @@ App em `http://localhost:3000`.
 ### EasyPanel (recomendado)
 
 1. **Novo app** → tipo **Docker Compose** ou **Dockerfile** (repositório Git).
-2. **Porta interna:** `3000` (variáveis `PORT`, `HOST=0.0.0.0`, `NITRO_HOST=0.0.0.0`).
-3. **Build args** (obrigatórios para o bundle do cliente):
+2. **Repositório:** `https://github.com/ojfernandess/portal-checkin.git`, branch **`main`**.
+3. **Porta interna:** `3000` (variáveis `PORT`, `HOST=0.0.0.0`, `NITRO_HOST=0.0.0.0`).
+4. **Build args** (obrigatórios para o bundle do cliente):
    - `VITE_SUPABASE_PROJECT_ID`
    - `VITE_SUPABASE_URL`
    - `VITE_SUPABASE_PUBLISHABLE_KEY`
-4. **Environment** (runtime — servidor):
+   - `GIT_COMMIT` — use o SHA do commit (ex.: `$GIT_SHA` do webhook) para forçar rebuild sem cache Docker
+   - `BUILD_DATE` — opcional, timestamp ISO do deploy
+5. **Environment** (runtime — servidor):
    - Supabase: `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
    - TecHospitality: `TECHOSPITALITY_BASE_URL`, tokens (`RESERVATIONS`, `HUB`, `CHECKOUTS`, `CREATED`, …)
    - AWS S3: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, `AWS_S3_BUCKET`, …
@@ -183,6 +186,39 @@ Se o proxy redirecionar antes do Node, `/auth` no domínio audaar nunca chega à
 | **Runtime** (ENV) | Supabase service role, TecHospitality, AWS — só no servidor |
 
 Se alterar `VITE_*`, faça **rebuild** da imagem.
+
+### Verificar se o deploy pegou o código novo
+
+Após cada deploy, confira:
+
+```bash
+curl https://checkin.techospitality.com/api/build-info
+```
+
+Resposta esperada (commit recente de `main`):
+
+```json
+{
+  "commit": "f7c091f",
+  "builtAt": "2026-08-25T...",
+  "features": { "inboxModule": true }
+}
+```
+
+| Teste | Deploy antigo | Deploy novo |
+|-------|---------------|-------------|
+| `GET /api/build-info` | 404 ou `commit: unknown` | JSON com commit recente |
+| `GET /admin/inbox` | **404** | 200 (redireciona para login se não autenticado) |
+| JS `tenant-branding-cache-*.js` | `tenantAccount.` (v1) | `tenantAccount.v2.` |
+
+Se `/admin/inbox` retorna **404**, o Easypanel ainda está servindo imagem antiga:
+
+1. Confirme branch **`main`** e último commit no log de build do Easypanel.
+2. **Redeploy** com **Clear build cache** / **Rebuild without cache**.
+3. Passe `GIT_COMMIT` diferente a cada deploy (build arg).
+4. Confirme que o serviço reiniciou (container novo, não só restart).
+
+Depois do deploy correto, habilite **Portaria Inbox** no Super Admin (`/platform/tenants`) e aplique as migrations multi-tenant no Supabase de produção.
 
 ## Rotas principais
 
