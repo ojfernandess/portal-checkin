@@ -250,6 +250,21 @@ html.hero-motion-paused .animate-step-pulse {
   animation: step-check-pop 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+.admin-page-enter {
+  animation: admin-page-fade-in 0.12s ease-out both;
+}
+
+@keyframes admin-page-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

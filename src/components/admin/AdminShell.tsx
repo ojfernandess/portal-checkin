@@ -1,5 +1,4 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import {
   Building2,
@@ -17,7 +16,6 @@ import {
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { supabase } from "@/integrations/supabase/client";
-import { adminMe } from "@/lib/api/admin.functions";
 import { platformMe } from "@/lib/api/platform.functions";
 import { TenantSelector } from "@/components/admin/TenantSelector";
 import { TenantPanelBrand } from "@/components/admin/TenantPanelBrand";
@@ -32,37 +30,15 @@ export type AdminAccount = {
   email: string;
   role: string;
   fullName: string | null;
+  tenantId?: string;
   tenantName?: string;
+  tenantSlug?: string;
   panelLogoUrl?: string | null;
+  isPlatformAdmin?: boolean;
 };
 
-export function useAdminAccount() {
-  const me = useServerFn(adminMe);
-  const [account, setAccount] = useState<AdminAccount | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    void me()
-      .then((data) => {
-        if (cancelled) return;
-        setAccount({
-          email: data.email,
-          role: data.role,
-          fullName: data.fullName,
-          tenantName: data.tenantName,
-          panelLogoUrl: data.panelLogoUrl,
-        });
-      })
-      .catch(() => {
-        if (!cancelled) setAccount(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [me]);
-
-  return account;
-}
+export { useAdminAccount, useAdminAccountActions, useAdminTenantScope } from "@/components/admin/AdminAccountProvider";
+export { AdminPage } from "@/components/admin/AdminPage";
 
 type Breadcrumb = {
   label: string;
@@ -113,6 +89,7 @@ function AdminNavLink({
   return (
     <Link
       to={item.to}
+      preload="intent"
       onClick={onNavigate}
       className={cn(
         "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",

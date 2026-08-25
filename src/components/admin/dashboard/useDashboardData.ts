@@ -1,5 +1,6 @@
 import { useServerFn } from "@tanstack/react-start";
 import { useCallback, useEffect, useState } from "react";
+import { useAdminTenantScope } from "@/components/admin/AdminAccountProvider";
 import {
   adminDashboardCheckouts,
   adminDashboardCreatedReservations,
@@ -11,6 +12,7 @@ import { todayIso } from "./utils";
 
 export function useDashboardData(date: string) {
   const { t } = useI18n();
+  const tenantScope = useAdminTenantScope();
   const portalFn = useServerFn(adminDashboardPortalStats);
   const checkoutsFn = useServerFn(adminDashboardCheckouts);
   const createdFn = useServerFn(adminDashboardCreatedReservations);
@@ -84,7 +86,7 @@ export function useDashboardData(date: string) {
 
     await Promise.all([portalPromise, checkoutsPromise, createdPromise]);
     setLoading(false);
-  }, [checkoutsFn, createdFn, date, portalFn, t]);
+  }, [checkoutsFn, createdFn, date, portalFn, t, tenantScope]);
 
   useEffect(() => {
     void load();

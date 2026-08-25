@@ -3,7 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useCallback, useEffect, useState } from "react";
 import { adminListAuditLogs } from "@/lib/api/admin.functions";
 import { AdminResponsiveTable } from "@/components/admin/AdminResponsiveTable";
-import { AdminShell, useAdminAccount } from "@/components/admin/AdminShell";
+import { AdminPage, useAdminAccount, useAdminTenantScope } from "@/components/admin/AdminShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatDateTime } from "@/lib/format-dates";
@@ -27,6 +27,7 @@ export const Route = createFileRoute("/_authenticated/admin/audit")({
 function AdminAuditPage() {
   const { locale, t } = useI18n();
   const account = useAdminAccount();
+  const tenantScope = useAdminTenantScope();
   const listFn = useServerFn(adminListAuditLogs);
   const [action, setAction] = useState("");
   const [appliedAction, setAppliedAction] = useState("");
@@ -46,7 +47,7 @@ function AdminAuditPage() {
     } finally {
       setLoading(false);
     }
-  }, [listFn, appliedAction, t]);
+  }, [listFn, appliedAction, t, tenantScope]);
 
   useEffect(() => {
     void load();
@@ -54,14 +55,14 @@ function AdminAuditPage() {
 
   if (account && account.role !== "admin") {
     return (
-      <AdminShell title={t("admin.audit")} account={account}>
+      <AdminPage title={t("admin.audit")}>
         <p className="text-sm text-muted-foreground">{t("errors.accessRestricted")}</p>
-      </AdminShell>
+      </AdminPage>
     );
   }
 
   return (
-    <AdminShell title={t("admin.auditPage.title")} account={account}>
+    <AdminPage title={t("admin.auditPage.title")}>
       <div className="min-w-0 space-y-4 sm:space-y-6">
         <form
           className="flex flex-col gap-3 sm:flex-row sm:items-center"
@@ -134,6 +135,6 @@ function AdminAuditPage() {
           ]}
         />
       </div>
-    </AdminShell>
+    </AdminPage>
   );
 }

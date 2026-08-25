@@ -10,7 +10,7 @@ import {
   adminResolveEstablishmentFromLocalizer,
   type EstablishmentSummary,
 } from "@/lib/api/admin.functions";
-import { AdminShell, useAdminAccount } from "@/components/admin/AdminShell";
+import { AdminPage, useAdminAccount, useAdminTenantScope } from "@/components/admin/AdminShell";
 import { PhoneDisplay } from "@/components/checkin/PhoneDisplay";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -36,6 +36,7 @@ export const Route = createFileRoute("/_authenticated/admin/establishments/")({
 function AdminEstablishmentsPage() {
   const { t } = useI18n();
   const account = useAdminAccount();
+  const tenantScope = useAdminTenantScope();
   const listFn = useServerFn(adminListEstablishments);
   const createFn = useServerFn(adminCreateEstablishment);
   const deleteFn = useServerFn(adminDeleteEstablishment);
@@ -61,11 +62,12 @@ function AdminEstablishmentsPage() {
   }
 
   useEffect(() => {
+    setLoading(true);
     void listFn()
       .then((result) => setEstablishments(result.establishments))
       .catch((err) => setError(err instanceof Error ? err.message : t("admin.establishmentsPage.listError")))
       .finally(() => setLoading(false));
-  }, [listFn, t]);
+  }, [listFn, t, tenantScope]);
 
   async function handleResolveLocalizer() {
     if (localizer.trim().length < 3) {
@@ -133,14 +135,14 @@ function AdminEstablishmentsPage() {
 
   if (account && account.role !== "admin") {
     return (
-      <AdminShell title={t("admin.establishments")} account={account}>
+      <AdminPage title={t("admin.establishments")}>
         <p className="text-sm text-muted-foreground">{t("errors.accessRestricted")}</p>
-      </AdminShell>
+      </AdminPage>
     );
   }
 
   return (
-    <AdminShell title={t("admin.establishmentsPage.title")} account={account}>
+    <AdminPage title={t("admin.establishmentsPage.title")}>
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <p className="max-w-2xl text-sm text-muted-foreground">{t("admin.establishmentsPage.body")}</p>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -321,6 +323,6 @@ function AdminEstablishmentsPage() {
           <p className="text-sm text-muted-foreground">{t("admin.establishmentsPage.empty")}</p>
         ) : null}
       </div>
-    </AdminShell>
+    </AdminPage>
   );
 }

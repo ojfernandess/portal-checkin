@@ -9,7 +9,7 @@ import {
 } from "@/lib/api/admin.functions";
 import { CheckinRecordDetail } from "@/components/admin/CheckinRecordDetail";
 import { AdminResponsiveTable } from "@/components/admin/AdminResponsiveTable";
-import { AdminShell, useAdminAccount } from "@/components/admin/AdminShell";
+import { AdminPage, useAdminTenantScope } from "@/components/admin/AdminShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,7 +30,7 @@ export const Route = createFileRoute("/_authenticated/admin/checkins")({
 
 function AdminCheckinsPage() {
   const { locale, t } = useI18n();
-  const account = useAdminAccount();
+  const tenantScope = useAdminTenantScope();
   const listFn = useServerFn(adminListCheckinRecords);
   const detailFn = useServerFn(adminGetCheckinRecord);
   const [localizer, setLocalizer] = useState("");
@@ -58,7 +58,7 @@ function AdminCheckinsPage() {
     } finally {
       setLoading(false);
     }
-  }, [listFn, applied, t]);
+  }, [listFn, applied, t, tenantScope]);
 
   useEffect(() => {
     void load();
@@ -74,7 +74,7 @@ function AdminCheckinsPage() {
   }
 
   return (
-    <AdminShell title={t("admin.checkinsPage.title")} account={account}>
+    <AdminPage title={t("admin.checkinsPage.title")}>
       <div className="min-w-0 space-y-4 sm:space-y-6">
         <p className="text-sm text-muted-foreground">{t("admin.checkinsPage.body")}</p>
 
@@ -194,6 +194,6 @@ function AdminCheckinsPage() {
           {detail ? <CheckinRecordDetail record={detail} /> : null}
         </DialogContent>
       </Dialog>
-    </AdminShell>
+    </AdminPage>
   );
 }

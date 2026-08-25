@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { AdminShell, useAdminAccount } from "@/components/admin/AdminShell";
+import { AdminPage, useAdminAccount, useAdminAccountActions, useAdminTenantScope } from "@/components/admin/AdminShell";
 import { TenantLogoEditor } from "@/components/admin/TenantLogoEditor";
 import { adminGetTenantBranding, adminSaveTenantLogo } from "@/lib/api/admin.functions";
 import { buildTenantLoginUrl } from "@/lib/api/auth.functions";
@@ -16,6 +16,8 @@ export const Route = createFileRoute("/_authenticated/admin/branding")({
 function AdminBrandingPage() {
   const { t } = useI18n();
   const account = useAdminAccount();
+  const { updateBranding } = useAdminAccountActions();
+  const tenantScope = useAdminTenantScope();
   const getBranding = useServerFn(adminGetTenantBranding);
   const saveLogo = useServerFn(adminSaveTenantLogo);
 
@@ -34,13 +36,13 @@ function AdminBrandingPage() {
       .then((result) => setPanelLogoUrl(result.settings.panelLogoUrl))
       .catch((err) => toast.error(err instanceof Error ? err.message : t("errors.loadFailed")))
       .finally(() => setLoading(false));
-  }, [getBranding, t]);
+  }, [getBranding, t, tenantScope]);
 
   if (account && account.role !== "admin") {
     return (
-      <AdminShell title={t("admin.branding.title")} account={account}>
+      <AdminPage title={t("admin.branding.title")}>
         <p className="text-sm text-muted-foreground">{t("errors.accessRestricted")}</p>
-      </AdminShell>
+      </AdminPage>
     );
   }
 
@@ -48,8 +50,8 @@ function AdminBrandingPage() {
     setSaving(true);
     try {
       await saveLogo({ data: { panelLogoUrl } });
+      updateBranding(panelLogoUrl);
       toast.success(t("admin.branding.saved"));
-      window.location.reload();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t("errors.saveFailed"));
     } finally {
@@ -58,10 +60,9 @@ function AdminBrandingPage() {
   }
 
   return (
-    <AdminShell
+    <AdminPage
       title={t("admin.branding.title")}
       subtitle={t("admin.branding.subtitle")}
-      account={account}
     >
       {loading ? (
         <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
@@ -83,6 +84,6 @@ function AdminBrandingPage() {
           />
         </div>
       )}
-    </AdminShell>
+    </AdminPage>
   );
 }

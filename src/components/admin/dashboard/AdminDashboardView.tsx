@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { Settings } from "lucide-react";
-import { AdminShell, useAdminAccount } from "@/components/admin/AdminShell";
+import { AdminPage, useAdminAccount } from "@/components/admin/AdminShell";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n/context";
 import { useState } from "react";
@@ -27,8 +27,7 @@ export function AdminDashboardView() {
   const referenceDate = portal?.date ?? date;
 
   return (
-    <AdminShell
-      account={account}
+    <AdminPage
       hidePageHeader
       mobileTitle={t("admin.dashboard")}
       mobileActions={
@@ -94,6 +93,6 @@ export function AdminDashboardView() {
 
         <DashboardCreatedTable rows={created.rows} error={created.error} locale={locale} loading={loading} />
       </div>
-    </AdminShell>
+    </AdminPage>
   );
 }

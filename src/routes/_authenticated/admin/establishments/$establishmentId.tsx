@@ -23,7 +23,7 @@ import {
   type InboxManagedUnitOption,
 } from "@/components/admin/EstablishmentInboxPanel";
 import { EstablishmentUsefulInfoEditor } from "@/components/admin/EstablishmentUsefulInfoEditor";
-import { AdminShell, useAdminAccount } from "@/components/admin/AdminShell";
+import { AdminPage, useAdminAccount } from "@/components/admin/AdminShell";
 import { PhoneDisplay } from "@/components/checkin/PhoneDisplay";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -147,9 +147,9 @@ function EstablishmentConfigPage() {
 
   if (account && account.role !== "admin") {
     return (
-      <AdminShell title={t("common.establishment")} account={account}>
+      <AdminPage title={t("common.establishment")}>
         <p className="text-sm text-muted-foreground">{t("errors.accessRestricted")}</p>
-      </AdminShell>
+      </AdminPage>
     );
   }
 
@@ -249,9 +249,8 @@ function EstablishmentConfigPage() {
     establishmentName || t("admin.establishmentConfig.titleFallback", { id: establishmentId });
 
   return (
-    <AdminShell
+    <AdminPage
       title={pageTitle}
-      account={account}
       breadcrumbs={[
         { label: t("admin.establishments"), to: "/admin/establishments" },
         { label: pageTitle },
@@ -498,6 +497,6 @@ function EstablishmentConfigPage() {
           </TabsContent>
         </Tabs>
       )}
-    </AdminShell>
+    </AdminPage>
   );
 }

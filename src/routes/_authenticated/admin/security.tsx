@@ -5,7 +5,7 @@ import { ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { adminGetAppSettings, adminSaveAppSettings } from "@/lib/api/admin.functions";
 import { getTurnstileConfig } from "@/lib/api/turnstile.functions";
-import { AdminShell, useAdminAccount } from "@/components/admin/AdminShell";
+import { AdminPage, useAdminAccount } from "@/components/admin/AdminShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -39,9 +39,9 @@ function AdminSecurityPage() {
 
   if (account && account.role !== "admin") {
     return (
-      <AdminShell title={t("admin.securityPage.title")} account={account}>
+      <AdminPage title={t("admin.securityPage.title")}>
         <p className="text-sm text-muted-foreground">{t("errors.accessRestricted")}</p>
-      </AdminShell>
+      </AdminPage>
     );
   }
 
@@ -60,7 +60,7 @@ function AdminSecurityPage() {
   }
 
   return (
-    <AdminShell title={t("admin.securityPage.title")} account={account}>
+    <AdminPage title={t("admin.securityPage.title")}>
       {loading ? (
         <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
       ) : (
@@ -107,6 +107,6 @@ function AdminSecurityPage() {
           </Button>
         </div>
       )}
-    </AdminShell>
+    </AdminPage>
   );
 }

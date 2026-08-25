@@ -1,7 +1,7 @@
-import { useServerFn } from "@tanstack/react-start";
+import { useNavigate } from "@tanstack/react-router";
 import { Building2, Check, ChevronsUpDown } from "lucide-react";
 import { useEffect, useState } from "react";
-import { adminMyTenants, type TenantSummary } from "@/lib/api/admin.functions";
+import { useAdminAccountActions } from "@/components/admin/AdminAccountProvider";
 import {
   getStoredActiveTenantId,
   setStoredActiveTenantId,
@@ -26,49 +26,25 @@ type Props = {
 
 export function TenantSelector({ className, compact = false }: Props) {
   const { t } = useI18n();
-  const loadTenants = useServerFn(adminMyTenants);
-  const [tenants, setTenants] = useState<TenantSummary[]>([]);
-  const [activeTenantId, setActiveTenantId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+  const { tenants, tenantsLoading, switchTenant } = useAdminAccountActions();
+  const [activeTenantId, setActiveTenantId] = useState<string | null>(() => getStoredActiveTenantId());
 
   useEffect(() => {
-    let cancelled = false;
+    const stored = getStoredActiveTenantId();
+    const validStored =
+      stored && tenants.some((tenant) => tenant.id === stored) ? stored : null;
+    const resolved = validStored ?? tenants[0]?.id ?? null;
 
-    void loadTenants()
-      .then((result) => {
-        if (cancelled) return;
+    if (resolved && resolved !== stored) {
+      setStoredActiveTenantId(resolved);
+    }
 
-        const list = result.tenants;
-        setTenants(list);
+    setActiveTenantId(resolved);
+  }, [tenants]);
 
-        const stored = getStoredActiveTenantId();
-        const validStored = stored && list.some((tenant) => tenant.id === stored) ? stored : null;
-        const resolved = validStored ?? list[0]?.id ?? null;
-
-        if (resolved && resolved !== stored) {
-          setStoredActiveTenantId(resolved);
-          if (stored && stored !== resolved) {
-            window.location.reload();
-            return;
-          }
-        }
-
-        setActiveTenantId(resolved);
-      })
-      .catch(() => {
-        if (!cancelled) setTenants([]);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [loadTenants]);
-
-  if (loading || tenants.length <= 1) {
-    if (loading || tenants.length === 0) return null;
+  if (tenantsLoading || tenants.length <= 1) {
+    if (tenantsLoading || tenants.length === 0) return null;
 
     const onlyTenant = tenants[0]!;
     return (
@@ -89,11 +65,16 @@ export function TenantSelector({ className, compact = false }: Props) {
   function handleSelect(tenantId: string) {
     if (tenantId === activeTenantId) return;
     const selected = tenants.find((tenant) => tenant.id === tenantId);
+    if (!selected) return;
+
+    setActiveTenantId(tenantId);
     setStoredActiveTenantId(tenantId);
-    if (selected?.slug) {
+    if (selected.slug) {
       setStoredActiveTenantSlug(selected.slug);
     }
-    window.location.assign("/admin/dashboard");
+
+    switchTenant(tenantId);
+    navigate({ to: "/admin/dashboard", replace: true });
   }
 
   return (

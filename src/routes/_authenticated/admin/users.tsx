@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { AdminShell, useAdminAccount } from "@/components/admin/AdminShell";
+import { AdminPage, useAdminAccount, useAdminTenantScope } from "@/components/admin/AdminShell";
 import { useServerFn } from "@tanstack/react-start";
 import { useCallback, useEffect, useState } from "react";
 import { Trash2, UserPlus } from "lucide-react";
@@ -39,6 +39,7 @@ function AdminUsersPage() {
   const { t } = useI18n();
   const navigate = useNavigate();
   const account = useAdminAccount();
+  const tenantScope = useAdminTenantScope();
   const listStaff = useServerFn(adminListStaff);
   const createStaff = useServerFn(adminCreateStaff);
   const deleteStaff = useServerFn(adminDeleteStaff);
@@ -62,7 +63,7 @@ function AdminUsersPage() {
     } finally {
       setLoading(false);
     }
-  }, [listStaff, t]);
+  }, [listStaff, t, tenantScope]);
 
   useEffect(() => {
     if (account && account.role !== "admin") navigate({ to: "/admin/dashboard", replace: true });
@@ -104,10 +105,9 @@ function AdminUsersPage() {
   }
 
   return (
-    <AdminShell
+    <AdminPage
       title={t("admin.usersPage.title")}
       subtitle={t("admin.usersPage.subtitle")}
-      account={account}
     >
       <form
         onSubmit={handleCreate}
@@ -195,6 +195,6 @@ function AdminUsersPage() {
           </article>
         ))}
       </div>
-    </AdminShell>
+    </AdminPage>
   );
 }
