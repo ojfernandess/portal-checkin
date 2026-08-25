@@ -639,6 +639,8 @@ export const ptBR = {
       refresh: "Atualizar",
       colName: "Nome",
       colStatus: "Status",
+      stayStatusCheckedIn: "Check-in realizado",
+      stayStatusCheckedOut: "Check-out",
       colEnterprise: "Condomínio",
       settingsTitle: "Credenciais e módulos",
       settingsBody:

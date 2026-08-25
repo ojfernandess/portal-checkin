@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { InboxStayStatusBadge } from "@/components/admin/inbox/InboxStayStatusBadge";
 import {
   adminCreateInboxStay,
   adminListInboxStays,
@@ -235,7 +236,7 @@ function InboxStaysPage() {
                   cell: (row) => row.external_id ?? "—",
                   mobilePrimary: true,
                 },
-                { id: "status", header: t("admin.inbox.colStatus"), cell: (row) => row.status ?? "—" },
+                { id: "status", header: t("admin.inbox.colStatus"), cell: (row) => <InboxStayStatusBadge status={row.status} /> },
                 {
                   id: "checkin",
                   header: t("admin.inbox.checkIn"),

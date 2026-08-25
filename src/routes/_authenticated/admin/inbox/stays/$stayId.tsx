@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { InboxGuestPhotoUpload, type ImageFileBase64 } from "@/components/admin/inbox/InboxGuestPhotoUpload";
+import { InboxStayStatusBadge } from "@/components/admin/inbox/InboxStayStatusBadge";
 import {
   adminCancelInboxStay,
   adminCheckoutInboxStay,
@@ -221,9 +222,10 @@ function InboxStayDetailPage() {
 
       <AdminSection title={`${t("admin.inbox.stay")} #${stay.id}`}>
         <AdminCard className="grid gap-3 text-sm md:grid-cols-2">
-          <p>
-            <span className="font-medium">{t("admin.inbox.colStatus")}:</span> {stay.status ?? "—"}
-          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-medium">{t("admin.inbox.colStatus")}:</span>
+            <InboxStayStatusBadge status={stay.status} />
+          </div>
           <p>
             <span className="font-medium">{t("admin.inbox.localizer")}:</span> {stay.external_id ?? "—"}
           </p>

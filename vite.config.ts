@@ -3,6 +3,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
+import { startStorageContextClientStubPlugin } from "./src/lib/vite/start-storage-context-client-stub-plugin.ts";
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const csrfMiddlewareShim = path.resolve(root, "src/lib/shims/createCsrfMiddleware.server.ts");
@@ -17,18 +18,16 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
-  environments: {
-    client: {
-      resolve: {
-        alias: {
-          "@tanstack/start-storage-context": startStorageContextClientStub,
-        },
+  // Lovable defineConfig only forwards `vite`, `plugins`, tanstackStart, nitro, etc. — not bare resolve/environments.
+  plugins: [startStorageContextClientStubPlugin(startStorageContextClientStub)],
+  vite: {
+    resolve: {
+      alias: {
+        "@tanstack/start-client-core/dist/esm/createCsrfMiddleware.js": csrfMiddlewareShim,
       },
     },
-  },
-  resolve: {
-    alias: {
-      "@tanstack/start-client-core/dist/esm/createCsrfMiddleware.js": csrfMiddlewareShim,
+    optimizeDeps: {
+      exclude: ["@tanstack/start-client-core"],
     },
   },
   // Docker / EasyPanel / Node: node-server (default). Lovable sandbox still forces cloudflare-module.

@@ -638,6 +638,8 @@ export const en: MessageTree = {
       refresh: "Refresh",
       colName: "Name",
       colStatus: "Status",
+      stayStatusCheckedIn: "Checked in",
+      stayStatusCheckedOut: "Check-out",
       colEnterprise: "Enterprise",
       overviewTitle: "Integration overview",
       overviewBody: "Inbox integration status for this company.",

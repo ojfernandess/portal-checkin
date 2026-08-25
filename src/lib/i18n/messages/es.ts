@@ -641,6 +641,8 @@ export const es: MessageTree = {
       refresh: "Actualizar",
       colName: "Nombre",
       colStatus: "Estado",
+      stayStatusCheckedIn: "Check-in realizado",
+      stayStatusCheckedOut: "Check-out",
       colEnterprise: "Condominio",
       overviewTitle: "Resumen de la integración",
       overviewBody: "Estado de la integración Inbox de esta empresa.",
