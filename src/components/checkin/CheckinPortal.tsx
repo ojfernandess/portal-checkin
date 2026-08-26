@@ -20,7 +20,7 @@ import { GuestForm } from "@/components/checkin/GuestForm";
 import { CompanionsStep } from "@/components/checkin/CompanionsStep";
 import { EmbraturStep } from "@/components/checkin/EmbraturStep";
 import { CameraCapture } from "@/components/checkin/CameraCapture";
-import { SelfieCapture } from "@/components/checkin/SelfieCapture";
+import { SelfieCapture, type SelfieValidationOutcome } from "@/components/checkin/SelfieCapture";
 import { RegisteredPhotoTile } from "@/components/checkin/RegisteredPhotoTile";
 import { EstablishmentTermsPanel } from "@/components/checkin/EstablishmentTermsPanel";
 import { CheckinFinalizingScreen } from "@/components/checkin/CheckinFinalizingScreen";
@@ -37,12 +37,14 @@ import {
   getEstablishmentContact,
   getEstablishmentExtraFields,
   getEstablishmentSettings,
+  getCheckinFaceValidationSettings,
   getEstablishmentTerms,
   getReservationDetails,
   lookupGuest,
   startCheckinSession,
   submitCheckin,
   uploadCheckinMedia,
+  validateCheckinSelfie,
   verifyReaccessBirthDate,
   type CheckinExtraField,
   type CompletedCheckinContext,
@@ -218,6 +220,8 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
   const loadContact = useServerFn(getEstablishmentContact);
   const loadExtraFields = useServerFn(getEstablishmentExtraFields);
   const loadSettings = useServerFn(getEstablishmentSettings);
+  const loadFaceValidationSettings = useServerFn(getCheckinFaceValidationSettings);
+  const validateSelfieFn = useServerFn(validateCheckinSelfie);
   const upload = useServerFn(uploadCheckinMedia);
   const loadReference = useServerFn(getEmbraturReference);
   const submit = useServerFn(submitCheckin);
@@ -353,6 +357,7 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
   const [establishmentSettings, setEstablishmentSettings] = useState<EstablishmentSettings>(
     DEFAULT_ESTABLISHMENT_SETTINGS,
   );
+  const [faceValidationEnabled, setFaceValidationEnabled] = useState(false);
   const [birthDateConfirmInput, setBirthDateConfirmInput] = useState("");
   const [birthDateConfirmError, setBirthDateConfirmError] = useState("");
   const [reaccessVerifiedFor, setReaccessVerifiedFor] = useState<string | null>(null);
@@ -469,13 +474,15 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
     const establishmentId = String(found.establishmentId ?? "");
     if (!establishmentId) {
       setEstablishmentSettings(DEFAULT_ESTABLISHMENT_SETTINGS);
+      setFaceValidationEnabled(false);
       return DEFAULT_ESTABLISHMENT_SETTINGS;
     }
-    const [terms, contact, extra, settings] = await Promise.all([
+    const [terms, contact, extra, settings, faceValidation] = await Promise.all([
       loadTerms({ data: { establishmentId } }),
       loadContact({ data: { establishmentId } }),
       loadExtraFields({ data: { establishmentId } }),
       loadSettings({ data: { establishmentId } }),
+      loadFaceValidationSettings({ data: { establishmentId } }),
     ]);
     setTermsSections(terms.sections);
     setTermsVersion(terms.version);
@@ -484,7 +491,28 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
     setExtraFieldValues({});
     setExtraFieldErrors({});
     setEstablishmentSettings(settings);
+    setFaceValidationEnabled(faceValidation.enabled === true);
     return settings;
+  }
+
+  async function validateSelfiePhoto(photoBase64: string): Promise<SelfieValidationOutcome> {
+    const establishmentId = String(reservation?.establishmentId ?? "").trim();
+    if (!establishmentId) {
+      return { status: "ERROR", reason: "SERVICE_UNAVAILABLE" };
+    }
+    const result = await validateSelfieFn({
+      data: {
+        establishmentId,
+        imageData: photoBase64,
+        ...(checkinSessionId ? { checkinSessionId } : {}),
+        ...(guest.documentNumber ? { guestId: String(guest.documentNumber) } : {}),
+      },
+    });
+    return {
+      status: result.status,
+      reason: result.reason,
+      maxAttemptsReached: result.maxAttemptsReached,
+    };
   }
 
   function applyReaccessSecurityForLocalizer(
@@ -1434,6 +1462,8 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
                       setSelfie(registeredDisplayUrl(lookupResult, "profile"));
                     }}
                     onCapture={(value) => handleRegisteredPhotoCapture("profile", value)}
+                    validationEnabled={faceValidationEnabled}
+                    onValidateSelfie={validateSelfiePhoto}
                   />
                   <RegisteredPhotoTile
                     title={t("checkin.photos.document")}
@@ -1596,6 +1626,8 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
                   title={t("checkin.photos.selfie")}
                   value={selfie}
                   captureId="selfie"
+                  validationEnabled={faceValidationEnabled}
+                  onValidate={validateSelfiePhoto}
                   {...exclusiveCameraProps}
                   onCapture={(value) => setSelfie(value || null)}
                 />

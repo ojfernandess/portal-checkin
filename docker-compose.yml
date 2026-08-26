@@ -37,4 +37,29 @@ services:
       AWS_S3_FORCE_PATH_STYLE: ${AWS_S3_FORCE_PATH_STYLE:-true}
       PUBLIC_CHECKIN_ORIGIN: ${PUBLIC_CHECKIN_ORIGIN:-https://checkin.audaar.com.br}
       ADMIN_PANEL_ORIGIN: ${ADMIN_PANEL_ORIGIN:-https://checkin.techospitality.com}
+      ZEPIRIS_ENABLED: ${ZEPIRIS_ENABLED:-false}
+      ZEPIRIS_ML_URL: ${ZEPIRIS_ML_URL:-https://photoguard.agentslabs.cloud}
+      ZEPIRIS_TIMEOUT_MS: ${ZEPIRIS_TIMEOUT_MS:-10000}
+      ZEPIRIS_UNAVAILABLE_POLICY: ${ZEPIRIS_UNAVAILABLE_POLICY:-BLOCK}
+    restart: unless-stopped
+
+  # ZepIris ML Inference (opcional) — build a partir de https://github.com/zepto-labs/zepiris
+  # docker compose --profile zepiris up -d
+  zepiris-ml:
+    profiles: ["zepiris"]
+    image: zepiris-ml-inference:latest
+    build:
+      context: https://github.com/zepto-labs/zepiris.git
+      dockerfile: ml_inference.Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      ML_SERVICE_HOST: "0.0.0.0"
+      ML_SERVICE_PORT: "8001"
+      ML_SERVICE_ML_DEVICE: "cpu"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/healthz"]
+      interval: 30s
+      timeout: 30s
+      retries: 5
     restart: unless-stopped

@@ -31,6 +31,7 @@ import {
   platformListTenantMembers,
   platformRemoveTenantMember,
   platformSaveTenantInboxConfig,
+  platformSaveTenantZepirisConfig,
   platformSaveTenantPmsConfig,
   platformSaveTenantLogo,
   platformUpdateTenant,
@@ -49,6 +50,7 @@ export const Route = createFileRoute("/_authenticated/platform/tenants/$tenantNu
 const FEATURE_LABELS: Record<string, string> = {
   pms_vivakey: "PMS Vivakey",
   portaria_inbox: "Portaria Inbox",
+  zepiris_photo_validation: "Validação inteligente de fotos",
 };
 
 const TOKEN_FIELDS = [
@@ -79,6 +81,7 @@ function PlatformTenantDetailPage() {
   const featuresFn = useServerFn(platformUpdateTenantFeatures);
   const pmsFn = useServerFn(platformSaveTenantPmsConfig);
   const inboxFn = useServerFn(platformSaveTenantInboxConfig);
+  const zepirisFn = useServerFn(platformSaveTenantZepirisConfig);
   const saveLogoFn = useServerFn(platformSaveTenantLogo);
   const membersFn = useServerFn(platformListTenantMembers);
   const addMemberFn = useServerFn(platformAddTenantMember);
@@ -115,6 +118,18 @@ function PlatformTenantDetailPage() {
     guests: true,
     readers: false,
   });
+
+  const [zepirisOperational, setZepirisOperational] = useState(false);
+  const [zepirisGloballyEnabled, setZepirisGloballyEnabled] = useState(false);
+  const [zepirisProvider, setZepirisProvider] = useState("zepiris");
+  const [zepirisVersion, setZepirisVersion] = useState("1.0.0");
+  const [zepirisFaceDetection, setZepirisFaceDetection] = useState(true);
+  const [zepirisBlurCheck, setZepirisBlurCheck] = useState(true);
+  const [zepirisSpoofCheck, setZepirisSpoofCheck] = useState(true);
+  const [zepirisNsfwCheck, setZepirisNsfwCheck] = useState(false);
+  const [zepirisMaxAttempts, setZepirisMaxAttempts] = useState(5);
+  const [zepirisTimeoutMs, setZepirisTimeoutMs] = useState(10000);
+  const [zepirisUnavailablePolicy, setZepirisUnavailablePolicy] = useState<"BLOCK" | "FALLBACK">("BLOCK");
 
   const [members, setMembers] = useState<PlatformTenantMember[]>([]);
   const [memberEmail, setMemberEmail] = useState("");
@@ -168,6 +183,17 @@ function PlatformTenantDetailPage() {
       setInboxHasSecret(detail.inbox.hasClientSecret);
       setInboxMaskedClientId(detail.inbox.maskedClientId);
       setInboxModules(detail.inbox.modules);
+      setZepirisOperational(detail.zepiris.operational);
+      setZepirisGloballyEnabled(detail.zepiris.globallyEnabled);
+      setZepirisProvider(detail.zepiris.provider);
+      setZepirisVersion(detail.zepiris.version);
+      setZepirisFaceDetection(detail.zepiris.config.faceDetection);
+      setZepirisBlurCheck(detail.zepiris.config.blurCheck);
+      setZepirisSpoofCheck(detail.zepiris.config.spoofCheck);
+      setZepirisNsfwCheck(detail.zepiris.config.nsfwCheck);
+      setZepirisMaxAttempts(detail.zepiris.config.maxAttempts);
+      setZepirisTimeoutMs(detail.zepiris.config.timeoutMs);
+      setZepirisUnavailablePolicy(detail.zepiris.config.unavailablePolicy);
       setMembers(membersResult.members);
     }
 
@@ -214,6 +240,17 @@ function PlatformTenantDetailPage() {
     setInboxHasSecret(detail.inbox.hasClientSecret);
     setInboxMaskedClientId(detail.inbox.maskedClientId);
     setInboxModules(detail.inbox.modules);
+    setZepirisOperational(detail.zepiris.operational);
+    setZepirisGloballyEnabled(detail.zepiris.globallyEnabled);
+    setZepirisProvider(detail.zepiris.provider);
+    setZepirisVersion(detail.zepiris.version);
+    setZepirisFaceDetection(detail.zepiris.config.faceDetection);
+    setZepirisBlurCheck(detail.zepiris.config.blurCheck);
+    setZepirisSpoofCheck(detail.zepiris.config.spoofCheck);
+    setZepirisNsfwCheck(detail.zepiris.config.nsfwCheck);
+    setZepirisMaxAttempts(detail.zepiris.config.maxAttempts);
+    setZepirisTimeoutMs(detail.zepiris.config.timeoutMs);
+    setZepirisUnavailablePolicy(detail.zepiris.config.unavailablePolicy);
     setMembers(membersResult.members);
   }
 
@@ -308,8 +345,36 @@ function PlatformTenantDetailPage() {
     }
   }
 
+  async function handleSaveZepiris() {
+    setSaving(true);
+    try {
+      await zepirisFn({
+        data: {
+          publicNumber,
+          faceDetection: zepirisFaceDetection,
+          blurCheck: zepirisBlurCheck,
+          spoofCheck: zepirisSpoofCheck,
+          nsfwCheck: zepirisNsfwCheck,
+          maxAttempts: zepirisMaxAttempts,
+          timeoutMs: zepirisTimeoutMs,
+          unavailablePolicy: zepirisUnavailablePolicy,
+        },
+      });
+      toast.success(t("platform.tenantDetail.zepirisSaved"));
+      await load();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("errors.saveFailed"));
+    } finally {
+      setSaving(false);
+    }
+  }
+
   const inboxFeatureEnabled = features.some(
     (feature) => feature.featureKey === "portaria_inbox" && feature.enabled,
+  );
+
+  const zepirisFeatureEnabled = features.some(
+    (feature) => feature.featureKey === "zepiris_photo_validation" && feature.enabled,
   );
 
   async function handleAddMember() {
@@ -385,6 +450,7 @@ function PlatformTenantDetailPage() {
           <TabsTrigger value="features">{t("platform.tenantDetail.tabFeatures")}</TabsTrigger>
           <TabsTrigger value="pms">{t("platform.tenantDetail.tabPms")}</TabsTrigger>
           <TabsTrigger value="inbox">{t("platform.tenantDetail.tabInbox")}</TabsTrigger>
+          <TabsTrigger value="zepiris">{t("platform.tenantDetail.tabZepiris")}</TabsTrigger>
           <TabsTrigger value="members">{t("platform.tenantDetail.tabMembers")}</TabsTrigger>
         </TabsList>
 
@@ -571,6 +637,109 @@ function PlatformTenantDetailPage() {
                 </div>
 
                 <Button disabled={saving} onClick={() => void handleSaveInbox()}>
+                  {saving ? t("common.loading") : t("common.save")}
+                </Button>
+              </PlatformCard>
+            )}
+          </PlatformSection>
+        </TabsContent>
+
+        <TabsContent value="zepiris">
+          <PlatformSection
+            title={t("platform.tenantDetail.zepirisTitle")}
+            description={t("platform.tenantDetail.zepirisHint")}
+          >
+            {!zepirisFeatureEnabled ? (
+              <PlatformCard>
+                <p className="text-sm text-muted-foreground">{t("platform.tenantDetail.zepirisFeatureRequired")}</p>
+              </PlatformCard>
+            ) : (
+              <PlatformCard className="space-y-6">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <ReadOnlyField label={t("platform.tenantDetail.zepirisProvider")} value={zepirisProvider} />
+                  <ReadOnlyField label={t("platform.tenantDetail.zepirisVersion")} value={zepirisVersion} />
+                  <div className="space-y-1 sm:col-span-2">
+                    <p className="text-sm font-medium">{t("platform.tenantDetail.zepirisServiceStatus")}</p>
+                    <div className="flex items-center gap-2 text-sm">
+                      <span
+                        className={
+                          zepirisGloballyEnabled && zepirisOperational
+                            ? "size-2 rounded-full bg-emerald-500"
+                            : "size-2 rounded-full bg-red-500"
+                        }
+                        aria-hidden
+                      />
+                      <span>
+                        {zepirisGloballyEnabled
+                          ? zepirisOperational
+                            ? t("platform.tenantDetail.zepirisOperational")
+                            : t("platform.tenantDetail.zepirisUnavailable")
+                          : t("platform.tenantDetail.zepirisGloballyDisabled")}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4 border-t border-border pt-4">
+                  <div className="flex items-center justify-between gap-4">
+                    <p className="font-medium">{t("platform.tenantDetail.zepirisFaceDetection")}</p>
+                    <Switch checked={zepirisFaceDetection} onCheckedChange={setZepirisFaceDetection} />
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <p className="font-medium">{t("platform.tenantDetail.zepirisBlurCheck")}</p>
+                    <Switch checked={zepirisBlurCheck} onCheckedChange={setZepirisBlurCheck} />
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <p className="font-medium">{t("platform.tenantDetail.zepirisSpoofCheck")}</p>
+                    <Switch checked={zepirisSpoofCheck} onCheckedChange={setZepirisSpoofCheck} />
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <p className="font-medium">{t("platform.tenantDetail.zepirisNsfwCheck")}</p>
+                    <Switch checked={zepirisNsfwCheck} onCheckedChange={setZepirisNsfwCheck} />
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="zepiris-max-attempts">{t("platform.tenantDetail.zepirisMaxAttempts")}</Label>
+                      <Input
+                        id="zepiris-max-attempts"
+                        type="number"
+                        min={1}
+                        max={20}
+                        value={zepirisMaxAttempts}
+                        onChange={(event) => setZepirisMaxAttempts(Number(event.target.value) || 5)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="zepiris-timeout">{t("platform.tenantDetail.zepirisTimeout")}</Label>
+                      <Input
+                        id="zepiris-timeout"
+                        type="number"
+                        min={1000}
+                        max={30000}
+                        step={500}
+                        value={zepirisTimeoutMs}
+                        onChange={(event) => setZepirisTimeoutMs(Number(event.target.value) || 10000)}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>{t("platform.tenantDetail.zepirisUnavailablePolicy")}</Label>
+                    <Select
+                      value={zepirisUnavailablePolicy}
+                      onValueChange={(value) => setZepirisUnavailablePolicy(value as "BLOCK" | "FALLBACK")}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="BLOCK">{t("platform.tenantDetail.zepirisPolicyBlock")}</SelectItem>
+                        <SelectItem value="FALLBACK">{t("platform.tenantDetail.zepirisPolicyFallback")}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <Button disabled={saving} onClick={() => void handleSaveZepiris()}>
                   {saving ? t("common.loading") : t("common.save")}
                 </Button>
               </PlatformCard>

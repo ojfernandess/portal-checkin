@@ -87,22 +87,31 @@ async function resolveTenantUuidByPublicNumber(publicNumber: number): Promise<st
 export const platformMe = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { supabase, userId } = context;
-    const { data, error } = await supabase.rpc("is_platform_admin", { _user_id: userId });
-    if (error) throw new Error(error.message);
+    const { userId } = context;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const [{ data: profile }, { data: tenant }] = await Promise.all([
-      supabase.from("profiles").select("email, full_name").eq("id", userId).maybeSingle(),
-      supabase
+    const [
+      { data: isPlatformAdmin, error: platformError },
+      { data: profile, error: profileError },
+      { data: tenant, error: tenantError },
+    ] = await Promise.all([
+      supabaseAdmin.rpc("is_platform_admin", { _user_id: userId }),
+      supabaseAdmin.from("profiles").select("email, full_name").eq("id", userId).maybeSingle(),
+      supabaseAdmin
         .from("tenants")
         .select("id, name, slug")
         .eq("status", "active")
+        .order("name", { ascending: true })
         .limit(1)
         .maybeSingle(),
     ]);
 
+    if (platformError) throw new Error(platformError.message);
+    if (profileError) throw new Error(profileError.message);
+    if (tenantError) throw new Error(tenantError.message);
+
     return {
-      isPlatformAdmin: Boolean(data),
+      isPlatformAdmin: Boolean(isPlatformAdmin),
       email: profile?.email ?? "",
       fullName: profile?.full_name ?? null,
       sampleTenantName: tenant?.name ?? null,
@@ -228,6 +237,20 @@ export const platformCreateTenant = createServerFn({ method: "POST" })
       [
         { tenant_id: row.id, feature_key: "pms_vivakey", enabled: false },
         { tenant_id: row.id, feature_key: "portaria_inbox", enabled: false },
+        {
+          tenant_id: row.id,
+          feature_key: "zepiris_photo_validation",
+          enabled: false,
+          config: {
+            blurCheck: true,
+            spoofCheck: true,
+            nsfwCheck: false,
+            faceDetection: true,
+            maxAttempts: 5,
+            timeoutMs: 10000,
+            unavailablePolicy: "BLOCK",
+          },
+        },
       ],
       { onConflict: "tenant_id,feature_key" },
     );
@@ -265,7 +288,7 @@ export const platformGetTenant = createServerFn({ method: "POST" })
     const [{ data: features }, { data: pmsRow }] = await Promise.all([
       supabaseAdmin
         .from("tenant_features")
-        .select("feature_key, enabled")
+        .select("feature_key, enabled, config")
         .eq("tenant_id", tenantUuid),
       supabaseAdmin
         .from("tenant_pms_configs")
@@ -279,8 +302,16 @@ export const platformGetTenant = createServerFn({ method: "POST" })
     const tokens = pmsConfig.tokens ?? {};
     const { parseTenantSettings } = await import("@/lib/tenant-settings");
     const { loadTenantInboxContext } = await import("@/lib/inbox/tenant.server");
+    const { loadTenantZepirisContext } = await import("@/lib/face-validation/service.server");
+    const { checkZepirisMlHealth } = await import("@/lib/face-validation/zepiris-http.server");
+    const { readZepirisRuntimeConfig } = await import("@/lib/face-validation/config");
     const branding = parseTenantSettings(tenant.settings);
     const inbox = await loadTenantInboxContext(tenantUuid);
+    const zepiris = await loadTenantZepirisContext(tenantUuid);
+    const runtime = readZepirisRuntimeConfig();
+    const zepirisOperational = runtime.globallyEnabled
+      ? await checkZepirisMlHealth(runtime.mlUrl, 5000)
+      : false;
 
     return {
       tenant: {
@@ -327,6 +358,16 @@ export const platformGetTenant = createServerFn({ method: "POST" })
         maskedClientId: inbox.maskedClientId,
         hasClientSecret: inbox.hasClientSecret,
         modules: inbox.modules,
+      },
+      zepiris: {
+        featureEnabled: zepiris.featureEnabled,
+        active: zepiris.active,
+        provider: zepiris.provider,
+        version: zepiris.version,
+        operational: zepirisOperational,
+        globallyEnabled: runtime.globallyEnabled,
+        mlUrl: runtime.mlUrl,
+        config: zepiris.config,
       },
     };
   });
@@ -559,6 +600,89 @@ export const platformSaveTenantInboxConfig = createServerFn({ method: "POST" })
     });
 
     return { ok: true as const, inbox: refreshed };
+  });
+
+export const platformSaveTenantZepirisConfig = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth, requirePlatformAdmin])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        publicNumber: tenantPublicNumberSchema,
+        blurCheck: z.boolean().optional(),
+        spoofCheck: z.boolean().optional(),
+        nsfwCheck: z.boolean().optional(),
+        faceDetection: z.boolean().optional(),
+        maxAttempts: z.number().int().min(1).max(20).optional(),
+        timeoutMs: z.number().int().min(1000).max(30000).optional(),
+        unavailablePolicy: z.enum(["BLOCK", "FALLBACK"]).optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { parseZepirisTenantConfig, DEFAULT_ZEPIRIS_TENANT_CONFIG } = await import(
+      "@/lib/face-validation/config"
+    );
+    const { ZEPIRIS_FEATURE_KEY } = await import("@/lib/face-validation/service.server");
+    const tenantUuid = await resolveTenantUuidByPublicNumber(data.publicNumber);
+
+    const { data: existing } = await supabaseAdmin
+      .from("tenant_features")
+      .select("enabled, config")
+      .eq("tenant_id", tenantUuid)
+      .eq("feature_key", ZEPIRIS_FEATURE_KEY)
+      .maybeSingle();
+
+    if (!existing?.enabled) {
+      throw new Error("Habilite a feature Validação inteligente de fotos antes de configurar.");
+    }
+
+    const current = parseZepirisTenantConfig(existing.config ?? DEFAULT_ZEPIRIS_TENANT_CONFIG);
+    const nextConfig = {
+      blurCheck: data.blurCheck ?? current.blurCheck,
+      spoofCheck: data.spoofCheck ?? current.spoofCheck,
+      nsfwCheck: data.nsfwCheck ?? current.nsfwCheck,
+      faceDetection: data.faceDetection ?? current.faceDetection,
+      maxAttempts: data.maxAttempts ?? current.maxAttempts,
+      timeoutMs: data.timeoutMs ?? current.timeoutMs,
+      unavailablePolicy: data.unavailablePolicy ?? current.unavailablePolicy,
+    };
+
+    const { error } = await supabaseAdmin.from("tenant_features").upsert(
+      {
+        tenant_id: tenantUuid,
+        feature_key: ZEPIRIS_FEATURE_KEY,
+        enabled: true,
+        config: nextConfig,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "tenant_id,feature_key" },
+    );
+    if (error) throw new Error(error.message);
+
+    await writeAuditLog({
+      userId: context.userId,
+      tenantId: tenantUuid,
+      action: "platform.tenant.zepiris",
+      entityType: "tenant_features",
+      entityId: tenantUuid,
+      newData: nextConfig,
+    });
+
+    return { ok: true as const, config: nextConfig };
+  });
+
+export const platformGetZepIrisHealth = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth, requirePlatformAdmin])
+  .handler(async () => {
+    const { readZepirisRuntimeConfig } = await import("@/lib/face-validation/config");
+    const { checkZepirisMlHealth } = await import("@/lib/face-validation/zepiris-http.server");
+    const runtime = readZepirisRuntimeConfig();
+    if (!runtime.globallyEnabled) {
+      return { globallyEnabled: false, operational: false, mlUrl: runtime.mlUrl };
+    }
+    const operational = await checkZepirisMlHealth(runtime.mlUrl, 5000);
+    return { globallyEnabled: true, operational, mlUrl: runtime.mlUrl };
   });
 
 export const platformSaveTenantLogo = createServerFn({ method: "POST" })

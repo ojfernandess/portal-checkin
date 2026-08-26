@@ -494,6 +494,49 @@ export const getEstablishmentSettings = createServerFn({ method: "POST" })
     return parseEstablishmentSettings(row?.settings ?? null);
   });
 
+export const getCheckinFaceValidationSettings = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    z.object({ establishmentId: z.string().trim().min(1).max(64) }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    const { assertRegisteredEstablishmentAccess } = await import("@/lib/establishment-registry.server");
+    await assertRegisteredEstablishmentAccess(data.establishmentId);
+    const tenantId = await resolveCheckinTenantId(data.establishmentId);
+    const { loadTenantZepirisContext } = await import("@/lib/face-validation/service.server");
+    const context = await loadTenantZepirisContext(tenantId);
+    return {
+      enabled: context.active,
+      maxAttempts: context.config.maxAttempts,
+      provider: context.provider,
+    };
+  });
+
+export const validateCheckinSelfie = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        establishmentId: z.string().trim().min(1).max(64),
+        checkinSessionId: z.string().uuid().optional(),
+        guestId: z.string().trim().max(128).optional(),
+        imageData: z.string().min(50),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    await enforceRateLimit(clientIpBucket("face-validation"), { maxRequests: 60 });
+    const { assertRegisteredEstablishmentAccess } = await import("@/lib/establishment-registry.server");
+    await assertRegisteredEstablishmentAccess(data.establishmentId);
+    const tenantId = await resolveCheckinTenantId(data.establishmentId);
+    const { validateCheckinSelfieForTenant } = await import("@/lib/face-validation/service.server");
+    const { client } = await validateCheckinSelfieForTenant({
+      tenantId,
+      checkinSessionId: data.checkinSessionId,
+      guestId: data.guestId,
+      imageData: data.imageData,
+    });
+    return client;
+  });
+
 async function lookupGuestBirthDateByIdentity(
   reservation: Reservation,
   tenantId: string,

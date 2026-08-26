@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Camera, Loader2, Upload, X } from "lucide-react";
+import { Camera, Check, Loader2, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n/context";
 import { cn } from "@/lib/utils";
@@ -20,6 +20,12 @@ export type SelfieCaptureResult = {
 
 type Phase = "idle" | "live" | "preview";
 
+export type SelfieValidationOutcome = {
+  status: "APPROVED" | "REJECTED" | "ERROR";
+  reason?: string;
+  maxAttemptsReached?: boolean;
+};
+
 type Props = {
   value: string | null;
   onCapture: (dataUrl: string) => void;
@@ -27,6 +33,9 @@ type Props = {
   title?: string;
   /** Versão reduzida para tile de foto cadastrada */
   compact?: boolean;
+  /** Quando definido, valida a selfie via backend antes de confirmar */
+  validationEnabled?: boolean;
+  onValidate?: (photoBase64: string) => Promise<SelfieValidationOutcome>;
 } & Partial<ExclusiveCameraProps>;
 
 const JPEG_QUALITY = 0.85;
@@ -37,6 +46,8 @@ export function SelfieCapture({
   onConfirm,
   title,
   compact = false,
+  validationEnabled = false,
+  onValidate,
   captureId,
   activeCaptureId,
   onRequestCapture,
@@ -60,6 +71,9 @@ export function SelfieCapture({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [openingCamera, setOpeningCamera] = useState(false);
+  const [validating, setValidating] = useState(false);
+  const [validationHint, setValidationHint] = useState<string | null>(null);
+  const [validationSuccess, setValidationSuccess] = useState(false);
 
   const stopCamera = useCallback(() => {
     unregisterActiveDeviceStream(streamRef.current);
@@ -183,6 +197,8 @@ export function SelfieCapture({
     const dataUrl = canvas.toDataURL("image/jpeg", JPEG_QUALITY);
     setPreviewUrl(dataUrl);
     setPhase("preview");
+    setValidationHint(null);
+    setValidationSuccess(false);
     stopCamera();
     setOpeningCamera(false);
     if (captureId && onReleaseCapture) {
@@ -190,18 +206,44 @@ export function SelfieCapture({
     }
   }
 
-  function confirmPhoto() {
+  async function confirmPhoto() {
     const photo = previewUrl ?? value;
     if (!photo) return;
+
+    if (validationEnabled && onValidate) {
+      setValidating(true);
+      setValidationHint(null);
+      setValidationSuccess(false);
+      setError(null);
+      try {
+        const outcome = await onValidate(photo);
+        if (outcome.status !== "APPROVED") {
+          setValidationHint(t(faceValidationMessageKey(outcome)));
+          return;
+        }
+        setValidationSuccess(true);
+        setValidationHint(t("checkin.faceValidation.approved"));
+      } catch {
+        setValidationHint(t("checkin.faceValidation.unavailable"));
+        return;
+      } finally {
+        setValidating(false);
+      }
+    }
+
     onCapture(photo);
     onConfirm?.({ photoBase64: photo });
     setPreviewUrl(null);
     setPhase("idle");
+    setValidationHint(null);
+    setValidationSuccess(false);
   }
 
   function retake() {
     setPreviewUrl(null);
     onCapture("");
+    setValidationHint(null);
+    setValidationSuccess(false);
     beginCamera();
   }
 
@@ -218,6 +260,8 @@ export function SelfieCapture({
       const result = String(reader.result ?? "");
       setPreviewUrl(result);
       setPhase("preview");
+      setValidationHint(null);
+      setValidationSuccess(false);
     };
     reader.readAsDataURL(file);
   }
@@ -333,6 +377,25 @@ export function SelfieCapture({
           <p className={cn("text-destructive", compact ? "text-xs" : "text-sm")}>{error}</p>
         ) : null}
 
+        {validationHint ? (
+          <div
+            className={cn(
+              "flex items-start gap-2 rounded-lg border px-3 py-2 text-sm",
+              validationSuccess
+                ? "border-success/40 bg-success/10 text-success"
+                : "border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-100",
+            )}
+            role="status"
+          >
+            {validationSuccess ? (
+              <Check className="mt-0.5 size-4 shrink-0" aria-hidden />
+            ) : null}
+            <p>{validationHint}</p>
+          </div>
+        ) : validationEnabled && showingPreview ? (
+          <p className="text-xs text-muted-foreground">{t("checkin.faceValidation.hint")}</p>
+        ) : null}
+
         {!showingLive ? (
           <div className="flex flex-col gap-2">
             {showingConfirmed ? (
@@ -353,8 +416,15 @@ export function SelfieCapture({
               </>
             ) : showingPreview ? (
               <>
-                <Button type="button" className="tap-safe w-full" onClick={confirmPhoto}>
-                  {t("checkin.selfieCapture.usePhoto")}
+                <Button type="button" className="tap-safe w-full" disabled={validating} onClick={() => void confirmPhoto()}>
+                  {validating ? (
+                    <>
+                      <Loader2 className="size-4 animate-spin" aria-hidden />
+                      {t("checkin.faceValidation.validating")}
+                    </>
+                  ) : (
+                    t("checkin.selfieCapture.usePhoto")
+                  )}
                 </Button>
                 <Button type="button" variant="outline" className="tap-safe w-full" onClick={retake}>
                   {t("checkin.selfieCapture.retake")}
@@ -394,6 +464,26 @@ export function SelfieCapture({
       </div>
     </>
   );
+}
+
+function faceValidationMessageKey(outcome: SelfieValidationOutcome) {
+  if (outcome.maxAttemptsReached || outcome.reason === "MAX_ATTEMPTS") {
+    return "checkin.faceValidation.maxAttempts" as const;
+  }
+  switch (outcome.reason) {
+    case "NO_FACE":
+      return "checkin.faceValidation.noFace" as const;
+    case "BLUR":
+      return "checkin.faceValidation.blur" as const;
+    case "SPOOF":
+      return "checkin.faceValidation.spoof" as const;
+    case "NSFW":
+      return "checkin.faceValidation.nsfw" as const;
+    case "INVALID_IMAGE":
+      return "checkin.faceValidation.invalidImage" as const;
+    default:
+      return "checkin.faceValidation.unavailable" as const;
+  }
 }
 
 function SelfieOverlay({

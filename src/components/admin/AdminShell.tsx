@@ -1,4 +1,5 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import {
   Building2,
@@ -168,13 +169,14 @@ export function AdminShell({
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const { t } = useI18n();
+  const loadPlatformMe = useServerFn(platformMe);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
   const isAdmin = account?.role === "admin";
 
   useEffect(() => {
     let cancelled = false;
-    void platformMe()
+    void loadPlatformMe()
       .then((data) => {
         if (!cancelled) setIsPlatformAdmin(data.isPlatformAdmin);
       })
@@ -184,7 +186,7 @@ export function AdminShell({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [loadPlatformMe]);
 
   async function signOut() {
     clearStoredActiveTenantId();

@@ -3,7 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { Camera, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CameraCapture } from "@/components/checkin/CameraCapture";
-import { SelfieCapture } from "@/components/checkin/SelfieCapture";
+import { SelfieCapture, type SelfieValidationOutcome } from "@/components/checkin/SelfieCapture";
 import { getCheckinPhotoDisplay } from "@/lib/api/checkin.functions";
 import type { ExclusiveCameraProps } from "@/lib/camera-utils";
 import { useI18n } from "@/lib/i18n/context";
@@ -21,6 +21,8 @@ type Props = {
   onStartEdit: () => void;
   onCancelEdit: () => void;
   onCapture: (value: string) => void;
+  validationEnabled?: boolean;
+  onValidateSelfie?: (photoBase64: string) => Promise<SelfieValidationOutcome>;
 } & Partial<ExclusiveCameraProps>;
 
 export function RegisteredPhotoTile({
@@ -35,6 +37,8 @@ export function RegisteredPhotoTile({
   onStartEdit,
   onCancelEdit,
   onCapture,
+  validationEnabled = false,
+  onValidateSelfie,
   captureId,
   activeCaptureId,
   onRequestCapture,
@@ -93,6 +97,8 @@ export function RegisteredPhotoTile({
             title={title}
             value={editValue}
             onCapture={onCapture}
+            validationEnabled={validationEnabled}
+            onValidate={onValidateSelfie}
             captureId={captureId}
             activeCaptureId={activeCaptureId}
             onRequestCapture={onRequestCapture}
