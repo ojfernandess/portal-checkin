@@ -122,6 +122,8 @@ function PlatformTenantDetailPage() {
   const [zepirisOperational, setZepirisOperational] = useState(false);
   const [zepirisGloballyEnabled, setZepirisGloballyEnabled] = useState(false);
   const [zepirisApiKeyConfigured, setZepirisApiKeyConfigured] = useState(false);
+  const [zepirisPhotoguardTenantConfigured, setZepirisPhotoguardTenantConfigured] = useState(false);
+  const [zepirisTenant, setZepirisTenant] = useState("");
   const [zepirisProvider, setZepirisProvider] = useState("zepiris");
   const [zepirisVersion, setZepirisVersion] = useState("1.0.0");
   const [zepirisFaceDetection, setZepirisFaceDetection] = useState(true);
@@ -187,6 +189,8 @@ function PlatformTenantDetailPage() {
       setZepirisOperational(detail.zepiris.operational);
       setZepirisGloballyEnabled(detail.zepiris.globallyEnabled);
       setZepirisApiKeyConfigured(detail.zepiris.apiKeyConfigured);
+      setZepirisPhotoguardTenantConfigured(detail.zepiris.photoguardTenantConfigured);
+      setZepirisTenant(detail.zepiris.config.zepirisTenant ?? "");
       setZepirisProvider(detail.zepiris.provider);
       setZepirisVersion(detail.zepiris.version);
       setZepirisFaceDetection(detail.zepiris.config.faceDetection);
@@ -245,6 +249,8 @@ function PlatformTenantDetailPage() {
     setZepirisOperational(detail.zepiris.operational);
     setZepirisGloballyEnabled(detail.zepiris.globallyEnabled);
     setZepirisApiKeyConfigured(detail.zepiris.apiKeyConfigured);
+    setZepirisPhotoguardTenantConfigured(detail.zepiris.photoguardTenantConfigured);
+    setZepirisTenant(detail.zepiris.config.zepirisTenant ?? "");
     setZepirisProvider(detail.zepiris.provider);
     setZepirisVersion(detail.zepiris.version);
     setZepirisFaceDetection(detail.zepiris.config.faceDetection);
@@ -358,6 +364,7 @@ function PlatformTenantDetailPage() {
           blurCheck: zepirisBlurCheck,
           spoofCheck: zepirisSpoofCheck,
           nsfwCheck: zepirisNsfwCheck,
+          zepirisTenant: zepirisTenant.trim() || undefined,
           maxAttempts: zepirisMaxAttempts,
           timeoutMs: zepirisTimeoutMs,
           unavailablePolicy: zepirisUnavailablePolicy,
@@ -677,11 +684,23 @@ function PlatformTenantDetailPage() {
                           ? t("platform.tenantDetail.zepirisGloballyDisabled")
                           : !zepirisApiKeyConfigured
                             ? t("platform.tenantDetail.zepirisApiKeyMissing")
-                            : zepirisOperational
-                              ? t("platform.tenantDetail.zepirisOperational")
-                              : t("platform.tenantDetail.zepirisUnavailable")}
+                            : !zepirisPhotoguardTenantConfigured
+                              ? t("platform.tenantDetail.zepirisTenantMissing")
+                              : zepirisOperational
+                                ? t("platform.tenantDetail.zepirisOperational")
+                                : t("platform.tenantDetail.zepirisUnavailable")}
                       </span>
                     </div>
+                  </div>
+                  <div className="space-y-1 sm:col-span-2">
+                    <Label htmlFor="zepiris-tenant">{t("platform.tenantDetail.zepirisPhotoguardTenant")}</Label>
+                    <Input
+                      id="zepiris-tenant"
+                      value={zepirisTenant}
+                      onChange={(event) => setZepirisTenant(event.target.value)}
+                      placeholder={t("platform.tenantDetail.zepirisPhotoguardTenantPlaceholder")}
+                    />
+                    <p className="text-xs text-muted-foreground">{t("platform.tenantDetail.zepirisPhotoguardTenantHint")}</p>
                   </div>
                 </div>
 

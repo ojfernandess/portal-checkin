@@ -1,7 +1,9 @@
 import {
   DEFAULT_ZEPIRIS_TENANT_CONFIG,
+  isZepirisApiTenantConfigured,
   parseZepirisTenantConfig,
   readZepirisRuntimeConfig,
+  resolveZepirisApiTenant,
   type ZepirisTenantConfig,
 } from "@/lib/face-validation/config";
 import {
@@ -54,7 +56,11 @@ export async function loadTenantZepirisContext(tenantId: string): Promise<Tenant
 
   return {
     featureEnabled,
-    active: runtime.globallyEnabled && runtime.apiKeyConfigured && featureEnabled,
+    active:
+      runtime.globallyEnabled &&
+      runtime.apiKeyConfigured &&
+      isZepirisApiTenantConfigured(tenantConfig, runtime) &&
+      featureEnabled,
     config: mergedConfig,
     provider: ZEPIRIS_PROVIDER,
     version: "1.0.0",
@@ -71,7 +77,7 @@ function inactiveContext(): TenantZepirisContext {
   };
 }
 
-async function resolveTenantZepirisKey(tenantId: string): Promise<string> {
+async function resolveTenantSlug(tenantId: string): Promise<string> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data } = await supabaseAdmin.from("tenants").select("slug").eq("id", tenantId).maybeSingle();
   return data?.slug?.trim() || tenantId;
@@ -130,6 +136,7 @@ function logFaceValidationEvent(input: {
   checkinSessionId?: string | null;
   status: string;
   reason?: string | null;
+  technicalMessage?: string | null;
   durationMs: number;
   attempts?: number;
 }) {
@@ -140,6 +147,7 @@ function logFaceValidationEvent(input: {
       checkinSessionId: input.checkinSessionId ?? null,
       status: input.status,
       reason: input.reason ?? null,
+      technicalMessage: input.technicalMessage ?? null,
       durationMs: input.durationMs,
       attempts: input.attempts ?? null,
       provider: ZEPIRIS_PROVIDER,
@@ -245,7 +253,8 @@ export async function validateCheckinSelfieForTenant(input: {
   let result: FaceValidationResult;
 
   try {
-    const tenantKey = await resolveTenantZepirisKey(input.tenantId);
+    const tenantSlug = await resolveTenantSlug(input.tenantId);
+    const apiTenant = resolveZepirisApiTenant(context.config, runtime, tenantSlug);
     const requestId = input.checkinSessionId
       ? `checkin-${input.checkinSessionId}`
       : input.guestId
@@ -254,7 +263,7 @@ export async function validateCheckinSelfieForTenant(input: {
     const service = new ZepirisFaceValidationService({
       apiUrl: runtime.mlUrl,
       apiKey: runtime.apiKey,
-      tenant: tenantKey,
+      tenant: apiTenant,
       requestId,
       config: context.config,
     });
@@ -269,7 +278,8 @@ export async function validateCheckinSelfieForTenant(input: {
         tenantId: input.tenantId,
         checkinSessionId: input.checkinSessionId,
         status: "FALLBACK",
-        reason: technicalMessage,
+        reason: result.reasons[0] ?? null,
+        technicalMessage,
         durationMs,
         attempts,
       });
@@ -300,6 +310,7 @@ export async function validateCheckinSelfieForTenant(input: {
     checkinSessionId: input.checkinSessionId,
     status: result.status,
     reason: result.reasons[0] ?? null,
+    technicalMessage: result.technicalMessage ?? null,
     durationMs,
     attempts: nextAttempts,
   });
@@ -308,7 +319,7 @@ export async function validateCheckinSelfieForTenant(input: {
     checkinSessionId: input.checkinSessionId,
     guestId: input.guestId,
     status: result.status,
-    reason: result.reasons[0] ?? null,
+    reason: result.technicalMessage ?? result.reasons[0] ?? null,
     score: result.score ?? null,
     processingTimeMs: durationMs,
   });

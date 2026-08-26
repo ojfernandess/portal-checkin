@@ -304,7 +304,9 @@ export const platformGetTenant = createServerFn({ method: "POST" })
     const { loadTenantInboxContext } = await import("@/lib/inbox/tenant.server");
     const { loadTenantZepirisContext } = await import("@/lib/face-validation/service.server");
     const { checkZepirisMlHealth } = await import("@/lib/face-validation/zepiris-http.server");
-    const { readZepirisRuntimeConfig } = await import("@/lib/face-validation/config");
+    const { readZepirisRuntimeConfig, isZepirisApiTenantConfigured } = await import(
+      "@/lib/face-validation/config"
+    );
     const branding = parseTenantSettings(tenant.settings);
     const inbox = await loadTenantInboxContext(tenantUuid);
     const zepiris = await loadTenantZepirisContext(tenantUuid);
@@ -312,6 +314,7 @@ export const platformGetTenant = createServerFn({ method: "POST" })
     const zepirisOperational =
       runtime.globallyEnabled &&
       runtime.apiKeyConfigured &&
+      isZepirisApiTenantConfigured(zepiris.config, runtime) &&
       (await checkZepirisMlHealth(runtime.mlUrl, 5000, runtime.apiKey));
 
     return {
@@ -368,6 +371,7 @@ export const platformGetTenant = createServerFn({ method: "POST" })
         operational: zepirisOperational,
         globallyEnabled: runtime.globallyEnabled,
         apiKeyConfigured: runtime.apiKeyConfigured,
+        photoguardTenantConfigured: isZepirisApiTenantConfigured(zepiris.config, runtime),
         mlUrl: runtime.mlUrl,
         config: zepiris.config,
       },
@@ -614,6 +618,7 @@ export const platformSaveTenantZepirisConfig = createServerFn({ method: "POST" }
         spoofCheck: z.boolean().optional(),
         nsfwCheck: z.boolean().optional(),
         faceDetection: z.boolean().optional(),
+        zepirisTenant: z.string().trim().max(128).optional(),
         maxAttempts: z.number().int().min(1).max(20).optional(),
         timeoutMs: z.number().int().min(1000).max(30000).optional(),
         unavailablePolicy: z.enum(["BLOCK", "FALLBACK"]).optional(),
@@ -645,6 +650,10 @@ export const platformSaveTenantZepirisConfig = createServerFn({ method: "POST" }
       spoofCheck: data.spoofCheck ?? current.spoofCheck,
       nsfwCheck: data.nsfwCheck ?? current.nsfwCheck,
       faceDetection: data.faceDetection ?? current.faceDetection,
+      zepirisTenant:
+        data.zepirisTenant !== undefined
+          ? data.zepirisTenant.trim() || undefined
+          : current.zepirisTenant,
       maxAttempts: data.maxAttempts ?? current.maxAttempts,
       timeoutMs: data.timeoutMs ?? current.timeoutMs,
       unavailablePolicy: data.unavailablePolicy ?? current.unavailablePolicy,
@@ -684,10 +693,30 @@ export const platformGetZepIrisHealth = createServerFn({ method: "GET" })
       return { globallyEnabled: false, operational: false, apiKeyConfigured: false, mlUrl: runtime.mlUrl };
     }
     if (!runtime.apiKeyConfigured) {
-      return { globallyEnabled: true, operational: false, apiKeyConfigured: false, mlUrl: runtime.mlUrl };
+      return { globallyEnabled: true, operational: false, apiKeyConfigured: false, photoguardTenantConfigured: false, mlUrl: runtime.mlUrl };
+    }
+    const { isZepirisApiTenantConfigured } = await import("@/lib/face-validation/config");
+    const photoguardTenantConfigured = isZepirisApiTenantConfigured(
+      (await import("@/lib/face-validation/config")).DEFAULT_ZEPIRIS_TENANT_CONFIG,
+      runtime,
+    );
+    if (!photoguardTenantConfigured) {
+      return {
+        globallyEnabled: true,
+        operational: false,
+        apiKeyConfigured: true,
+        photoguardTenantConfigured: false,
+        mlUrl: runtime.mlUrl,
+      };
     }
     const operational = await checkZepirisMlHealth(runtime.mlUrl, 5000, runtime.apiKey);
-    return { globallyEnabled: true, operational, apiKeyConfigured: true, mlUrl: runtime.mlUrl };
+    return {
+      globallyEnabled: true,
+      operational,
+      apiKeyConfigured: true,
+      photoguardTenantConfigured: true,
+      mlUrl: runtime.mlUrl,
+    };
   });
 
 export const platformSaveTenantLogo = createServerFn({ method: "POST" })

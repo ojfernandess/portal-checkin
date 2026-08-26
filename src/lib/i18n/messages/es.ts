@@ -1190,6 +1190,11 @@ export const es: MessageTree = {
       zepirisUnavailable: "No disponible",
       zepirisGloballyDisabled: "ZEPIRIS_ENABLED está desactivado en la infraestructura.",
       zepirisApiKeyMissing: "ZEPIRIS_API_KEY no está configurada en la infraestructura.",
+      zepirisTenantMissing: "Tenant Photoguard no configurado (ZEPIRIS_TENANT o campo abajo).",
+      zepirisPhotoguardTenant: "Tenant Photoguard",
+      zepirisPhotoguardTenantPlaceholder: "slug de la empresa en Photoguard",
+      zepirisPhotoguardTenantHint:
+        "Debe coincidir con la empresa vinculada a ZEPIRIS_API_KEY. Consulte a AgentsLabs si no lo sabe.",
       zepirisFaceDetection: "Detección facial",
       zepirisBlurCheck: "Verificación de nitidez",
       zepirisSpoofCheck: "Anti-spoofing",

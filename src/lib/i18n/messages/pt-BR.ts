@@ -1189,6 +1189,11 @@ export const ptBR = {
       zepirisUnavailable: "Indisponível",
       zepirisGloballyDisabled: "ZEPIRIS_ENABLED está desativado na infraestrutura.",
       zepirisApiKeyMissing: "ZEPIRIS_API_KEY não configurada na infraestrutura.",
+      zepirisTenantMissing: "Tenant Photoguard não configurado (ZEPIRIS_TENANT ou campo abaixo).",
+      zepirisPhotoguardTenant: "Tenant Photoguard",
+      zepirisPhotoguardTenantPlaceholder: "slug da empresa na Photoguard",
+      zepirisPhotoguardTenantHint:
+        "Deve ser o identificador da empresa vinculado à ZEPIRIS_API_KEY. Solicite à AgentsLabs se não souber.",
       zepirisFaceDetection: "Detecção facial",
       zepirisBlurCheck: "Verificação de nitidez",
       zepirisSpoofCheck: "Anti-spoofing",
