@@ -23,6 +23,8 @@ export const DEFAULT_ZEPIRIS_TENANT_CONFIG: ZepirisTenantConfig = {
 export type ZepirisRuntimeConfig = {
   globallyEnabled: boolean;
   mlUrl: string;
+  apiKey: string | null;
+  apiKeyConfigured: boolean;
   defaultTimeoutMs: number;
   defaultUnavailablePolicy: ZepirisUnavailablePolicy;
 };
@@ -32,6 +34,7 @@ export function readZepirisRuntimeConfig(): ZepirisRuntimeConfig {
   const mlUrl = (process.env.ZEPIRIS_ML_URL ?? "https://photoguard.agentslabs.cloud")
     .trim()
     .replace(/\/+$/, "");
+  const apiKey = (process.env.ZEPIRIS_API_KEY ?? "").trim() || null;
   const defaultTimeoutMs = Number(process.env.ZEPIRIS_TIMEOUT_MS ?? process.env.ZEPIRIS_TIMEOUT ?? "10000");
   const policyRaw = (process.env.ZEPIRIS_UNAVAILABLE_POLICY ?? "BLOCK").trim().toUpperCase();
   const defaultUnavailablePolicy: ZepirisUnavailablePolicy =
@@ -40,6 +43,8 @@ export function readZepirisRuntimeConfig(): ZepirisRuntimeConfig {
   return {
     globallyEnabled,
     mlUrl,
+    apiKey,
+    apiKeyConfigured: Boolean(apiKey),
     defaultTimeoutMs: Number.isFinite(defaultTimeoutMs) && defaultTimeoutMs > 0 ? defaultTimeoutMs : 10_000,
     defaultUnavailablePolicy,
   };

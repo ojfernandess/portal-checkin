@@ -1188,6 +1188,7 @@ export const ptBR = {
       zepirisOperational: "Operacional",
       zepirisUnavailable: "Indisponível",
       zepirisGloballyDisabled: "ZEPIRIS_ENABLED está desativado na infraestrutura.",
+      zepirisApiKeyMissing: "ZEPIRIS_API_KEY não configurada na infraestrutura.",
       zepirisFaceDetection: "Detecção facial",
       zepirisBlurCheck: "Verificação de nitidez",
       zepirisSpoofCheck: "Anti-spoofing",

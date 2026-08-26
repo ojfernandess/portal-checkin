@@ -309,9 +309,10 @@ export const platformGetTenant = createServerFn({ method: "POST" })
     const inbox = await loadTenantInboxContext(tenantUuid);
     const zepiris = await loadTenantZepirisContext(tenantUuid);
     const runtime = readZepirisRuntimeConfig();
-    const zepirisOperational = runtime.globallyEnabled
-      ? await checkZepirisMlHealth(runtime.mlUrl, 5000)
-      : false;
+    const zepirisOperational =
+      runtime.globallyEnabled &&
+      runtime.apiKeyConfigured &&
+      (await checkZepirisMlHealth(runtime.mlUrl, 5000, runtime.apiKey));
 
     return {
       tenant: {
@@ -366,6 +367,7 @@ export const platformGetTenant = createServerFn({ method: "POST" })
         version: zepiris.version,
         operational: zepirisOperational,
         globallyEnabled: runtime.globallyEnabled,
+        apiKeyConfigured: runtime.apiKeyConfigured,
         mlUrl: runtime.mlUrl,
         config: zepiris.config,
       },
@@ -679,10 +681,13 @@ export const platformGetZepIrisHealth = createServerFn({ method: "GET" })
     const { checkZepirisMlHealth } = await import("@/lib/face-validation/zepiris-http.server");
     const runtime = readZepirisRuntimeConfig();
     if (!runtime.globallyEnabled) {
-      return { globallyEnabled: false, operational: false, mlUrl: runtime.mlUrl };
+      return { globallyEnabled: false, operational: false, apiKeyConfigured: false, mlUrl: runtime.mlUrl };
     }
-    const operational = await checkZepirisMlHealth(runtime.mlUrl, 5000);
-    return { globallyEnabled: true, operational, mlUrl: runtime.mlUrl };
+    if (!runtime.apiKeyConfigured) {
+      return { globallyEnabled: true, operational: false, apiKeyConfigured: false, mlUrl: runtime.mlUrl };
+    }
+    const operational = await checkZepirisMlHealth(runtime.mlUrl, 5000, runtime.apiKey);
+    return { globallyEnabled: true, operational, apiKeyConfigured: true, mlUrl: runtime.mlUrl };
   });
 
 export const platformSaveTenantLogo = createServerFn({ method: "POST" })

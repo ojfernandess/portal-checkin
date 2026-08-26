@@ -1189,6 +1189,7 @@ export const es: MessageTree = {
       zepirisOperational: "Operacional",
       zepirisUnavailable: "No disponible",
       zepirisGloballyDisabled: "ZEPIRIS_ENABLED está desactivado en la infraestructura.",
+      zepirisApiKeyMissing: "ZEPIRIS_API_KEY no está configurada en la infraestructura.",
       zepirisFaceDetection: "Detección facial",
       zepirisBlurCheck: "Verificación de nitidez",
       zepirisSpoofCheck: "Anti-spoofing",

@@ -121,6 +121,7 @@ function PlatformTenantDetailPage() {
 
   const [zepirisOperational, setZepirisOperational] = useState(false);
   const [zepirisGloballyEnabled, setZepirisGloballyEnabled] = useState(false);
+  const [zepirisApiKeyConfigured, setZepirisApiKeyConfigured] = useState(false);
   const [zepirisProvider, setZepirisProvider] = useState("zepiris");
   const [zepirisVersion, setZepirisVersion] = useState("1.0.0");
   const [zepirisFaceDetection, setZepirisFaceDetection] = useState(true);
@@ -185,6 +186,7 @@ function PlatformTenantDetailPage() {
       setInboxModules(detail.inbox.modules);
       setZepirisOperational(detail.zepiris.operational);
       setZepirisGloballyEnabled(detail.zepiris.globallyEnabled);
+      setZepirisApiKeyConfigured(detail.zepiris.apiKeyConfigured);
       setZepirisProvider(detail.zepiris.provider);
       setZepirisVersion(detail.zepiris.version);
       setZepirisFaceDetection(detail.zepiris.config.faceDetection);
@@ -242,6 +244,7 @@ function PlatformTenantDetailPage() {
     setInboxModules(detail.inbox.modules);
     setZepirisOperational(detail.zepiris.operational);
     setZepirisGloballyEnabled(detail.zepiris.globallyEnabled);
+    setZepirisApiKeyConfigured(detail.zepiris.apiKeyConfigured);
     setZepirisProvider(detail.zepiris.provider);
     setZepirisVersion(detail.zepiris.version);
     setZepirisFaceDetection(detail.zepiris.config.faceDetection);
@@ -670,11 +673,13 @@ function PlatformTenantDetailPage() {
                         aria-hidden
                       />
                       <span>
-                        {zepirisGloballyEnabled
-                          ? zepirisOperational
-                            ? t("platform.tenantDetail.zepirisOperational")
-                            : t("platform.tenantDetail.zepirisUnavailable")
-                          : t("platform.tenantDetail.zepirisGloballyDisabled")}
+                        {!zepirisGloballyEnabled
+                          ? t("platform.tenantDetail.zepirisGloballyDisabled")
+                          : !zepirisApiKeyConfigured
+                            ? t("platform.tenantDetail.zepirisApiKeyMissing")
+                            : zepirisOperational
+                              ? t("platform.tenantDetail.zepirisOperational")
+                              : t("platform.tenantDetail.zepirisUnavailable")}
                       </span>
                     </div>
                   </div>

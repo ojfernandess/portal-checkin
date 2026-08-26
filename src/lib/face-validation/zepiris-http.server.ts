@@ -25,10 +25,12 @@ export class ZepirisApiError extends Error {
 export class ZepirisGatewayClient {
   private readonly baseUrl: string;
   private readonly timeoutMs: number;
+  private readonly apiKey: string | null;
 
-  constructor(baseUrl: string, timeoutMs: number) {
+  constructor(baseUrl: string, timeoutMs: number, apiKey: string | null = null) {
     this.baseUrl = baseUrl.replace(/\/+$/, "");
     this.timeoutMs = timeoutMs;
+    this.apiKey = apiKey?.trim() || null;
   }
 
   async healthz(): Promise<{ status: string }> {
@@ -60,6 +62,11 @@ export class ZepirisGatewayClient {
     });
   }
 
+  private authHeaders(): Record<string, string> {
+    if (!this.apiKey) return {};
+    return { Authorization: `Bearer ${this.apiKey}` };
+  }
+
   private async requestJson<T>(path: string, init: RequestInit): Promise<T> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
@@ -70,6 +77,7 @@ export class ZepirisGatewayClient {
         signal: controller.signal,
         headers: {
           Accept: "application/json",
+          ...this.authHeaders(),
           ...(init.headers ?? {}),
         },
       });
@@ -102,9 +110,13 @@ function isNoFaceResponse(status: number, detail: string): boolean {
   return /no face|face not found|face_not|without face|unable to detect|no face detected/.test(lower);
 }
 
-export async function checkZepirisMlHealth(baseUrl: string, timeoutMs = 5000): Promise<boolean> {
+export async function checkZepirisMlHealth(
+  baseUrl: string,
+  timeoutMs = 5000,
+  apiKey: string | null = null,
+): Promise<boolean> {
   try {
-    const client = new ZepirisGatewayClient(baseUrl, timeoutMs);
+    const client = new ZepirisGatewayClient(baseUrl, timeoutMs, apiKey);
     const result = await client.healthz();
     return result.status === "ok";
   } catch {

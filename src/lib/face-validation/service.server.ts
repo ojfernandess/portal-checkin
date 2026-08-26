@@ -54,7 +54,7 @@ export async function loadTenantZepirisContext(tenantId: string): Promise<Tenant
 
   return {
     featureEnabled,
-    active: runtime.globallyEnabled && featureEnabled,
+    active: runtime.globallyEnabled && runtime.apiKeyConfigured && featureEnabled,
     config: mergedConfig,
     provider: ZEPIRIS_PROVIDER,
     version: "1.0.0",
@@ -253,6 +253,7 @@ export async function validateCheckinSelfieForTenant(input: {
         : `validate-${input.tenantId}-${Date.now()}`;
     const service = new ZepirisFaceValidationService({
       apiUrl: runtime.mlUrl,
+      apiKey: runtime.apiKey,
       tenant: tenantKey,
       requestId,
       config: context.config,

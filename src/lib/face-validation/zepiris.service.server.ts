@@ -8,6 +8,7 @@ import { ZepirisApiError, ZepirisGatewayClient } from "@/lib/face-validation/zep
 
 export type ZepirisFaceValidationOptions = {
   apiUrl: string;
+  apiKey: string | null;
   tenant: string;
   requestId: string;
   config: ZepirisTenantConfig;
@@ -20,7 +21,7 @@ export class ZepirisFaceValidationService implements FaceValidationService {
   private readonly requestId: string;
 
   constructor(options: ZepirisFaceValidationOptions) {
-    this.client = new ZepirisGatewayClient(options.apiUrl, options.config.timeoutMs);
+    this.client = new ZepirisGatewayClient(options.apiUrl, options.config.timeoutMs, options.apiKey);
     this.config = options.config;
     this.tenant = options.tenant;
     this.requestId = options.requestId;

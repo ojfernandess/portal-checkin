@@ -39,6 +39,7 @@ services:
       ADMIN_PANEL_ORIGIN: ${ADMIN_PANEL_ORIGIN:-https://checkin.techospitality.com}
       ZEPIRIS_ENABLED: ${ZEPIRIS_ENABLED:-false}
       ZEPIRIS_ML_URL: ${ZEPIRIS_ML_URL:-https://photoguard.agentslabs.cloud}
+      ZEPIRIS_API_KEY: ${ZEPIRIS_API_KEY:-}
       ZEPIRIS_TIMEOUT_MS: ${ZEPIRIS_TIMEOUT_MS:-10000}
       ZEPIRIS_UNAVAILABLE_POLICY: ${ZEPIRIS_UNAVAILABLE_POLICY:-BLOCK}
     restart: unless-stopped
