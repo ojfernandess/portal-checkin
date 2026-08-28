@@ -536,6 +536,8 @@ function faceValidationMessageKey(outcome: SelfieValidationOutcome) {
       return "checkin.faceValidation.nsfw" as const;
     case "INVALID_IMAGE":
       return "checkin.faceValidation.invalidImage" as const;
+    case "INVALID_API_KEY":
+      return "checkin.faceValidation.invalidApiKey" as const;
     default:
       return "checkin.faceValidation.unavailable" as const;
   }

@@ -82,6 +82,8 @@ export function reasonToMessageKey(reason: FaceValidationReasonCode | undefined)
       return "checkin.faceValidation.nsfw";
     case "SERVICE_UNAVAILABLE":
       return "checkin.faceValidation.unavailable";
+    case "INVALID_API_KEY":
+      return "checkin.faceValidation.invalidApiKey";
     case "MAX_ATTEMPTS":
       return "checkin.faceValidation.maxAttempts";
     case "INVALID_IMAGE":
@@ -96,6 +98,16 @@ function averageScore(iqa: ZepirisIqaResponse, faceDetected: boolean): number {
   if (faceDetected) parts.push(1);
   const sum = parts.reduce((acc, value) => acc + value, 0);
   return Math.round((sum / parts.length) * 1000) / 1000;
+}
+
+export function buildInvalidApiKeyResult(): FaceValidationResult {
+  return {
+    status: "ERROR",
+    faceDetected: false,
+    reasons: ["INVALID_API_KEY"],
+    userMessageKey: "checkin.faceValidation.invalidApiKey",
+    technicalMessage: "Photoguard rejected ZEPIRIS_API_KEY (401 invalid_api_key)",
+  };
 }
 
 export function buildServiceUnavailableResult(policy: "BLOCK" | "FALLBACK"): FaceValidationResult {

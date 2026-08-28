@@ -495,17 +495,21 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
     return settings;
   }
 
-  async function validateSelfiePhoto(photoBase64: string): Promise<SelfieValidationOutcome> {
+  async function validateSelfiePhoto(
+    photoBase64: string,
+    companionGuestId?: string,
+  ): Promise<SelfieValidationOutcome> {
     const establishmentId = String(reservation?.establishmentId ?? "").trim();
     if (!establishmentId) {
       return { status: "ERROR", reason: "SERVICE_UNAVAILABLE" };
     }
+    const guestId = companionGuestId?.trim() || guest.documentNumber?.trim();
     const result = await validateSelfieFn({
       data: {
         establishmentId,
         imageData: photoBase64,
         ...(checkinSessionId ? { checkinSessionId } : {}),
-        ...(guest.documentNumber ? { guestId: String(guest.documentNumber) } : {}),
+        ...(guestId ? { guestId: String(guestId) } : {}),
       },
     });
     return {
@@ -1584,6 +1588,8 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
               mainGuest={guest}
               dependents={dependents}
               inboxEnabled={establishmentSettings.inboxEnabled}
+              faceValidationEnabled={faceValidationEnabled}
+              onValidateSelfie={validateSelfiePhoto}
               {...exclusiveCameraProps}
               onChange={setDependents}
               onBack={() => setSubStep("form")}
@@ -1751,6 +1757,8 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
                         lockedCount={postCompanionsLockedCount}
                         saving={postCompanionsSaving}
                         inboxEnabled={establishmentSettings.inboxEnabled}
+                        faceValidationEnabled={faceValidationEnabled}
+                        onValidateSelfie={validateSelfiePhoto}
                         {...exclusiveCameraProps}
                         onChange={setPostCompanionsDraft}
                         onBack={resetPostCompanionsEditor}

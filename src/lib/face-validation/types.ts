@@ -8,6 +8,7 @@ export type FaceValidationReasonCode =
   | "NSFW"
   | "INVALID_IMAGE"
   | "SERVICE_UNAVAILABLE"
+  | "INVALID_API_KEY"
   | "MAX_ATTEMPTS";
 
 export type FaceValidationResult = {

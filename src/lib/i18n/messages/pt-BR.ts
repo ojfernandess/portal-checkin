@@ -356,6 +356,8 @@ export const ptBR = {
       spoof: "Não foi possível validar sua selfie. Tente novamente em um local bem iluminado.",
       nsfw: "Não foi possível usar esta imagem. Envie uma selfie adequada para o check-in.",
       unavailable: "Não foi possível validar sua foto no momento. Tente novamente em alguns instantes.",
+      invalidApiKey:
+        "A validação de selfies está indisponível no momento (configuração Photoguard). Tente novamente mais tarde ou fale com a recepção.",
       invalidImage: "Formato de imagem inválido. Use JPEG ou PNG e tente novamente.",
       maxAttempts: "Não foi possível validar sua selfie. Entre em contato com o atendimento.",
     },
@@ -396,7 +398,7 @@ export const ptBR = {
       alreadyRegistered: "Já cadastrado",
       inboxPhotoTitle: "Foto para portaria (opcional)",
       inboxPhotoHint:
-        "Selfie do acompanhante para liberação de acesso na portaria (enviada somente à Inbox, não ao PMS). Use uma foto nítida, bem iluminada e com o rosto visível.",
+        "Selfie do acompanhante para liberação de acesso na portaria (enviada somente à Inbox, não ao PMS). Use uma foto nítida, bem iluminada e com o rosto visível. Ao confirmar, a selfie passará pela mesma verificação de segurança do hóspede principal.",
       inboxPhotoAdd: "Adicionar foto",
       inboxPhotoChange: "Alterar foto",
     },

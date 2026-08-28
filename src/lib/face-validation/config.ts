@@ -1,3 +1,8 @@
+import {
+  normalizeZepirisApiKey,
+  readZepirisEnv,
+} from "@/lib/env.server";
+
 export type ZepirisUnavailablePolicy = "BLOCK" | "FALLBACK";
 
 export type ZepirisTenantConfig = {
@@ -34,14 +39,17 @@ export type ZepirisRuntimeConfig = {
 };
 
 export function readZepirisRuntimeConfig(): ZepirisRuntimeConfig {
-  const globallyEnabled = process.env.ZEPIRIS_ENABLED === "true" || process.env.ZEPIRIS_ENABLED === "1";
-  const mlUrl = (process.env.ZEPIRIS_ML_URL ?? "https://photoguard.agentslabs.cloud")
+  const globallyEnabled =
+    readZepirisEnv("ZEPIRIS_ENABLED") === "true" || readZepirisEnv("ZEPIRIS_ENABLED") === "1";
+  const mlUrl = (readZepirisEnv("ZEPIRIS_ML_URL") ?? "https://photoguard.agentslabs.cloud")
     .trim()
     .replace(/\/+$/, "");
-  const apiKey = (process.env.ZEPIRIS_API_KEY ?? "").trim() || null;
-  const defaultTenant = (process.env.ZEPIRIS_TENANT ?? "").trim() || null;
-  const defaultTimeoutMs = Number(process.env.ZEPIRIS_TIMEOUT_MS ?? process.env.ZEPIRIS_TIMEOUT ?? "10000");
-  const policyRaw = (process.env.ZEPIRIS_UNAVAILABLE_POLICY ?? "BLOCK").trim().toUpperCase();
+  const apiKey = normalizeZepirisApiKey(readZepirisEnv("ZEPIRIS_API_KEY"));
+  const defaultTenant = readZepirisEnv("ZEPIRIS_TENANT")?.trim() || null;
+  const defaultTimeoutMs = Number(
+    readZepirisEnv("ZEPIRIS_TIMEOUT_MS") ?? readZepirisEnv("ZEPIRIS_TIMEOUT") ?? "10000",
+  );
+  const policyRaw = (readZepirisEnv("ZEPIRIS_UNAVAILABLE_POLICY") ?? "BLOCK").trim().toUpperCase();
   const defaultUnavailablePolicy: ZepirisUnavailablePolicy =
     policyRaw === "FALLBACK" ? "FALLBACK" : "BLOCK";
 

@@ -8,6 +8,7 @@ import {
 } from "@/lib/face-validation/config";
 import {
   buildInvalidImageResult,
+  buildInvalidApiKeyResult,
   buildMaxAttemptsResult,
   buildServiceUnavailableResult,
 } from "@/lib/face-validation/mapper";
@@ -274,8 +275,13 @@ export async function validateCheckinSelfieForTenant(input: {
     authConfigError = /zepiris_http_401|zepiris_http_403|invalid_api_key|tenant_does_not_match/.test(
       technicalMessage,
     );
-    result = buildServiceUnavailableResult(context.config.unavailablePolicy);
-    result.technicalMessage = technicalMessage;
+    if (/invalid_api_key/i.test(technicalMessage)) {
+      result = buildInvalidApiKeyResult();
+      result.technicalMessage = technicalMessage;
+    } else {
+      result = buildServiceUnavailableResult(context.config.unavailablePolicy);
+      result.technicalMessage = technicalMessage;
+    }
     if (result.fallbackUsed) {
       const durationMs = Date.now() - started;
       logFaceValidationEvent({

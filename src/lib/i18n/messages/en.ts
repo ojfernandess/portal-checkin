@@ -357,6 +357,8 @@ export const en: MessageTree = {
       spoof: "We couldn't validate your selfie. Try again in a well-lit place.",
       nsfw: "This image can't be used. Please send an appropriate selfie for check-in.",
       unavailable: "We couldn't validate your photo right now. Please try again in a moment.",
+      invalidApiKey:
+        "Selfie validation is temporarily unavailable (Photoguard configuration). Please try again later or contact the front desk.",
       invalidImage: "Invalid image format. Use JPEG or PNG and try again.",
       maxAttempts: "We couldn't validate your selfie. Please contact the front desk.",
     },
@@ -397,7 +399,7 @@ export const en: MessageTree = {
       alreadyRegistered: "Already registered",
       inboxPhotoTitle: "Photo for front desk (optional)",
       inboxPhotoHint:
-        "Companion selfie for front-desk access (sent to Inbox only, not to the PMS). Use a clear, well-lit photo with the face visible.",
+        "Companion selfie for front-desk access (sent to Inbox only, not to the PMS). Use a clear, well-lit photo with the face visible. When you confirm, it goes through the same security check as the main guest.",
       inboxPhotoAdd: "Add photo",
       inboxPhotoChange: "Change photo",
     },

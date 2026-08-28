@@ -358,6 +358,8 @@ export const es: MessageTree = {
       spoof: "No fue posible validar su selfie. Intente de nuevo en un lugar bien iluminado.",
       nsfw: "No se puede usar esta imagen. Envíe una selfie adecuada para el check-in.",
       unavailable: "No fue posible validar su foto en este momento. Intente de nuevo en unos instantes.",
+      invalidApiKey:
+        "La validación de selfies no está disponible en este momento (configuración Photoguard). Intente más tarde o contacte la recepción.",
       invalidImage: "Formato de imagen inválido. Use JPEG o PNG e intente de nuevo.",
       maxAttempts: "No fue posible validar su selfie. Contacte con la recepción.",
     },
@@ -398,7 +400,7 @@ export const es: MessageTree = {
       alreadyRegistered: "Ya registrado",
       inboxPhotoTitle: "Foto para portinería (opcional)",
       inboxPhotoHint:
-        "Selfie del acompañante para acceso en la portinería (solo se envía a Inbox, no al PMS). Use una foto nítida, bien iluminada y con el rostro visible.",
+        "Selfie del acompañante para acceso en la portinería (solo se envía a Inbox, no al PMS). Use una foto nítida, bien iluminada y con el rostro visible. Al confirmar, pasará por la misma verificación de seguridad del huésped principal.",
       inboxPhotoAdd: "Agregar foto",
       inboxPhotoChange: "Cambiar foto",
     },

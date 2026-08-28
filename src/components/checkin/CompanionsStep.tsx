@@ -15,7 +15,7 @@ import {
 import { BirthDateInput } from "@/components/checkin/BirthDateInput";
 import { SearchableSelect } from "@/components/checkin/SearchableSelect";
 import { PhoneWithDialCodeInput } from "@/components/checkin/PhoneWithDialCodeInput";
-import { SelfieCapture } from "@/components/checkin/SelfieCapture";
+import { SelfieCapture, type SelfieValidationOutcome } from "@/components/checkin/SelfieCapture";
 import { getEmbraturReference } from "@/lib/api/checkin.functions";
 import type { Dependent, MainGuest } from "@/lib/api/types";
 import { normalizeEmbratur } from "@/lib/embratur";
@@ -47,6 +47,8 @@ type Props = {
   saving?: boolean;
   /** Portaria Inbox: permite selfie opcional por acompanhante. */
   inboxEnabled?: boolean;
+  faceValidationEnabled?: boolean;
+  onValidateSelfie?: (photoBase64: string, guestId?: string) => Promise<SelfieValidationOutcome>;
 } & Partial<ExclusiveCameraProps>;
 
 const EMPTY: Dependent = {
@@ -122,6 +124,8 @@ export function CompanionsStep({
   lockedCount = 0,
   saving = false,
   inboxEnabled = false,
+  faceValidationEnabled = false,
+  onValidateSelfie,
   captureId: _captureId,
   activeCaptureId,
   onRequestCapture,
@@ -143,6 +147,13 @@ export function CompanionsStep({
   const [editingPhotoIndex, setEditingPhotoIndex] = useState<number | null>(null);
 
   const showInboxPhotos = inboxEnabled && max > 0;
+
+  function validateCompanionPhoto(photoBase64: string, guestId?: string) {
+    if (!faceValidationEnabled || !onValidateSelfie) {
+      return Promise.resolve({ status: "APPROVED" as const });
+    }
+    return onValidateSelfie(photoBase64, guestId?.trim() || undefined);
+  }
 
   const isForeignDocument = draft.documentType === "PASSPORT";
 
@@ -461,6 +472,9 @@ export function CompanionsStep({
                       compact
                       title={t("checkin.photos.selfie")}
                       value={dependent.profilePhotoUrl ?? null}
+                      photoGuidance="new"
+                      validationEnabled={faceValidationEnabled}
+                      onValidate={(photo) => validateCompanionPhoto(photo, dependent.documentNumber)}
                       captureId={`companion-photo-${index}`}
                       activeCaptureId={activeCaptureId}
                       onRequestCapture={onRequestCapture}
@@ -639,6 +653,9 @@ export function CompanionsStep({
                 compact
                 title={t("checkin.photos.selfie")}
                 value={draft.profilePhotoUrl ?? null}
+                photoGuidance="new"
+                validationEnabled={faceValidationEnabled}
+                onValidate={(photo) => validateCompanionPhoto(photo, draft.documentNumber)}
                 captureId="companion-draft-photo"
                 activeCaptureId={activeCaptureId}
                 onRequestCapture={onRequestCapture}
