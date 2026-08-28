@@ -324,6 +324,12 @@ export const es: MessageTree = {
       keepRegistered: "Mantener foto registrada",
       changePhoto: "Cambiar foto",
       unavailable: "Foto no disponible",
+      registeredQualityNotice:
+        "Verifique que la selfie registrada sea legible y de buena calidad — se usará para el acceso en la portinería.",
+      newSelfieGuidanceTitle: "Selfie para check-in",
+      newSelfieGuidanceBody:
+        "Envíe una selfie nítida y bien iluminada, con el rostro visible. La foto pasará por una verificación de seguridad antes de liberar el acceso en la portinería.",
+      newSelfieGuidanceConfirm: "Entendido",
     },
     camera: {
       accessError: "No pudimos acceder a la cámara. Envíe un archivo desde su dispositivo.",
@@ -390,6 +396,11 @@ export const es: MessageTree = {
         "No encontramos los datos completos del check-in anterior. Contacte la recepción.",
       postBlockedCancelled: "Esta reserva no permite registrar acompañantes en este momento.",
       alreadyRegistered: "Ya registrado",
+      inboxPhotoTitle: "Foto para portinería (opcional)",
+      inboxPhotoHint:
+        "Selfie del acompañante para acceso en la portinería (solo se envía a Inbox, no al PMS). Use una foto nítida, bien iluminada y con el rostro visible.",
+      inboxPhotoAdd: "Agregar foto",
+      inboxPhotoChange: "Cambiar foto",
     },
     errors: {
       intro: "Corrija lo siguiente antes de continuar:",

@@ -221,6 +221,11 @@ function parseDependents(raw: unknown): Dependent[] | undefined {
         number: row.number != null ? String(row.number) : undefined,
         neighborhood: row.neighborhood != null ? String(row.neighborhood) : undefined,
         fnrhId: row.fnrhId != null ? String(row.fnrhId) : null,
+        profilePhotoUrl: str(row.profilePhotoUrl),
+        profilePhotoId:
+          row.profilePhotoId != null
+            ? (typeof row.profilePhotoId === "number" ? row.profilePhotoId : String(row.profilePhotoId))
+            : undefined,
       } satisfies Dependent;
     })
     .filter(Boolean) as Dependent[];

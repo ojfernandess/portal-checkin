@@ -275,6 +275,29 @@ export function prepareDependentsForCheckin(
     .filter(Boolean) as Record<string, unknown>[];
 }
 
+/** Preserva foto do acompanhante apenas para Inbox (data URL). Remove refs de mídia do PMS. */
+export function sanitizeDependentsForStorage(dependents: Dependent[]): Dependent[] {
+  return dependents.map((dependent) => {
+    const next: Dependent = { ...dependent };
+    delete next.profilePhotoId;
+
+    const photo = next.profilePhotoUrl?.trim();
+    if (!photo) {
+      delete next.profilePhotoUrl;
+      return next;
+    }
+
+    if (photo.startsWith("data:")) {
+      next.profilePhotoUrl = photo;
+      return next;
+    }
+
+    // URLs de mídia do PMS não devem ser usadas para acompanhantes — só data URL local/Inbox.
+    delete next.profilePhotoUrl;
+    return next;
+  });
+}
+
 function parseMediaUpload(payload: unknown, type: "profile" | "document"): MediaUploadResult {
   const row = payload as Record<string, unknown>;
   const nestedRaw = row["media"] ?? row["result"];
@@ -1200,6 +1223,16 @@ export const submitCheckin = createServerFn({ method: "POST" })
             ),
       );
     }
+
+    const storedDependents = sanitizeDependentsForStorage(dependentsInput);
+
+    if (dependentsInput.length > 0 && preparedDependents.length < dependentsInput.length) {
+      console.warn(
+        "[checkin] Alguns acompanhantes foram omitidos do payload PMS:",
+        dependentsInput.length - preparedDependents.length,
+      );
+    }
+
     const body: Record<string, unknown> = {
       mode: "digital",
       fnrhId: null,
@@ -1225,7 +1258,7 @@ export const submitCheckin = createServerFn({ method: "POST" })
       ...(data.establishmentId ? { establishmentId: data.establishmentId } : {}),
       ...(data.establishmentName ? { establishmentName: data.establishmentName } : {}),
       mainGuest,
-      dependents: data.dependents as Dependent[],
+      dependents: storedDependents,
       embratur: data.embratur as unknown as EmbraturForm,
       reservationSnapshot: (data.reservationSnapshot as Reservation | undefined) ?? null,
       ...(data.extraFields ? { extraFields: data.extraFields } : {}),
@@ -1247,7 +1280,7 @@ export const submitCheckin = createServerFn({ method: "POST" })
         localizer,
         reservationId: data.reservationId,
         mainGuest,
-        dependents: data.dependents as Dependent[],
+        dependents: storedDependents,
         reservationSnapshot: (data.reservationSnapshot as Reservation | undefined) ?? null,
         checkinRecordId,
       });

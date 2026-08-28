@@ -1,6 +1,15 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Camera, Check, Loader2, Upload, X } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n/context";
 import { cn } from "@/lib/utils";
@@ -35,6 +44,8 @@ type Props = {
   compact?: boolean;
   /** Quando definido, valida a selfie via backend antes de confirmar */
   validationEnabled?: boolean;
+  /** Exibe aviso minimalista (hóspede já cadastrado) ou dialog antes de capturar (hóspede novo). */
+  photoGuidance?: "registered" | "new";
   onValidate?: (photoBase64: string) => Promise<SelfieValidationOutcome>;
 } & Partial<ExclusiveCameraProps>;
 
@@ -46,6 +57,7 @@ export function SelfieCapture({
   onConfirm,
   title,
   compact = false,
+  photoGuidance,
   validationEnabled = false,
   onValidate,
   captureId,
@@ -74,6 +86,9 @@ export function SelfieCapture({
   const [validating, setValidating] = useState(false);
   const [validationHint, setValidationHint] = useState<string | null>(null);
   const [validationSuccess, setValidationSuccess] = useState(false);
+  const [guidanceOpen, setGuidanceOpen] = useState(false);
+  const [guidanceAcknowledged, setGuidanceAcknowledged] = useState(false);
+  const [pendingCaptureAction, setPendingCaptureAction] = useState<"camera" | "file" | null>(null);
 
   const stopCamera = useCallback(() => {
     unregisterActiveDeviceStream(streamRef.current);
@@ -126,6 +141,28 @@ export function SelfieCapture({
     requestCapture();
     setOpeningCamera(true);
   }, [requestCapture, stopCamera]);
+
+  function runPendingCaptureAction(action: "camera" | "file") {
+    if (action === "camera") beginCamera();
+    else fileRef.current?.click();
+  }
+
+  function requestPhotoCapture(action: "camera" | "file") {
+    if (photoGuidance === "new" && !guidanceAcknowledged) {
+      setPendingCaptureAction(action);
+      setGuidanceOpen(true);
+      return;
+    }
+    runPendingCaptureAction(action);
+  }
+
+  function confirmPhotoGuidance() {
+    setGuidanceAcknowledged(true);
+    setGuidanceOpen(false);
+    const action = pendingCaptureAction;
+    setPendingCaptureAction(null);
+    if (action) runPendingCaptureAction(action);
+  }
 
   useEffect(() => {
     if (!openingCamera || !videoReady) return;
@@ -244,12 +281,12 @@ export function SelfieCapture({
     onCapture("");
     setValidationHint(null);
     setValidationSuccess(false);
-    beginCamera();
+    requestPhotoCapture("camera");
   }
 
   function replaceConfirmed() {
     onCapture("");
-    beginCamera();
+    requestPhotoCapture("camera");
   }
 
   function pickFile(file: File | undefined) {
@@ -354,6 +391,10 @@ export function SelfieCapture({
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</p>
         ) : null}
 
+        {photoGuidance === "registered" ? (
+          <p className="text-xs leading-relaxed text-muted-foreground">{t("checkin.photos.registeredQualityNotice")}</p>
+        ) : null}
+
         <div className={viewportClass}>
           <canvas ref={canvasRef} className="hidden" aria-hidden />
 
@@ -408,7 +449,7 @@ export function SelfieCapture({
                   type="button"
                   variant="outline"
                   className="tap-safe w-full"
-                  onClick={() => fileRef.current?.click()}
+                  onClick={() => requestPhotoCapture("file")}
                 >
                   <Upload className="size-4 shrink-0" aria-hidden />
                   {t("checkin.camera.uploadPhoto")}
@@ -432,7 +473,7 @@ export function SelfieCapture({
               </>
             ) : (
               <>
-                <Button type="button" className="tap-safe w-full" onClick={beginCamera}>
+                <Button type="button" className="tap-safe w-full" onClick={() => requestPhotoCapture("camera")}>
                   <Camera className="size-4 shrink-0" aria-hidden />
                   {t("checkin.camera.openCamera")}
                 </Button>
@@ -440,7 +481,7 @@ export function SelfieCapture({
                   type="button"
                   variant="outline"
                   className="tap-safe w-full"
-                  onClick={() => fileRef.current?.click()}
+                  onClick={() => requestPhotoCapture("file")}
                 >
                   <Upload className="size-4 shrink-0" aria-hidden />
                   {t("checkin.camera.uploadPhoto")}
@@ -462,6 +503,20 @@ export function SelfieCapture({
           }}
         />
       </div>
+
+      <AlertDialog open={guidanceOpen} onOpenChange={setGuidanceOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("checkin.photos.newSelfieGuidanceTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("checkin.photos.newSelfieGuidanceBody")}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction className="tap-safe" onClick={confirmPhotoGuidance}>
+              {t("checkin.photos.newSelfieGuidanceConfirm")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

@@ -15,9 +15,11 @@ import {
 import { BirthDateInput } from "@/components/checkin/BirthDateInput";
 import { SearchableSelect } from "@/components/checkin/SearchableSelect";
 import { PhoneWithDialCodeInput } from "@/components/checkin/PhoneWithDialCodeInput";
+import { SelfieCapture } from "@/components/checkin/SelfieCapture";
 import { getEmbraturReference } from "@/lib/api/checkin.functions";
 import type { Dependent, MainGuest } from "@/lib/api/types";
 import { normalizeEmbratur } from "@/lib/embratur";
+import type { ExclusiveCameraProps } from "@/lib/camera-utils";
 import {
   BRAZIL_PMS_COUNTRY,
   matchPmsCountryValue,
@@ -36,14 +38,16 @@ type Props = {
   mainGuest: MainGuest;
   dependents: Dependent[];
   onChange: (dependents: Dependent[]) => void;
-  onContinue: () => void;
+  onContinue: (dependents?: Dependent[]) => void;
   onBack: () => void;
   /** Pós-check-in: lista existente somente leitura; botão salva em vez de continuar. */
   mode?: "flow" | "postCheckin";
   /** Quantidade de acompanhantes já gravados (somente leitura no modo postCheckin). */
   lockedCount?: number;
   saving?: boolean;
-};
+  /** Portaria Inbox: permite selfie opcional por acompanhante. */
+  inboxEnabled?: boolean;
+} & Partial<ExclusiveCameraProps>;
 
 const EMPTY: Dependent = {
   dependentId: null,
@@ -117,6 +121,11 @@ export function CompanionsStep({
   mode = "flow",
   lockedCount = 0,
   saving = false,
+  inboxEnabled = false,
+  captureId: _captureId,
+  activeCaptureId,
+  onRequestCapture,
+  onReleaseCapture,
 }: Props) {
   const { t } = useI18n();
   const loadReference = useServerFn(getEmbraturReference);
@@ -131,6 +140,9 @@ export function CompanionsStep({
     ReturnType<typeof toPmsCountryOptions>
   >([]);
   const [countriesLoading, setCountriesLoading] = useState(true);
+  const [editingPhotoIndex, setEditingPhotoIndex] = useState<number | null>(null);
+
+  const showInboxPhotos = inboxEnabled && max > 0;
 
   const isForeignDocument = draft.documentType === "PASSPORT";
 
@@ -259,12 +271,21 @@ export function CompanionsStep({
     return issues.length === 0;
   }
 
-  function add() {
-    if (!validate()) return;
+  function draftHasMinimumData(): boolean {
+    return Boolean(
+      draft.name?.trim() ||
+        draft.email?.trim() ||
+        draft.documentNumber?.trim() ||
+        draft.profilePhotoUrl?.trim(),
+    );
+  }
+
+  function buildCompanionFromDraft(): Dependent | null {
+    if (!validate()) return null;
 
     const address = useMainGuestAddress ? addressFromMainGuest(mainGuest) : draft;
     const documentType = draft.documentType;
-    const companion: Dependent = {
+    return {
       dependentId: null,
       name: draft.name.trim(),
       email: draft.email?.trim(),
@@ -292,12 +313,49 @@ export function CompanionsStep({
       state: address.state?.trim(),
       country: address.country?.trim() || BRAZIL_PMS_COUNTRY,
       fnrhId: null,
+      ...(draft.profilePhotoUrl?.trim() ? { profilePhotoUrl: draft.profilePhotoUrl.trim() } : {}),
     };
+  }
 
-    onChange([...dependents, companion]);
+  function resetDraftForm() {
     setDraft(EMPTY);
     setUseMainGuestAddress(false);
     setErrors({});
+    setEditingPhotoIndex(null);
+  }
+
+  function add() {
+    const companion = buildCompanionFromDraft();
+    if (!companion) return;
+
+    onChange([...dependents, companion]);
+    resetDraftForm();
+  }
+
+  function handleContinue() {
+    let nextDependents = dependents;
+    if (adding && dependents.length < max && draftHasMinimumData()) {
+      const companion = buildCompanionFromDraft();
+      if (!companion) return;
+      nextDependents = [...dependents, companion];
+      onChange(nextDependents);
+      resetDraftForm();
+    }
+    onContinue(nextDependents);
+  }
+
+  function updateDependentPhoto(index: number, photoUrl: string) {
+    onChange(
+      dependents.map((dependent, i) =>
+        i === index
+          ? {
+              ...dependent,
+              profilePhotoUrl: photoUrl || undefined,
+              ...(photoUrl ? {} : { profilePhotoId: undefined }),
+            }
+          : dependent,
+      ),
+    );
   }
 
   function field(
@@ -368,7 +426,10 @@ export function CompanionsStep({
                     variant="ghost"
                     size="icon"
                     aria-label={t("checkin.companions.removeAria", { name: dependent.name })}
-                    onClick={() => onChange(dependents.filter((_, i) => i !== index))}
+                    onClick={() => {
+                      onChange(dependents.filter((_, i) => i !== index));
+                      if (editingPhotoIndex === index) setEditingPhotoIndex(null);
+                    }}
                   >
                     <Trash2 className="size-4 text-destructive" aria-hidden />
                   </Button>
@@ -378,6 +439,81 @@ export function CompanionsStep({
           })}
         </ul>
       )}
+
+      {showInboxPhotos && dependents.length > 0 ? (
+        <section className="space-y-3">
+          <header className="space-y-1">
+            <h3 className="font-display text-lg">{t("checkin.companions.inboxPhotoTitle")}</h3>
+            <p className="text-sm text-muted-foreground">{t("checkin.companions.inboxPhotoHint")}</p>
+          </header>
+          <ul className="space-y-3">
+            {dependents.map((dependent, index) => {
+              const locked = index < readOnlyCount;
+              const editingPhoto = editingPhotoIndex === index;
+              return (
+                <li
+                  key={`photo-${dependent.documentNumber}-${index}`}
+                  className="rounded-xl border border-border bg-card p-4"
+                >
+                  <p className="mb-3 text-sm font-medium">{dependent.name}</p>
+                  {locked ? null : editingPhoto ? (
+                    <SelfieCapture
+                      compact
+                      title={t("checkin.photos.selfie")}
+                      value={dependent.profilePhotoUrl ?? null}
+                      captureId={`companion-photo-${index}`}
+                      activeCaptureId={activeCaptureId}
+                      onRequestCapture={onRequestCapture}
+                      onReleaseCapture={onReleaseCapture}
+                      onCapture={(value) => updateDependentPhoto(index, value)}
+                    />
+                  ) : dependent.profilePhotoUrl ? (
+                    <div className="space-y-2">
+                      <div className="relative aspect-square max-w-[140px] overflow-hidden rounded-xl border border-border bg-muted">
+                        <img
+                          src={dependent.profilePhotoUrl}
+                          alt={dependent.name}
+                          className="size-full object-cover"
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="tap-safe"
+                        onClick={() => setEditingPhotoIndex(index)}
+                      >
+                        {t("checkin.companions.inboxPhotoChange")}
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="tap-safe"
+                      onClick={() => setEditingPhotoIndex(index)}
+                    >
+                      {t("checkin.companions.inboxPhotoAdd")}
+                    </Button>
+                  )}
+                  {editingPhoto ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="tap-safe mt-2 h-8 text-xs"
+                      onClick={() => setEditingPhotoIndex(null)}
+                    >
+                      {t("common.back")}
+                    </Button>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      ) : null}
 
       {adding && dependents.length < max && (
         <div className="space-y-5 rounded-2xl border border-border bg-card p-5 shadow-card">
@@ -493,6 +629,31 @@ export function CompanionsStep({
             {field("profession", `${t("common.profession")} *`)}
           </section>
 
+          {showInboxPhotos ? (
+            <section className="space-y-3">
+              <header className="space-y-1">
+                <h3 className="font-display text-lg">{t("checkin.companions.inboxPhotoTitle")}</h3>
+                <p className="text-sm text-muted-foreground">{t("checkin.companions.inboxPhotoHint")}</p>
+              </header>
+              <SelfieCapture
+                compact
+                title={t("checkin.photos.selfie")}
+                value={draft.profilePhotoUrl ?? null}
+                captureId="companion-draft-photo"
+                activeCaptureId={activeCaptureId}
+                onRequestCapture={onRequestCapture}
+                onReleaseCapture={onReleaseCapture}
+                onCapture={(value) =>
+                  setDraft((current) => ({
+                    ...current,
+                    profilePhotoUrl: value || undefined,
+                    ...(value ? {} : { profilePhotoId: undefined }),
+                  }))
+                }
+              />
+            </section>
+          ) : null}
+
           <section className="space-y-4">
             <h3 className="font-display text-lg">{t("guest.addressSection")}</h3>
             <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/30 p-3">
@@ -578,7 +739,7 @@ export function CompanionsStep({
           type="button"
           className="tap-safe flex-1"
           disabled={saving || (isPostCheckin && dependents.length <= readOnlyCount)}
-          onClick={onContinue}
+          onClick={handleContinue}
         >
           {saving ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
           {isPostCheckin

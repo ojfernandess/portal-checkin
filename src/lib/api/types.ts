@@ -147,6 +147,9 @@ export type Dependent = {
   number?: string;
   neighborhood?: string;
   fnrhId: string | null;
+  /** Selfie opcional — enviada somente à Inbox (portaria), nunca ao PMS. */
+  profilePhotoUrl?: string;
+  profilePhotoId?: string | number;
 };
 
 export type EmbraturField = { value: string; label: string };

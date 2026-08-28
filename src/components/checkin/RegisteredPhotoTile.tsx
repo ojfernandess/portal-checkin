@@ -97,6 +97,7 @@ export function RegisteredPhotoTile({
             title={title}
             value={editValue}
             onCapture={onCapture}
+            photoGuidance="registered"
             validationEnabled={validationEnabled}
             onValidate={onValidateSelfie}
             captureId={captureId}
@@ -134,6 +135,11 @@ export function RegisteredPhotoTile({
   return (
     <div className="space-y-2">
       <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</p>
+      {photoType === "profile" && facingMode === "user" ? (
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          {t("checkin.photos.registeredQualityNotice")}
+        </p>
+      ) : null}
       <div
         className={cn(
           "relative aspect-square overflow-hidden rounded-xl border border-border bg-muted",

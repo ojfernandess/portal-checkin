@@ -938,9 +938,11 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
     setLoading(true);
     let checkinResult: Record<string, unknown> | null = null;
     let mainGuest = guest;
+    const submittedDependents = dependents;
     try {
       mainGuest = await resolveGuestForSubmit(guest);
       setGuest(mainGuest);
+      setDependents(submittedDependents);
       setSelfie(mainGuest.profilePhotoUrl ?? null);
       setDocPhoto(mainGuest.documentPhotoUrl ?? null);
 
@@ -975,7 +977,7 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
           },
           photosReplaced: replacementFlags,
           embratur: embratur as unknown as Record<string, unknown>,
-          dependents: dependents as unknown as Record<string, unknown>[],
+          dependents: submittedDependents as unknown as Record<string, unknown>[],
           termsAcceptedAt: termsAcceptedAt ?? undefined,
           termsVersion: termsVersion || undefined,
           ...(checkinSessionId ? { checkinSessionId } : {}),
@@ -1011,7 +1013,7 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
           preserveReservationDetails(prior ?? refreshed, {
             ...merged,
             mainGuest: mergeGuests(mainGuest, merged.mainGuest),
-            dependents: merged.dependents?.length ? merged.dependents : dependents,
+            dependents: merged.dependents?.length ? merged.dependents : submittedDependents,
           }),
         );
         await loadEstablishmentConfig(merged);
@@ -1133,16 +1135,17 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
     }
   }
 
-  async function savePostCompanions() {
+  async function savePostCompanions(companionsOverride?: Dependent[]) {
     if (!reservation || !postCompanionsContext?.embratur) return;
-    if (postCompanionsDraft.length <= postCompanionsLockedCount) {
+    const companionsToSave = companionsOverride ?? postCompanionsDraft;
+    if (companionsToSave.length <= postCompanionsLockedCount) {
       toast.error(t("checkin.companions.postNeedNew"));
       return;
     }
 
     const labels = buildCheckinErrorLabels(t);
     const mainGuest = postCompanionsContext.mainGuest;
-    const issues = validateDependents(postCompanionsDraft, mainGuest);
+    const issues = validateDependents(companionsToSave, mainGuest);
     if (issues.length > 0) {
       showCheckinError(formatCheckinIssues(issues, labels));
       return;
@@ -1159,7 +1162,7 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
           reservationSnapshot: reservation,
           mainGuest: mainGuest as Record<string, unknown>,
           embratur: postCompanionsContext.embratur as unknown as Record<string, unknown>,
-          dependents: postCompanionsDraft as unknown as Record<string, unknown>[],
+          dependents: companionsToSave as unknown as Record<string, unknown>[],
           purpose: "companions",
           registeredPhotos: {
             ...(mainGuest.profilePhotoUrl ? { profileUrl: mainGuest.profilePhotoUrl } : {}),
@@ -1176,12 +1179,13 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
         setReservation(
           preserveReservationDetails(reservation, {
             ...refreshed,
-            dependents: postCompanionsDraft,
+            dependents: companionsToSave,
             mainGuest: mergeGuests(mainGuest, refreshed.mainGuest),
           }),
         );
       }
-      setDependents(postCompanionsDraft);
+      setDependents(companionsToSave);
+      setPostCompanionsDraft(companionsToSave);
       setGuest(mainGuest);
       setEmbratur(postCompanionsContext.embratur);
       resetPostCompanionsEditor();
@@ -1579,9 +1583,14 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
               guestsQuantity={guestsQuantity}
               mainGuest={guest}
               dependents={dependents}
+              inboxEnabled={establishmentSettings.inboxEnabled}
+              {...exclusiveCameraProps}
               onChange={setDependents}
               onBack={() => setSubStep("form")}
-              onContinue={() => void goToPhotosOrEmbratur()}
+              onContinue={(next) => {
+                if (next) setDependents(next);
+                void goToPhotosOrEmbratur();
+              }}
             />
           )}
 
@@ -1625,6 +1634,7 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
                 <SelfieCapture
                   title={t("checkin.photos.selfie")}
                   value={selfie}
+                  photoGuidance="new"
                   captureId="selfie"
                   validationEnabled={faceValidationEnabled}
                   onValidate={validateSelfiePhoto}
@@ -1740,9 +1750,17 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
                         dependents={postCompanionsDraft}
                         lockedCount={postCompanionsLockedCount}
                         saving={postCompanionsSaving}
+                        inboxEnabled={establishmentSettings.inboxEnabled}
+                        {...exclusiveCameraProps}
                         onChange={setPostCompanionsDraft}
                         onBack={resetPostCompanionsEditor}
-                        onContinue={() => void savePostCompanions()}
+                        onContinue={(next) => {
+                          if (next) {
+                            setPostCompanionsDraft(next);
+                            setDependents(next);
+                          }
+                          void savePostCompanions(next);
+                        }}
                       />
                     ) : null
                   }

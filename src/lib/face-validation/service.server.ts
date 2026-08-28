@@ -251,6 +251,7 @@ export async function validateCheckinSelfieForTenant(input: {
 
   const runtime = readZepirisRuntimeConfig();
   let result: FaceValidationResult;
+  let authConfigError = false;
 
   try {
     const tenantSlug = await resolveTenantSlug(input.tenantId);
@@ -270,6 +271,9 @@ export async function validateCheckinSelfieForTenant(input: {
     result = await service.validate(parsed.base64, parsed.mimeType);
   } catch (error) {
     const technicalMessage = error instanceof Error ? error.message : "zepiris_error";
+    authConfigError = /zepiris_http_401|zepiris_http_403|invalid_api_key|tenant_does_not_match/.test(
+      technicalMessage,
+    );
     result = buildServiceUnavailableResult(context.config.unavailablePolicy);
     result.technicalMessage = technicalMessage;
     if (result.fallbackUsed) {
@@ -302,7 +306,9 @@ export async function validateCheckinSelfieForTenant(input: {
   const nextAttempts =
     result.status === "APPROVED" && !result.fallbackUsed
       ? attempts
-      : await incrementSessionValidationAttempts(input.checkinSessionId);
+      : authConfigError
+        ? attempts
+        : await incrementSessionValidationAttempts(input.checkinSessionId);
 
   const durationMs = Date.now() - started;
   logFaceValidationEvent({

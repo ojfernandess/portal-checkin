@@ -323,6 +323,12 @@ export const en: MessageTree = {
       keepRegistered: "Keep registered photo",
       changePhoto: "Change photo",
       unavailable: "Photo unavailable",
+      registeredQualityNotice:
+        "Check that your registered selfie is clear and good quality — it will be used for front-desk access.",
+      newSelfieGuidanceTitle: "Selfie for check-in",
+      newSelfieGuidanceBody:
+        "Send a clear, well-lit selfie with your face visible. The photo will go through a security check before front-desk access is granted.",
+      newSelfieGuidanceConfirm: "Got it",
     },
     camera: {
       accessError: "We couldn't access the camera. Upload a file from your device.",
@@ -389,6 +395,11 @@ export const en: MessageTree = {
         "We could not find the complete previous check-in data. Please contact the front desk.",
       postBlockedCancelled: "This reservation cannot register companions right now.",
       alreadyRegistered: "Already registered",
+      inboxPhotoTitle: "Photo for front desk (optional)",
+      inboxPhotoHint:
+        "Companion selfie for front-desk access (sent to Inbox only, not to the PMS). Use a clear, well-lit photo with the face visible.",
+      inboxPhotoAdd: "Add photo",
+      inboxPhotoChange: "Change photo",
     },
     errors: {
       intro: "Please fix the following before continuing:",

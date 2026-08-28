@@ -322,6 +322,12 @@ export const ptBR = {
       keepRegistered: "Manter foto cadastrada",
       changePhoto: "Alterar foto",
       unavailable: "Foto indisponível",
+      registeredQualityNotice:
+        "Verifique se a selfie cadastrada está legível e de boa qualidade — ela será usada na liberação da portaria.",
+      newSelfieGuidanceTitle: "Selfie para check-in",
+      newSelfieGuidanceBody:
+        "Envie uma selfie nítida e bem iluminada, com o rosto visível. A foto passará por verificação de segurança antes de liberar o acesso na portaria.",
+      newSelfieGuidanceConfirm: "Entendi",
     },
     camera: {
       accessError: "Não conseguimos acessar a câmera. Envie um arquivo do seu dispositivo.",
@@ -388,6 +394,11 @@ export const ptBR = {
         "Não encontramos os dados completos do check-in anterior. Entre em contato com a recepção.",
       postBlockedCancelled: "Esta reserva não permite cadastrar acompanhantes no momento.",
       alreadyRegistered: "Já cadastrado",
+      inboxPhotoTitle: "Foto para portaria (opcional)",
+      inboxPhotoHint:
+        "Selfie do acompanhante para liberação de acesso na portaria (enviada somente à Inbox, não ao PMS). Use uma foto nítida, bem iluminada e com o rosto visível.",
+      inboxPhotoAdd: "Adicionar foto",
+      inboxPhotoChange: "Alterar foto",
     },
     errors: {
       intro: "Corrija os seguintes pontos antes de continuar:",
