@@ -1190,7 +1190,7 @@ export const ptBR = {
       inboxModulesHint: "Somente os módulos ativos aparecem no menu Inbox do painel da empresa.",
       inboxSaved: "Configuração Inbox salva.",
       tabZepiris: "Validação de fotos",
-      zepirisTitle: "Validação inteligente de fotos (ZepIris)",
+      zepirisTitle: "Validação inteligente de fotos (PhotoGuard - AgentsLabs)",
       zepirisHint:
         "Quando ativada, o sistema utiliza o ZepIris v1.0.0 para analisar automaticamente a qualidade das selfies enviadas durante o check-in.",
       zepirisFeatureRequired: "Habilite a feature “Validação inteligente de fotos” na aba Features antes de configurar.",

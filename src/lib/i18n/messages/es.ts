@@ -1191,7 +1191,7 @@ export const es: MessageTree = {
       inboxModulesHint: "Solo los módulos activos aparecen en el menú Inbox del panel de la empresa.",
       inboxSaved: "Configuración Inbox guardada.",
       tabZepiris: "Validación de fotos",
-      zepirisTitle: "Validación inteligente de fotos (ZepIris)",
+      zepirisTitle: "Validación inteligente de fotos (PhotoGuard - AgentsLabs)",
       zepirisHint:
         "Cuando está activada, el sistema utiliza ZepIris v1.0.0 para analizar automáticamente la calidad de las selfies durante el check-in.",
       zepirisFeatureRequired: "Active la función “Validación inteligente de fotos” en la pestaña Features antes de configurar.",
