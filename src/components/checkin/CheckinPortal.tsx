@@ -21,7 +21,7 @@ import { CompanionsStep } from "@/components/checkin/CompanionsStep";
 import { EmbraturStep } from "@/components/checkin/EmbraturStep";
 import { CameraCapture } from "@/components/checkin/CameraCapture";
 import { SelfieCapture, type SelfieValidationOutcome } from "@/components/checkin/SelfieCapture";
-import { RegisteredPhotoTile } from "@/components/checkin/RegisteredPhotoTile";
+import { RegisteredPhotoTile, RegisteredSelfieQualityNotice } from "@/components/checkin/RegisteredPhotoTile";
 import { EstablishmentTermsPanel } from "@/components/checkin/EstablishmentTermsPanel";
 import { CheckinFinalizingScreen } from "@/components/checkin/CheckinFinalizingScreen";
 import { ReaccessIdentityGate } from "@/components/checkin/ReaccessIdentityGate";
@@ -1448,53 +1448,56 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
                   <p className="font-code text-sm">{lookupResult.documentNumber}</p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 border-t border-border pt-4">
-                  <RegisteredPhotoTile
-                    title={t("checkin.photos.selfie")}
-                    photoType="profile"
-                    label={t("checkin.photos.selfieHint")}
-                    registeredUrl={registeredDisplayUrl(lookupResult, "profile")}
-                    mediaId={lookupResult.profilePhotoId}
-                    facingMode="user"
-                    editing={editRegisteredSelfie}
-                    editValue={selfie}
-                    captureId="registered-selfie"
-                    {...exclusiveCameraProps}
-                    onStartEdit={(resolvedUrl) => {
-                      setEditRegisteredSelfie(true);
-                      setSelfie(resolvedUrl ?? registeredDisplayUrl(lookupResult, "profile"));
-                    }}
-                    onCancelEdit={() => {
-                      setEditRegisteredSelfie(false);
-                      photosReplacedRef.current.profile = false;
-                      setSelfie(registeredDisplayUrl(lookupResult, "profile"));
-                    }}
-                    onCapture={(value) => handleRegisteredPhotoCapture("profile", value)}
-                    validationEnabled={faceValidationEnabled}
-                    onValidateSelfie={validateSelfiePhoto}
-                  />
-                  <RegisteredPhotoTile
-                    title={t("checkin.photos.document")}
-                    photoType="document"
-                    label={t("checkin.photos.documentHint")}
-                    registeredUrl={registeredDisplayUrl(lookupResult, "document")}
-                    mediaId={lookupResult.documentPhotoId}
-                    facingMode="environment"
-                    editing={editRegisteredDocPhoto}
-                    editValue={docPhoto}
-                    captureId="registered-document"
-                    {...exclusiveCameraProps}
-                    onStartEdit={(resolvedUrl) => {
-                      setEditRegisteredDocPhoto(true);
-                      setDocPhoto(resolvedUrl ?? registeredDisplayUrl(lookupResult, "document"));
-                    }}
-                    onCancelEdit={() => {
-                      setEditRegisteredDocPhoto(false);
-                      photosReplacedRef.current.document = false;
-                      setDocPhoto(registeredDisplayUrl(lookupResult, "document"));
-                    }}
-                    onCapture={(value) => handleRegisteredPhotoCapture("document", value)}
-                  />
+                <div className="space-y-3 border-t border-border pt-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <RegisteredPhotoTile
+                      title={t("checkin.photos.selfie")}
+                      photoType="profile"
+                      label={t("checkin.photos.selfieHint")}
+                      registeredUrl={registeredDisplayUrl(lookupResult, "profile")}
+                      mediaId={lookupResult.profilePhotoId}
+                      facingMode="user"
+                      editing={editRegisteredSelfie}
+                      editValue={selfie}
+                      captureId="registered-selfie"
+                      {...exclusiveCameraProps}
+                      onStartEdit={(resolvedUrl) => {
+                        setEditRegisteredSelfie(true);
+                        setSelfie(resolvedUrl ?? registeredDisplayUrl(lookupResult, "profile"));
+                      }}
+                      onCancelEdit={() => {
+                        setEditRegisteredSelfie(false);
+                        photosReplacedRef.current.profile = false;
+                        setSelfie(registeredDisplayUrl(lookupResult, "profile"));
+                      }}
+                      onCapture={(value) => handleRegisteredPhotoCapture("profile", value)}
+                      validationEnabled={faceValidationEnabled}
+                      onValidateSelfie={validateSelfiePhoto}
+                    />
+                    <RegisteredPhotoTile
+                      title={t("checkin.photos.document")}
+                      photoType="document"
+                      label={t("checkin.photos.documentHint")}
+                      registeredUrl={registeredDisplayUrl(lookupResult, "document")}
+                      mediaId={lookupResult.documentPhotoId}
+                      facingMode="environment"
+                      editing={editRegisteredDocPhoto}
+                      editValue={docPhoto}
+                      captureId="registered-document"
+                      {...exclusiveCameraProps}
+                      onStartEdit={(resolvedUrl) => {
+                        setEditRegisteredDocPhoto(true);
+                        setDocPhoto(resolvedUrl ?? registeredDisplayUrl(lookupResult, "document"));
+                      }}
+                      onCancelEdit={() => {
+                        setEditRegisteredDocPhoto(false);
+                        photosReplacedRef.current.document = false;
+                        setDocPhoto(registeredDisplayUrl(lookupResult, "document"));
+                      }}
+                      onCapture={(value) => handleRegisteredPhotoCapture("document", value)}
+                    />
+                  </div>
+                  <RegisteredSelfieQualityNotice />
                 </div>
               </article>
 

@@ -404,10 +404,6 @@ export function SelfieCapture({
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</p>
         ) : null}
 
-        {photoGuidance === "registered" ? (
-          <p className="text-xs leading-relaxed text-muted-foreground">{t("checkin.photos.registeredQualityNotice")}</p>
-        ) : null}
-
         <div className={viewportClass}>
           <canvas ref={canvasRef} className="hidden" aria-hidden />
 

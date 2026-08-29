@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { Camera, Loader2 } from "lucide-react";
+import { Camera, Loader2, ScanFace } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CameraCapture } from "@/components/checkin/CameraCapture";
 import { SelfieCapture, type SelfieValidationOutcome } from "@/components/checkin/SelfieCapture";
@@ -24,6 +24,25 @@ type Props = {
   validationEnabled?: boolean;
   onValidateSelfie?: (photoBase64: string) => Promise<SelfieValidationOutcome>;
 } & Partial<ExclusiveCameraProps>;
+
+export function RegisteredSelfieQualityNotice() {
+  const { t } = useI18n();
+
+  return (
+    <div
+      className="flex items-start gap-2.5 rounded-lg border border-primary/15 bg-primary/[0.04] px-3 py-2.5"
+      role="note"
+    >
+      <div
+        className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"
+        aria-hidden
+      >
+        <ScanFace className="size-3.5" />
+      </div>
+      <p className="text-xs leading-relaxed text-muted-foreground">{t("checkin.photos.registeredQualityNotice")}</p>
+    </div>
+  );
+}
 
 export function RegisteredPhotoTile({
   title,
@@ -135,11 +154,6 @@ export function RegisteredPhotoTile({
   return (
     <div className="space-y-2">
       <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</p>
-      {photoType === "profile" && facingMode === "user" ? (
-        <p className="text-xs leading-relaxed text-muted-foreground">
-          {t("checkin.photos.registeredQualityNotice")}
-        </p>
-      ) : null}
       <div
         className={cn(
           "relative aspect-square overflow-hidden rounded-xl border border-border bg-muted",
