@@ -508,7 +508,6 @@ export function SelfieCapture({
           ref={fileRef}
           type="file"
           accept="image/*"
-          capture="user"
           className="sr-only"
           onChange={(event) => {
             pickFile(event.target.files?.[0]);
