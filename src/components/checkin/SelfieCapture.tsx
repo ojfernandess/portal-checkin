@@ -87,8 +87,8 @@ export function SelfieCapture({
   const [validationHint, setValidationHint] = useState<string | null>(null);
   const [validationSuccess, setValidationSuccess] = useState(false);
   const [guidanceOpen, setGuidanceOpen] = useState(false);
-  const [guidanceAcknowledged, setGuidanceAcknowledged] = useState(false);
   const [pendingCaptureAction, setPendingCaptureAction] = useState<"camera" | "file" | null>(null);
+  const [replacingPhoto, setReplacingPhoto] = useState(false);
 
   const stopCamera = useCallback(() => {
     unregisterActiveDeviceStream(streamRef.current);
@@ -142,26 +142,40 @@ export function SelfieCapture({
     setOpeningCamera(true);
   }, [requestCapture, stopCamera]);
 
-  function runPendingCaptureAction(action: "camera" | "file") {
+  async function runPendingCaptureAction(action: "camera" | "file") {
+    await yieldForCameraHandoff();
+    await new Promise<void>((resolve) => {
+      window.setTimeout(resolve, 150);
+    });
+    setPreviewUrl(null);
+    setReplacingPhoto(true);
+    onCapture("");
     if (action === "camera") beginCamera();
     else fileRef.current?.click();
   }
 
   function requestPhotoCapture(action: "camera" | "file") {
-    if (photoGuidance === "new" && !guidanceAcknowledged) {
+    if (photoGuidance != null) {
       setPendingCaptureAction(action);
       setGuidanceOpen(true);
       return;
     }
-    runPendingCaptureAction(action);
+    void runPendingCaptureAction(action);
   }
 
   function confirmPhotoGuidance() {
-    setGuidanceAcknowledged(true);
     setGuidanceOpen(false);
     const action = pendingCaptureAction;
     setPendingCaptureAction(null);
-    if (action) runPendingCaptureAction(action);
+    if (action) void runPendingCaptureAction(action);
+  }
+
+  function dismissPhotoGuidance(open: boolean) {
+    setGuidanceOpen(open);
+    if (!open) {
+      setPendingCaptureAction(null);
+      setReplacingPhoto(false);
+    }
   }
 
   useEffect(() => {
@@ -193,6 +207,7 @@ export function SelfieCapture({
         if (cancelled) return;
         setPhase("live");
         setOpeningCamera(false);
+        setReplacingPhoto(false);
       } catch {
         if (cancelled) return;
         stopCamera();
@@ -277,15 +292,12 @@ export function SelfieCapture({
   }
 
   function retake() {
-    setPreviewUrl(null);
-    onCapture("");
     setValidationHint(null);
     setValidationSuccess(false);
     requestPhotoCapture("camera");
   }
 
   function replaceConfirmed() {
-    onCapture("");
     requestPhotoCapture("camera");
   }
 
@@ -297,6 +309,7 @@ export function SelfieCapture({
       const result = String(reader.result ?? "");
       setPreviewUrl(result);
       setPhase("preview");
+      setReplacingPhoto(false);
       setValidationHint(null);
       setValidationSuccess(false);
     };
@@ -304,7 +317,7 @@ export function SelfieCapture({
   }
 
   const showingPreview = phase === "preview" && previewUrl;
-  const showingConfirmed = phase === "idle" && value && !previewUrl;
+  const showingConfirmed = phase === "idle" && value && !previewUrl && !replacingPhoto;
   const showingLive = phase === "live" || openingCamera;
   const showLivePortal = showingLive && mounted;
 
@@ -504,20 +517,39 @@ export function SelfieCapture({
         />
       </div>
 
-      <AlertDialog open={guidanceOpen} onOpenChange={setGuidanceOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t("checkin.photos.newSelfieGuidanceTitle")}</AlertDialogTitle>
-            <AlertDialogDescription>{t("checkin.photos.newSelfieGuidanceBody")}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogAction className="tap-safe" onClick={confirmPhotoGuidance}>
+      <AlertDialog open={guidanceOpen} onOpenChange={dismissPhotoGuidance}>
+        <AlertDialogContent className="max-h-[min(92dvh,720px)] gap-0 overflow-hidden p-0 sm:max-w-md">
+          <div className="max-h-[min(92dvh,720px)] overflow-y-auto overscroll-contain px-6 pb-2 pt-6">
+            <AlertDialogHeader className="space-y-3 text-left">
+              <AlertDialogTitle>{t("checkin.photos.newSelfieGuidanceTitle")}</AlertDialogTitle>
+              <AlertDialogDescription>{t("checkin.photos.newSelfieGuidanceBody")}</AlertDialogDescription>
+            </AlertDialogHeader>
+            <SelfieGuidanceImage />
+          </div>
+          <AlertDialogFooter className="border-t border-border px-6 py-4 sm:justify-stretch">
+            <AlertDialogAction className="tap-safe w-full sm:w-auto" onClick={confirmPhotoGuidance}>
               {t("checkin.photos.newSelfieGuidanceConfirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </>
+  );
+}
+
+function SelfieGuidanceImage() {
+  const { t } = useI18n();
+
+  return (
+    <div className="mt-4 w-full overflow-hidden rounded-xl border border-border bg-muted/40">
+      <img
+        src="/aviso-selfie.png"
+        alt={t("checkin.photos.selfieGuidanceImageAlt")}
+        className="mx-auto block h-auto max-h-[min(50dvh,360px)] w-full object-contain"
+        loading="lazy"
+        decoding="async"
+      />
+    </div>
   );
 }
 

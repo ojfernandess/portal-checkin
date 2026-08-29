@@ -330,6 +330,7 @@ export const es: MessageTree = {
       newSelfieGuidanceBody:
         "Envíe una selfie nítida y bien iluminada, con el rostro visible. La foto pasará por una verificación de seguridad antes de liberar el acceso en la portinería.",
       newSelfieGuidanceConfirm: "Entendido",
+      selfieGuidanceImageAlt: "Ejemplos de selfie correcta e incorrecta para check-in",
     },
     camera: {
       accessError: "No pudimos acceder a la cámara. Envíe un archivo desde su dispositivo.",

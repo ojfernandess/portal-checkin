@@ -1460,9 +1460,9 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
                     editValue={selfie}
                     captureId="registered-selfie"
                     {...exclusiveCameraProps}
-                    onStartEdit={() => {
+                    onStartEdit={(resolvedUrl) => {
                       setEditRegisteredSelfie(true);
-                      setSelfie(registeredDisplayUrl(lookupResult, "profile"));
+                      setSelfie(resolvedUrl ?? registeredDisplayUrl(lookupResult, "profile"));
                     }}
                     onCancelEdit={() => {
                       setEditRegisteredSelfie(false);
@@ -1484,9 +1484,9 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
                     editValue={docPhoto}
                     captureId="registered-document"
                     {...exclusiveCameraProps}
-                    onStartEdit={() => {
+                    onStartEdit={(resolvedUrl) => {
                       setEditRegisteredDocPhoto(true);
-                      setDocPhoto(registeredDisplayUrl(lookupResult, "document"));
+                      setDocPhoto(resolvedUrl ?? registeredDisplayUrl(lookupResult, "document"));
                     }}
                     onCancelEdit={() => {
                       setEditRegisteredDocPhoto(false);

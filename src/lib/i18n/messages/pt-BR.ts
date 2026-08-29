@@ -328,6 +328,7 @@ export const ptBR = {
       newSelfieGuidanceBody:
         "Envie uma selfie nítida e bem iluminada, com o rosto visível. A foto passará por verificação de segurança antes de liberar o acesso na portaria.",
       newSelfieGuidanceConfirm: "Entendi",
+      selfieGuidanceImageAlt: "Exemplos de selfie correta e incorreta para check-in",
     },
     camera: {
       accessError: "Não conseguimos acessar a câmera. Envie um arquivo do seu dispositivo.",

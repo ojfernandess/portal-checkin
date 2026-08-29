@@ -18,7 +18,7 @@ type Props = {
   facingMode: "user" | "environment";
   editing: boolean;
   editValue: string | null;
-  onStartEdit: () => void;
+  onStartEdit: (resolvedUrl?: string | null) => void;
   onCancelEdit: () => void;
   onCapture: (value: string) => void;
   validationEnabled?: boolean;
@@ -164,7 +164,7 @@ export function RegisteredPhotoTile({
           </div>
         )}
       </div>
-      <Button type="button" variant="outline" size="sm" className="tap-safe w-full" onClick={onStartEdit}>
+      <Button type="button" variant="outline" size="sm" className="tap-safe w-full" onClick={() => onStartEdit(displayUrl)}>
         {t("checkin.photos.changePhoto")}
       </Button>
     </div>

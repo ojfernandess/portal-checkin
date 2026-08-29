@@ -329,6 +329,7 @@ export const en: MessageTree = {
       newSelfieGuidanceBody:
         "Send a clear, well-lit selfie with your face visible. The photo will go through a security check before front-desk access is granted.",
       newSelfieGuidanceConfirm: "Got it",
+      selfieGuidanceImageAlt: "Examples of correct and incorrect check-in selfies",
     },
     camera: {
       accessError: "We couldn't access the camera. Upload a file from your device.",
