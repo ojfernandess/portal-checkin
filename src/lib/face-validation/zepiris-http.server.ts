@@ -10,16 +10,65 @@ export type ZepirisSearchResponse = {
   };
 };
 
+export type ParsedZepirisError = {
+  noFace: boolean;
+  imageQualityAssessment?: ZepirisIqaResponse;
+};
+
 export class ZepirisApiError extends Error {
   readonly status: number;
   readonly noFace: boolean;
+  readonly imageQualityAssessment?: ZepirisIqaResponse;
 
-  constructor(message: string, status: number, noFace = false) {
+  constructor(message: string, status: number, parsed: ParsedZepirisError = { noFace: false }) {
     super(message);
     this.name = "ZepirisApiError";
     this.status = status;
-    this.noFace = noFace;
+    this.noFace = parsed.noFace;
+    this.imageQualityAssessment = parsed.imageQualityAssessment;
   }
+}
+
+export function parseZepirisErrorBody(detail: string): ParsedZepirisError {
+  const trimmed = detail.trim();
+  if (!trimmed) {
+    return { noFace: false };
+  }
+
+  try {
+    const parsed = JSON.parse(trimmed) as Record<string, unknown>;
+    const payload =
+      parsed.detail && typeof parsed.detail === "object"
+        ? (parsed.detail as Record<string, unknown>)
+        : parsed;
+
+    const message = String(payload.message ?? "").toLowerCase();
+    const iqa = normalizeImageQualityAssessment(payload.imageQualityAssessment);
+
+    if (message === "image_quality_check_failed" && iqa) {
+      return { noFace: false, imageQualityAssessment: iqa };
+    }
+
+    if (iqa && iqa.passed === false) {
+      return { noFace: false, imageQualityAssessment: iqa };
+    }
+
+    const serialized = JSON.stringify(payload).toLowerCase();
+    if (isNoFaceText(serialized)) {
+      return { noFace: true };
+    }
+  } catch {
+    // Fall through to plain-text heuristics.
+  }
+
+  return { noFace: isNoFaceText(trimmed.toLowerCase()) };
+}
+
+function normalizeImageQualityAssessment(value: unknown): ZepirisIqaResponse | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const record = value as Record<string, unknown>;
+  if (typeof record.passed !== "boolean") return undefined;
+  return record as ZepirisIqaResponse;
 }
 
 export class ZepirisGatewayClient {
@@ -84,10 +133,11 @@ export class ZepirisGatewayClient {
 
       if (!response.ok) {
         const detail = await response.text().catch(() => "");
+        const parsed = parseZepirisErrorBody(detail);
         throw new ZepirisApiError(
-          `zepiris_http_${response.status}:${detail.slice(0, 200)}`,
+          `zepiris_http_${response.status}:${detail.slice(0, 400)}`,
           response.status,
-          isNoFaceResponse(response.status, detail),
+          parsed,
         );
       }
 
@@ -104,9 +154,8 @@ export class ZepirisGatewayClient {
   }
 }
 
-function isNoFaceResponse(status: number, detail: string): boolean {
-  if (status !== 422 && status !== 400) return false;
-  const lower = detail.toLowerCase();
+function isNoFaceText(lower: string): boolean {
+  if (lower.includes("image_quality_check_failed")) return false;
   return /no face|face not found|face_not|without face|unable to detect|no face detected/.test(lower);
 }
 

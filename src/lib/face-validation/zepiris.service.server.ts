@@ -47,6 +47,13 @@ export class ZepirisFaceValidationService implements FaceValidationService {
         config: this.config,
       });
     } catch (error) {
+      if (error instanceof ZepirisApiError && error.imageQualityAssessment) {
+        return mapZepirisToFaceValidationResult({
+          iqa: error.imageQualityAssessment,
+          faceDetected: true,
+          config: this.config,
+        });
+      }
       if (error instanceof ZepirisApiError && error.noFace) {
         return mapZepirisToFaceValidationResult({
           iqa: neutralZepirisIqaResponse(),

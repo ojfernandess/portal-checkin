@@ -3,9 +3,11 @@ import { describe, it } from "node:test";
 import { DEFAULT_ZEPIRIS_TENANT_CONFIG, parseZepirisTenantConfig } from "./config.ts";
 import {
   buildServiceUnavailableResult,
+  mapProviderDetailsToReasons,
   mapZepirisToFaceValidationResult,
   reasonToMessageKey,
 } from "./mapper.ts";
+import { parseZepirisErrorBody } from "./zepiris-http.server.ts";
 
 describe("parseZepirisTenantConfig", () => {
   it("applies defaults when config is empty", () => {
@@ -85,6 +87,43 @@ describe("mapZepirisToFaceValidationResult", () => {
     assert.equal(result.reasons[0], "IQA_FAILED");
   });
 
+  it("rejects selfie_validator provider_details with specific reasons", () => {
+    const result = mapZepirisToFaceValidationResult({
+      iqa: {
+        passed: false,
+        validation_provider: "selfie_validator",
+        provider_details: {
+          valid: false,
+          sharpness_ok: false,
+          light_ok: false,
+          resolution_ok: true,
+          distance_ok: true,
+          angle_ok: true,
+          eyes_ok: true,
+        },
+      },
+      faceDetected: true,
+      config: DEFAULT_ZEPIRIS_TENANT_CONFIG,
+    });
+    assert.equal(result.status, "REJECTED");
+    assert.deepEqual(result.reasons, ["BLUR", "BAD_LIGHTING"]);
+    assert.equal(result.userMessageKey, "checkin.faceValidation.blur");
+  });
+
+  it("maps provider detail fields to reason codes", () => {
+    assert.deepEqual(
+      mapProviderDetailsToReasons({
+        resolution_ok: false,
+        sharpness_ok: false,
+        light_ok: false,
+        distance_ok: false,
+        angle_ok: false,
+        eyes_ok: false,
+      }),
+      ["LOW_RESOLUTION", "BLUR", "BAD_LIGHTING", "BAD_DISTANCE", "BAD_ANGLE", "EYES_NOT_DETECTED"],
+    );
+  });
+
   it("rejects multiple faces is not supported — only single face path", () => {
     const result = mapZepirisToFaceValidationResult({
       iqa: baseIqa,
@@ -109,11 +148,41 @@ describe("service unavailable policies", () => {
   });
 });
 
+describe("parseZepirisErrorBody", () => {
+  it("parses image_quality_check_failed payload", () => {
+    const parsed = parseZepirisErrorBody(
+      JSON.stringify({
+        detail: {
+          message: "image_quality_check_failed",
+          imageQualityAssessment: {
+            passed: false,
+            validation_provider: "selfie_validator",
+            provider_details: {
+              valid: false,
+              sharpness_ok: false,
+              light_ok: false,
+              resolution_ok: true,
+              distance_ok: true,
+              angle_ok: true,
+              eyes_ok: true,
+            },
+          },
+        },
+      }),
+    );
+    assert.equal(parsed.noFace, false);
+    assert.equal(parsed.imageQualityAssessment?.passed, false);
+    assert.equal(parsed.imageQualityAssessment?.provider_details?.sharpness_ok, false);
+  });
+});
+
 describe("reasonToMessageKey", () => {
   it("maps known reason codes to i18n keys", () => {
     assert.equal(reasonToMessageKey("NO_FACE"), "checkin.faceValidation.noFace");
     assert.equal(reasonToMessageKey("BLUR"), "checkin.faceValidation.blur");
     assert.equal(reasonToMessageKey("SPOOF"), "checkin.faceValidation.spoof");
     assert.equal(reasonToMessageKey("IQA_FAILED"), "checkin.faceValidation.iqaFailed");
+    assert.equal(reasonToMessageKey("LOW_RESOLUTION"), "checkin.faceValidation.lowResolution");
+    assert.equal(reasonToMessageKey("BAD_LIGHTING"), "checkin.faceValidation.badLighting");
   });
 });

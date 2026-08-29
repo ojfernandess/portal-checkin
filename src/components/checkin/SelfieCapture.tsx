@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n/context";
+import type { Locale } from "@/lib/i18n/types";
 import { cn } from "@/lib/utils";
 import {
   acquireCameraStream,
@@ -532,13 +533,24 @@ export function SelfieCapture({
   );
 }
 
+function selfieGuidanceImageSrc(locale: Locale): string {
+  switch (locale) {
+    case "en":
+      return "/aviso-selfie-en.png";
+    case "es":
+      return "/aviso-selfie-spa.png";
+    default:
+      return "/aviso-selfie.png";
+  }
+}
+
 function SelfieGuidanceImage() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
 
   return (
     <div className="mt-4 w-full overflow-hidden rounded-xl border border-border bg-muted/40">
       <img
-        src="/aviso-selfie.png"
+        src={selfieGuidanceImageSrc(locale)}
         alt={t("checkin.photos.selfieGuidanceImageAlt")}
         className="mx-auto block h-auto max-h-[min(50dvh,360px)] w-full object-contain"
         loading="lazy"
@@ -563,6 +575,16 @@ function faceValidationMessageKey(outcome: SelfieValidationOutcome) {
       return "checkin.faceValidation.nsfw" as const;
     case "IQA_FAILED":
       return "checkin.faceValidation.iqaFailed" as const;
+    case "LOW_RESOLUTION":
+      return "checkin.faceValidation.lowResolution" as const;
+    case "BAD_LIGHTING":
+      return "checkin.faceValidation.badLighting" as const;
+    case "BAD_DISTANCE":
+      return "checkin.faceValidation.badDistance" as const;
+    case "BAD_ANGLE":
+      return "checkin.faceValidation.badAngle" as const;
+    case "EYES_NOT_DETECTED":
+      return "checkin.faceValidation.eyesNotDetected" as const;
     case "INVALID_IMAGE":
       return "checkin.faceValidation.invalidImage" as const;
     case "INVALID_API_KEY":

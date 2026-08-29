@@ -353,11 +353,16 @@ export const ptBR = {
       validating: "Validando selfie…",
       approved: "Selfie aprovada.",
       noFace: "Não conseguimos identificar seu rosto. Posicione seu rosto dentro da área indicada e tente novamente.",
-      blur: "A foto está desfocada. Mantenha o celular parado e tente novamente.",
+      blur: "Foto desfocada.",
       spoof: "Não foi possível validar sua selfie. Tente novamente em um local bem iluminado.",
       nsfw: "Não foi possível usar esta imagem. Envie uma selfie adequada para o check-in.",
       iqaFailed:
         "Esta imagem não atende aos requisitos de selfie para check-in. Envie uma foto nítida e bem iluminada do seu rosto.",
+      lowResolution: "Imagem com resolução baixa (mín. 480×480).",
+      badLighting: "Iluminação inadequada.",
+      badDistance: "Rosto muito perto ou longe.",
+      badAngle: "Cabeça inclinada.",
+      eyesNotDetected: "Olhos não detectados.",
       unavailable: "Não foi possível validar sua foto no momento. Tente novamente em alguns instantes.",
       invalidApiKey:
         "A validação de selfies está indisponível no momento (configuração Photoguard). Tente novamente mais tarde ou fale com a recepção.",

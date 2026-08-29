@@ -355,11 +355,16 @@ export const es: MessageTree = {
       validating: "Validando selfie…",
       approved: "Selfie aprobada.",
       noFace: "No pudimos identificar su rostro. Posicione su rostro dentro del área indicada e intente de nuevo.",
-      blur: "La foto está desenfocada. Mantenga el celular quieto e intente de nuevo.",
+      blur: "Foto desenfocada.",
       spoof: "No fue posible validar su selfie. Intente de nuevo en un lugar bien iluminado.",
       nsfw: "No se puede usar esta imagen. Envíe una selfie adecuada para el check-in.",
       iqaFailed:
         "Esta imagen no cumple los requisitos de selfie para check-in. Envíe una foto nítida y bien iluminada de su rostro.",
+      lowResolution: "Imagen con resolución baja (mín. 480×480).",
+      badLighting: "Iluminación inadecuada.",
+      badDistance: "Rostro muy cerca o lejos.",
+      badAngle: "Cabeza inclinada.",
+      eyesNotDetected: "Ojos no detectados.",
       unavailable: "No fue posible validar su foto en este momento. Intente de nuevo en unos instantes.",
       invalidApiKey:
         "La validación de selfies no está disponible en este momento (configuración Photoguard). Intente más tarde o contacte la recepción.",
