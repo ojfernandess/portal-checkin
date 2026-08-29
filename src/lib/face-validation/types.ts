@@ -6,6 +6,7 @@ export type FaceValidationReasonCode =
   | "BLUR"
   | "SPOOF"
   | "NSFW"
+  | "IQA_FAILED"
   | "INVALID_IMAGE"
   | "SERVICE_UNAVAILABLE"
   | "INVALID_API_KEY"

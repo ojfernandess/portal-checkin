@@ -358,6 +358,8 @@ export const es: MessageTree = {
       blur: "La foto está desenfocada. Mantenga el celular quieto e intente de nuevo.",
       spoof: "No fue posible validar su selfie. Intente de nuevo en un lugar bien iluminado.",
       nsfw: "No se puede usar esta imagen. Envíe una selfie adecuada para el check-in.",
+      iqaFailed:
+        "Esta imagen no cumple los requisitos de selfie para check-in. Envíe una foto nítida y bien iluminada de su rostro.",
       unavailable: "No fue posible validar su foto en este momento. Intente de nuevo en unos instantes.",
       invalidApiKey:
         "La validación de selfies no está disponible en este momento (configuración Photoguard). Intente más tarde o contacte la recepción.",

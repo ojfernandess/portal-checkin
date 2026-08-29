@@ -72,6 +72,19 @@ describe("mapZepirisToFaceValidationResult", () => {
     assert.equal(result.reasons[0], "SPOOF");
   });
 
+  it("rejects when aggregate IQA fails even if individual checks pass", () => {
+    const result = mapZepirisToFaceValidationResult({
+      iqa: {
+        ...baseIqa,
+        passed: false,
+      },
+      faceDetected: true,
+      config: DEFAULT_ZEPIRIS_TENANT_CONFIG,
+    });
+    assert.equal(result.status, "REJECTED");
+    assert.equal(result.reasons[0], "IQA_FAILED");
+  });
+
   it("rejects multiple faces is not supported — only single face path", () => {
     const result = mapZepirisToFaceValidationResult({
       iqa: baseIqa,
@@ -101,5 +114,6 @@ describe("reasonToMessageKey", () => {
     assert.equal(reasonToMessageKey("NO_FACE"), "checkin.faceValidation.noFace");
     assert.equal(reasonToMessageKey("BLUR"), "checkin.faceValidation.blur");
     assert.equal(reasonToMessageKey("SPOOF"), "checkin.faceValidation.spoof");
+    assert.equal(reasonToMessageKey("IQA_FAILED"), "checkin.faceValidation.iqaFailed");
   });
 });

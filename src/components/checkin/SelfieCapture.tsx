@@ -561,6 +561,8 @@ function faceValidationMessageKey(outcome: SelfieValidationOutcome) {
       return "checkin.faceValidation.spoof" as const;
     case "NSFW":
       return "checkin.faceValidation.nsfw" as const;
+    case "IQA_FAILED":
+      return "checkin.faceValidation.iqaFailed" as const;
     case "INVALID_IMAGE":
       return "checkin.faceValidation.invalidImage" as const;
     case "INVALID_API_KEY":

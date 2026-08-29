@@ -357,6 +357,8 @@ export const en: MessageTree = {
       blur: "The photo is blurry. Hold your phone steady and try again.",
       spoof: "We couldn't validate your selfie. Try again in a well-lit place.",
       nsfw: "This image can't be used. Please send an appropriate selfie for check-in.",
+      iqaFailed:
+        "This image doesn't meet check-in selfie requirements. Send a clear, well-lit photo of your face.",
       unavailable: "We couldn't validate your photo right now. Please try again in a moment.",
       invalidApiKey:
         "Selfie validation is temporarily unavailable (Photoguard configuration). Please try again later or contact the front desk.",

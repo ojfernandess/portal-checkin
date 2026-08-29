@@ -42,6 +42,10 @@ export function mapZepirisToFaceValidationResult(input: {
     reasons.push("NSFW");
   }
 
+  if (!iqa.passed && reasons.length === 0) {
+    reasons.push("IQA_FAILED");
+  }
+
   const primaryReason = reasons[0];
   const score = averageScore(iqa, faceDetected);
 
@@ -80,6 +84,8 @@ export function reasonToMessageKey(reason: FaceValidationReasonCode | undefined)
       return "checkin.faceValidation.spoof";
     case "NSFW":
       return "checkin.faceValidation.nsfw";
+    case "IQA_FAILED":
+      return "checkin.faceValidation.iqaFailed";
     case "SERVICE_UNAVAILABLE":
       return "checkin.faceValidation.unavailable";
     case "INVALID_API_KEY":
