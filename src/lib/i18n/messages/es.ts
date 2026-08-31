@@ -411,6 +411,10 @@ export const es: MessageTree = {
         "Selfie del acompañante para acceso en la portinería (solo se envía a Inbox, no al PMS). Use una foto nítida, bien iluminada y con el rostro visible. Al confirmar, pasará por la misma verificación de seguridad del huésped principal.",
       inboxPhotoAdd: "Agregar foto",
       inboxPhotoChange: "Cambiar foto",
+      inboxPhotoSave: "Enviar foto a portinería",
+      inboxPhotoSaved: "Foto del acompañante enviada a portinería.",
+      inboxPhotoSaveFailed: "No se pudo enviar la foto del acompañante a portinería.",
+      postNeedNewOrPhoto: "Agregue un nuevo acompañante o envíe la foto de acceso a portinería.",
     },
     errors: {
       intro: "Corrija lo siguiente antes de continuar:",

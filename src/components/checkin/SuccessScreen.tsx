@@ -28,6 +28,7 @@ import {
 import { toast } from "sonner";
 import { WhatsAppIcon } from "@/components/icons/WhatsAppIcon";
 import { PhoneDisplay } from "@/components/checkin/PhoneDisplay";
+import { CompanionInboxPhotoTile } from "@/components/checkin/CompanionInboxPhotoTile";
 import { isReservationPaid, paymentBadgeClass } from "@/components/checkin/ReservationCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -39,6 +40,9 @@ import { localeToDateLocale, type Locale } from "@/lib/i18n/types";
 import { buildWhatsAppUrl } from "@/lib/phone-display";
 import { cn } from "@/lib/utils";
 import type { Dependent, GuestLookup, Reservation } from "@/lib/api/types";
+import { companionNeedsInboxPhoto } from "@/lib/companion-inbox-photos";
+import type { ExclusiveCameraProps } from "@/lib/camera-utils";
+import type { SelfieValidationOutcome } from "@/components/checkin/SelfieCapture";
 import type { UsefulInfoItem, UsefulInfoItemKind } from "@/lib/establishment-settings";
 import { parseUsefulInfoSteps, shouldRenderUsefulInfoAsFormattedBlock, shouldRenderUsefulInfoAsSteps } from "@/lib/useful-info-format";
 import {
@@ -64,7 +68,15 @@ type Props = {
   companionsSaving?: boolean;
   onStartAddCompanions?: () => void;
   companionsEditor?: ReactNode;
-};
+  faceValidationEnabled?: boolean;
+  onValidateCompanionSelfie?: (photoBase64: string, guestId?: string) => Promise<SelfieValidationOutcome>;
+  onSaveCompanionInboxPhoto?: (
+    companion: Dependent,
+    photoBase64: string,
+    companionKey?: string,
+  ) => Promise<void>;
+  companionInboxPhotoSavingKey?: string | null;
+} & Partial<ExclusiveCameraProps>;
 
 function formatMoney(value: number | string | undefined, locale: Locale): string | null {
   if (value == null || value === "") return null;
@@ -320,6 +332,14 @@ export function SuccessScreen({
   companionsSaving = false,
   onStartAddCompanions,
   companionsEditor,
+  faceValidationEnabled = false,
+  onValidateCompanionSelfie,
+  onSaveCompanionInboxPhoto,
+  companionInboxPhotoSavingKey = null,
+  captureId: _successCaptureId,
+  activeCaptureId,
+  onRequestCapture,
+  onReleaseCapture,
 }: Props) {
   const { locale, t } = useI18n();
   const guest = mainGuest ?? reservation.mainGuest ?? reservation.responsible;
@@ -741,6 +761,32 @@ export function SuccessScreen({
                               ) || "—"}
                             </p>
                           </div>
+                        ) : null}
+                        {!addingCompanions &&
+                        inboxPortariaEnabled &&
+                        onSaveCompanionInboxPhoto &&
+                        companionNeedsInboxPhoto(companion) ? (
+                          <CompanionInboxPhotoTile
+                            companion={companion}
+                            companionKey={`${companion.documentNumber || companion.name}-${index}`}
+                            saving={
+                              companionInboxPhotoSavingKey ===
+                              `${companion.documentNumber || companion.name}-${index}`
+                            }
+                            faceValidationEnabled={faceValidationEnabled}
+                            onValidateSelfie={onValidateCompanionSelfie}
+                            onSave={(photoBase64) =>
+                              onSaveCompanionInboxPhoto(
+                                companion,
+                                photoBase64,
+                                `${companion.documentNumber || companion.name}-${index}`,
+                              )
+                            }
+                            captureId={`success-companion-photo-${index}`}
+                            activeCaptureId={activeCaptureId}
+                            onRequestCapture={onRequestCapture}
+                            onReleaseCapture={onReleaseCapture}
+                          />
                         ) : null}
                       </div>
                     </li>

@@ -100,6 +100,40 @@ export async function saveCheckinRecord(input: SaveCheckinRecordInput): Promise<
   }
 }
 
+export async function updateCheckinRecordDependents(
+  localizer: string,
+  dependents: Dependent[],
+): Promise<boolean> {
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const code = localizer.trim().toUpperCase();
+    const { data: record, error: lookupError } = await supabaseAdmin
+      .from("checkin_records")
+      .select("id")
+      .eq("localizer", code)
+      .order("checked_in_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (lookupError || !record?.id) return false;
+
+    const { error } = await supabaseAdmin
+      .from("checkin_records")
+      .update({ dependents })
+      .eq("id", record.id);
+
+    if (error) {
+      console.error("[checkin-records] dependents update failed:", error.message);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error("[checkin-records] dependents update failed:", error);
+    return false;
+  }
+}
+
 export function mapCheckinRecordRow(row: Record<string, unknown>): CheckinRecordRow {
   return {
     id: String(row.id),

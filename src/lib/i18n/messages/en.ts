@@ -410,6 +410,10 @@ export const en: MessageTree = {
         "Companion selfie for front-desk access (sent to Inbox only, not to the PMS). Use a clear, well-lit photo with the face visible. When you confirm, it goes through the same security check as the main guest.",
       inboxPhotoAdd: "Add photo",
       inboxPhotoChange: "Change photo",
+      inboxPhotoSave: "Send photo to front desk",
+      inboxPhotoSaved: "Companion photo sent to front desk.",
+      inboxPhotoSaveFailed: "Could not send the companion photo to front desk.",
+      postNeedNewOrPhoto: "Add a new companion or send the front desk access photo.",
     },
     errors: {
       intro: "Please fix the following before continuing:",

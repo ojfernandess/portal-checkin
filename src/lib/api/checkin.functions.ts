@@ -1098,6 +1098,54 @@ export const getCompletedCheckinContext = createServerFn({ method: "POST" })
     };
   });
 
+export const updateCompanionInboxPhotos = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        localizer: LOCALIZER_SCHEMA,
+        establishmentId: z.string().trim().min(1).max(64),
+        dependents: z.array(z.record(z.any())),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    await enforceRateLimit(clientIpBucket("companion-inbox-photo"), { maxRequests: 20 });
+    const code = data.localizer.trim().toUpperCase();
+    const reservation = await fetchReservationByLocalizer(code);
+    const { assertRegisteredEstablishmentAccess, resolveReservationEstablishmentId } = await import(
+      "@/lib/establishment-registry.server"
+    );
+    await assertRegisteredEstablishmentAccess(resolveReservationEstablishmentId(reservation));
+
+    const establishmentId =
+      data.establishmentId.trim() ||
+      String(resolveReservationEstablishmentId(reservation) ?? "").trim();
+    if (!establishmentId) {
+      throw new Error("Estabelecimento não identificado para envio à portaria.");
+    }
+
+    const dependentsInput = data.dependents as Dependent[];
+    const sanitized = sanitizeDependentsForStorage(dependentsInput);
+    const companionsWithPhoto = sanitized.filter((dependent) =>
+      dependent.profilePhotoUrl?.trim().startsWith("data:"),
+    );
+    if (companionsWithPhoto.length === 0) {
+      throw new Error("Informe a foto do acompanhante para continuar.");
+    }
+
+    const { updateCheckinRecordDependents } = await import("@/lib/checkin-records");
+    await updateCheckinRecordDependents(code, sanitized);
+
+    const { syncCompanionGuestsToInbox } = await import("@/lib/inbox-sync.server");
+    await syncCompanionGuestsToInbox({
+      establishmentId,
+      localizer: code,
+      dependents: companionsWithPhoto,
+    });
+
+    return { dependents: sanitized };
+  });
+
 export const submitCheckin = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
     z
@@ -1274,16 +1322,25 @@ export const submitCheckin = createServerFn({ method: "POST" })
       );
 
     if (resolvedEstablishmentId) {
-      const { syncCheckinToInbox } = await import("@/lib/inbox-sync.server");
-      await syncCheckinToInbox({
-        establishmentId: String(resolvedEstablishmentId),
-        localizer,
-        reservationId: data.reservationId,
-        mainGuest,
-        dependents: storedDependents,
-        reservationSnapshot: (data.reservationSnapshot as Reservation | undefined) ?? null,
-        checkinRecordId,
-      });
+      if (purpose === "companions") {
+        const { syncCompanionGuestsToInbox } = await import("@/lib/inbox-sync.server");
+        await syncCompanionGuestsToInbox({
+          establishmentId: String(resolvedEstablishmentId),
+          localizer,
+          dependents: storedDependents,
+        });
+      } else {
+        const { syncCheckinToInbox } = await import("@/lib/inbox-sync.server");
+        await syncCheckinToInbox({
+          establishmentId: String(resolvedEstablishmentId),
+          localizer,
+          reservationId: data.reservationId,
+          mainGuest,
+          dependents: storedDependents,
+          reservationSnapshot: (data.reservationSnapshot as Reservation | undefined) ?? null,
+          checkinRecordId,
+        });
+      }
     }
 
     if (data.extraFields && Object.keys(data.extraFields).length > 0) {

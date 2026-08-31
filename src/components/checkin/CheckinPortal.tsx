@@ -43,6 +43,7 @@ import {
   lookupGuest,
   startCheckinSession,
   submitCheckin,
+  updateCompanionInboxPhotos,
   uploadCheckinMedia,
   validateCheckinSelfie,
   verifyReaccessBirthDate,
@@ -69,6 +70,9 @@ import {
   type EstablishmentSettings,
 } from "@/lib/establishment-settings";
 import { useI18n } from "@/lib/i18n/context";
+import {
+  companionsHaveInboxPhotoUpdates,
+} from "@/lib/companion-inbox-photos";
 
 export type CheckinPortalProps = {
   initialLocalizer?: string;
@@ -225,6 +229,7 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
   const upload = useServerFn(uploadCheckinMedia);
   const loadReference = useServerFn(getEmbraturReference);
   const submit = useServerFn(submitCheckin);
+  const updateCompanionInboxPhotosFn = useServerFn(updateCompanionInboxPhotos);
   const startSession = useServerFn(startCheckinSession);
   const verifyReaccess = useServerFn(verifyReaccessBirthDate);
   const loadCompletedContext = useServerFn(getCompletedCheckinContext);
@@ -373,6 +378,7 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
   const [postCompanionsContext, setPostCompanionsContext] = useState<CompletedCheckinContext | null>(
     null,
   );
+  const [companionInboxPhotoSavingKey, setCompanionInboxPhotoSavingKey] = useState<string | null>(null);
 
   const reservationId = String(reservation?.localizer ?? reservation?.reservationId ?? localizer);
   const guestsQuantity = Math.max(
@@ -1139,43 +1145,113 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
     }
   }
 
+  async function saveCompanionInboxPhoto(
+    companion: Dependent,
+    photoBase64: string,
+    companionKey?: string,
+  ) {
+    if (!reservation) return;
+    const establishmentId = String(reservation.establishmentId ?? "").trim();
+    if (!establishmentId) {
+      toast.error(t("checkin.companions.inboxPhotoSaveFailed"));
+      return;
+    }
+
+    const key = companionKey ?? `${companion.documentNumber || companion.name}`;
+    const currentDependents =
+      dependents.length > 0 ? dependents : (reservation.dependents ?? []);
+    const nextDependents = currentDependents.map((dependent) => {
+      const sameDocument =
+        dependent.documentNumber?.trim() &&
+        companion.documentNumber?.trim() &&
+        dependent.documentNumber.trim() === companion.documentNumber.trim();
+      const sameName =
+        dependent.name?.trim().toLowerCase() === companion.name?.trim().toLowerCase();
+      if (!sameDocument && !sameName) return dependent;
+      return { ...dependent, profilePhotoUrl: photoBase64 };
+    });
+
+    setCompanionInboxPhotoSavingKey(key);
+    try {
+      const result = await updateCompanionInboxPhotosFn({
+        data: {
+          localizer: String(reservation.localizer ?? localizer).trim().toUpperCase(),
+          establishmentId,
+          dependents: nextDependents as unknown as Record<string, unknown>[],
+        },
+      });
+      const savedDependents = result.dependents ?? nextDependents;
+      setDependents(savedDependents);
+      setPostCompanionsDraft(savedDependents);
+      setReservation((current) =>
+        current ? { ...current, dependents: savedDependents } : current,
+      );
+      toast.success(t("checkin.companions.inboxPhotoSaved"));
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : t("checkin.companions.inboxPhotoSaveFailed"),
+      );
+    } finally {
+      setCompanionInboxPhotoSavingKey(null);
+    }
+  }
+
   async function savePostCompanions(companionsOverride?: Dependent[]) {
     if (!reservation || !postCompanionsContext?.embratur) return;
     const companionsToSave = companionsOverride ?? postCompanionsDraft;
-    if (companionsToSave.length <= postCompanionsLockedCount) {
-      toast.error(t("checkin.companions.postNeedNew"));
+    const hasNewCompanions = companionsToSave.length > postCompanionsLockedCount;
+    const hasPhotoUpdates = companionsHaveInboxPhotoUpdates(
+      companionsToSave,
+      postCompanionsContext.dependents,
+    );
+
+    if (!hasNewCompanions && !hasPhotoUpdates) {
+      toast.error(t("checkin.companions.postNeedNewOrPhoto"));
       return;
     }
 
     const labels = buildCheckinErrorLabels(t);
     const mainGuest = postCompanionsContext.mainGuest;
-    const issues = validateDependents(companionsToSave, mainGuest);
-    if (issues.length > 0) {
-      showCheckinError(formatCheckinIssues(issues, labels));
-      return;
+
+    if (hasNewCompanions) {
+      const issues = validateDependents(companionsToSave, mainGuest);
+      if (issues.length > 0) {
+        showCheckinError(formatCheckinIssues(issues, labels));
+        return;
+      }
     }
 
     setPostCompanionsSaving(true);
     try {
-      await submit({
-        data: {
-          reservationId,
-          localizer: String(reservation.localizer ?? localizer).trim().toUpperCase(),
-          establishmentId: String(reservation.establishmentId ?? ""),
-          establishmentName: reservation.establishmentName,
-          reservationSnapshot: reservation,
-          mainGuest: mainGuest as Record<string, unknown>,
-          embratur: postCompanionsContext.embratur as unknown as Record<string, unknown>,
-          dependents: companionsToSave as unknown as Record<string, unknown>[],
-          purpose: "companions",
-          registeredPhotos: {
-            ...(mainGuest.profilePhotoUrl ? { profileUrl: mainGuest.profilePhotoUrl } : {}),
-            ...(mainGuest.profilePhotoId != null ? { profileId: mainGuest.profilePhotoId } : {}),
-            ...(mainGuest.documentPhotoUrl ? { documentUrl: mainGuest.documentPhotoUrl } : {}),
-            ...(mainGuest.documentPhotoId != null ? { documentId: mainGuest.documentPhotoId } : {}),
+      if (hasNewCompanions) {
+        await submit({
+          data: {
+            reservationId,
+            localizer: String(reservation.localizer ?? localizer).trim().toUpperCase(),
+            establishmentId: String(reservation.establishmentId ?? ""),
+            establishmentName: reservation.establishmentName,
+            reservationSnapshot: reservation,
+            mainGuest: mainGuest as Record<string, unknown>,
+            embratur: postCompanionsContext.embratur as unknown as Record<string, unknown>,
+            dependents: companionsToSave as unknown as Record<string, unknown>[],
+            purpose: "companions",
+            registeredPhotos: {
+              ...(mainGuest.profilePhotoUrl ? { profileUrl: mainGuest.profilePhotoUrl } : {}),
+              ...(mainGuest.profilePhotoId != null ? { profileId: mainGuest.profilePhotoId } : {}),
+              ...(mainGuest.documentPhotoUrl ? { documentUrl: mainGuest.documentPhotoUrl } : {}),
+              ...(mainGuest.documentPhotoId != null ? { documentId: mainGuest.documentPhotoId } : {}),
+            },
           },
-        },
-      });
+        });
+      } else if (hasPhotoUpdates && establishmentSettings.inboxEnabled) {
+        await updateCompanionInboxPhotosFn({
+          data: {
+            localizer: String(reservation.localizer ?? localizer).trim().toUpperCase(),
+            establishmentId: String(reservation.establishmentId ?? ""),
+            dependents: companionsToSave as unknown as Record<string, unknown>[],
+          },
+        });
+      }
 
       const code = String(reservation.localizer ?? localizer).trim().toUpperCase();
       const refreshed = await refreshReservation({ data: { localizer: code } });
@@ -1193,7 +1269,11 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
       setGuest(mainGuest);
       setEmbratur(postCompanionsContext.embratur);
       resetPostCompanionsEditor();
-      toast.success(t("checkin.companions.postSaved"));
+      toast.success(
+        hasNewCompanions
+          ? t("checkin.companions.postSaved")
+          : t("checkin.companions.inboxPhotoSaved"),
+      );
       void refreshPostCompanionsAvailability(code);
     } catch (error) {
       const message =
@@ -1750,6 +1830,15 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
                   addingCompanions={addingPostCompanions}
                   companionsSaving={postCompanionsSaving || loading}
                   onStartAddCompanions={() => void startAddPostCompanions()}
+                  faceValidationEnabled={faceValidationEnabled}
+                  onValidateCompanionSelfie={validateSelfiePhoto}
+                  onSaveCompanionInboxPhoto={
+                    establishmentSettings.inboxEnabled
+                      ? (companion, photoBase64) => saveCompanionInboxPhoto(companion, photoBase64)
+                      : undefined
+                  }
+                  companionInboxPhotoSavingKey={companionInboxPhotoSavingKey}
+                  {...exclusiveCameraProps}
                   companionsEditor={
                     addingPostCompanions && postCompanionsContext ? (
                       <CompanionsStep
@@ -1762,6 +1851,12 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
                         inboxEnabled={establishmentSettings.inboxEnabled}
                         faceValidationEnabled={faceValidationEnabled}
                         onValidateSelfie={validateSelfiePhoto}
+                        onSaveCompanionInboxPhoto={
+                          establishmentSettings.inboxEnabled
+                            ? (companion, photoBase64) => saveCompanionInboxPhoto(companion, photoBase64)
+                            : undefined
+                        }
+                        companionInboxPhotoSavingKey={companionInboxPhotoSavingKey}
                         {...exclusiveCameraProps}
                         onChange={setPostCompanionsDraft}
                         onBack={resetPostCompanionsEditor}

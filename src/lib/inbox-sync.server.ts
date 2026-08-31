@@ -4,8 +4,8 @@ import {
   parseEstablishmentSettings,
   resolveInboxManagedUnitId,
 } from "@/lib/establishment-settings";
-import type { InboxClient } from "@/lib/inbox/client.server";
-import type { CreateInboxStayInput, InboxStay } from "@/lib/inbox/types";
+import { normalizeInboxPaginated, type InboxClient } from "@/lib/inbox/client.server";
+import type { CreateInboxStayInput, InboxStay, InboxStayGuest } from "@/lib/inbox/types";
 import { resolveInboxClientForTenant, isPortariaInboxFeatureEnabled } from "@/lib/inbox/tenant.server";
 import { writeAuditLog } from "@/lib/audit";
 import { resolvePhotoForUpload, type ResolvedPhotoUpload } from "@/lib/s3.server";
@@ -18,6 +18,12 @@ export type SyncCheckinToInboxInput = {
   dependents: Dependent[];
   reservationSnapshot?: Reservation | null;
   checkinRecordId?: string | null;
+};
+
+export type SyncCompanionGuestsToInboxInput = {
+  establishmentId: string;
+  localizer: string;
+  dependents: Dependent[];
 };
 
 const CONFIRMATION_POLL_ATTEMPTS = 6;
@@ -195,6 +201,150 @@ function findPrimaryStayGuest(stay: InboxStay) {
   return guests.find((item) => item.is_primary) ?? guests[0];
 }
 
+function normalizeGuestDocument(value?: string | null): string {
+  return String(value ?? "").replace(/\D/g, "");
+}
+
+async function findInboxStayByLocalizer(
+  client: InboxClient,
+  localizer: string,
+): Promise<InboxStay | null> {
+  const code = localizer.trim().toUpperCase();
+  const result = await client.listStays({ external_id: code, per_page: 10 });
+  const normalized = normalizeInboxPaginated(result);
+  return (
+    normalized.items.find((stay) => stay.external_id?.trim().toUpperCase() === code) ??
+    normalized.items[0] ??
+    null
+  );
+}
+
+function matchInboxStayGuest(
+  guests: InboxStayGuest[],
+  dependent: Dependent,
+): InboxStayGuest | undefined {
+  const dependentDoc = normalizeGuestDocument(dependent.documentNumber);
+  const dependentName = dependent.name?.trim().toLowerCase();
+  return guests.find((guest) => {
+    const guestDoc = normalizeGuestDocument(guest.document);
+    if (dependentDoc && guestDoc && dependentDoc === guestDoc) return true;
+    const guestName = guest.name?.trim().toLowerCase();
+    return Boolean(dependentName && guestName && dependentName === guestName);
+  });
+}
+
+async function loadInboxSyncContext(establishmentId: string) {
+  const { resolveTenantIdForEstablishmentId } = await import("@/lib/tenant-pms.server");
+  const tenantId = await resolveTenantIdForEstablishmentId(establishmentId);
+  if (!tenantId) return null;
+
+  const featureEnabled = await isPortariaInboxFeatureEnabled(tenantId);
+  if (!featureEnabled) return null;
+
+  const client = await resolveInboxClientForTenant(tenantId);
+  if (!client) return null;
+
+  const settings = await loadEstablishmentSettings(establishmentId);
+  if (!settings.inboxEnabled) return null;
+
+  return { tenantId, client, settings };
+}
+
+/**
+ * Sincroniza hóspedes acompanhantes com a reserva Inbox existente (POST /stays/{stay}/guests ou photo).
+ * Não altera o PMS — apenas a portaria Inbox.
+ */
+export async function syncCompanionGuestsToInbox(input: SyncCompanionGuestsToInboxInput): Promise<void> {
+  const context = await loadInboxSyncContext(input.establishmentId);
+  if (!context) return;
+
+  const { tenantId, client } = context;
+  const localizer = input.localizer.trim().toUpperCase();
+  const companions = input.dependents.filter((dependent) => dependent.name?.trim());
+  if (companions.length === 0) return;
+
+  const stay = await findInboxStayByLocalizer(client, localizer);
+  if (!stay?.id) {
+    console.warn("[inbox-sync] stay not found for companion sync", localizer);
+    await writeAuditLog({
+      tenantId,
+      action: "inbox.companion.sync.skipped",
+      entityType: "reservation",
+      entityId: localizer,
+      newData: {
+        establishmentId: input.establishmentId,
+        reason: "stay_not_found",
+        companionCount: companions.length,
+      },
+    });
+    return;
+  }
+
+  let guests = stay.guests ?? [];
+  if (guests.length === 0) {
+    guests = await client.listStayGuests(stay.id);
+  }
+
+  let syncedCount = 0;
+
+  try {
+    for (const dependent of companions) {
+      const photo = await resolvePhotoForUpload("profile", {
+        url: dependent.profilePhotoUrl,
+        id: (dependent as { profilePhotoId?: string | number }).profilePhotoId,
+      });
+      const existing = matchInboxStayGuest(guests, dependent);
+
+      if (existing?.id) {
+        if (photo && !isInboxGuestCheckinCompleted(existing)) {
+          await completeInboxGuestCheckin(client, stay.id, existing.id, photo);
+          syncedCount += 1;
+        }
+        continue;
+      }
+
+      await client.createStayGuest(stay.id, {
+        name: dependent.name.trim(),
+        email: dependent.email?.trim() || undefined,
+        phone: dependent.mobilePhoneNumber?.trim() || undefined,
+        document: dependent.documentNumber?.trim() || undefined,
+        ...(photo ? { photo_base64: photo.base64 } : {}),
+      });
+      syncedCount += 1;
+      guests = await client.listStayGuests(stay.id);
+    }
+
+    await writeAuditLog({
+      tenantId,
+      action: "inbox.companion.sync.success",
+      entityType: "reservation",
+      entityId: localizer,
+      newData: {
+        establishmentId: input.establishmentId,
+        inboxStayId: stay.id,
+        companionCount: companions.length,
+        syncedCount,
+      },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("[inbox-sync] companion sync failed:", message);
+    await writeAuditLog({
+      tenantId,
+      action: "inbox.companion.sync.failed",
+      entityType: "reservation",
+      entityId: localizer,
+      newData: {
+        establishmentId: input.establishmentId,
+        inboxStayId: stay.id,
+        error: message,
+        companionCount: companions.length,
+      },
+    });
+    throw error;
+  }
+}
+
 function isInboxGuestCheckinCompleted(guest: { check_in_completed?: boolean; status?: string } | undefined): boolean {
   if (!guest) return false;
   if (guest.check_in_completed === true) return true;
@@ -274,18 +424,10 @@ async function createInboxStayWithGuestPhoto(
  * Na Inbox, check-in concluído = foto enviada (POST /stays ou POST .../guests/{id}/photo).
  */
 export async function syncCheckinToInbox(input: SyncCheckinToInboxInput): Promise<void> {
-  const { resolveTenantIdForEstablishmentId } = await import("@/lib/tenant-pms.server");
-  const tenantId = await resolveTenantIdForEstablishmentId(input.establishmentId);
-  if (!tenantId) return;
+  const context = await loadInboxSyncContext(input.establishmentId);
+  if (!context) return;
 
-  const featureEnabled = await isPortariaInboxFeatureEnabled(tenantId);
-  if (!featureEnabled) return;
-
-  const client = await resolveInboxClientForTenant(tenantId);
-  if (!client) return;
-
-  const settings = await loadEstablishmentSettings(input.establishmentId);
-  if (!settings.inboxEnabled) return;
+  const { tenantId, client, settings } = context;
 
   const managedUnitId = resolveInboxManagedUnitId(settings, input.reservationSnapshot ?? null);
   if (!managedUnitId) {

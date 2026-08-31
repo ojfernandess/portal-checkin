@@ -409,6 +409,10 @@ export const ptBR = {
         "Selfie do acompanhante para liberação de acesso na portaria (enviada somente à Inbox, não ao PMS). Use uma foto nítida, bem iluminada e com o rosto visível. Ao confirmar, a selfie passará pela mesma verificação de segurança do hóspede principal.",
       inboxPhotoAdd: "Adicionar foto",
       inboxPhotoChange: "Alterar foto",
+      inboxPhotoSave: "Enviar foto para portaria",
+      inboxPhotoSaved: "Foto do acompanhante enviada à portaria.",
+      inboxPhotoSaveFailed: "Não foi possível enviar a foto do acompanhante à portaria.",
+      postNeedNewOrPhoto: "Adicione um novo acompanhante ou envie a foto de acesso na portaria.",
     },
     errors: {
       intro: "Corrija os seguintes pontos antes de continuar:",

@@ -18,6 +18,8 @@ import { PhoneWithDialCodeInput } from "@/components/checkin/PhoneWithDialCodeIn
 import { SelfieCapture, type SelfieValidationOutcome } from "@/components/checkin/SelfieCapture";
 import { getEmbraturReference } from "@/lib/api/checkin.functions";
 import type { Dependent, MainGuest } from "@/lib/api/types";
+import { CompanionInboxPhotoTile } from "@/components/checkin/CompanionInboxPhotoTile";
+import { companionNeedsInboxPhoto, companionsHaveInboxPhotoUpdates } from "@/lib/companion-inbox-photos";
 import { normalizeEmbratur } from "@/lib/embratur";
 import type { ExclusiveCameraProps } from "@/lib/camera-utils";
 import {
@@ -49,6 +51,12 @@ type Props = {
   inboxEnabled?: boolean;
   faceValidationEnabled?: boolean;
   onValidateSelfie?: (photoBase64: string, guestId?: string) => Promise<SelfieValidationOutcome>;
+  onSaveCompanionInboxPhoto?: (
+    companion: Dependent,
+    photoBase64: string,
+    companionKey?: string,
+  ) => Promise<void>;
+  companionInboxPhotoSavingKey?: string | null;
 } & Partial<ExclusiveCameraProps>;
 
 const EMPTY: Dependent = {
@@ -126,6 +134,8 @@ export function CompanionsStep({
   inboxEnabled = false,
   faceValidationEnabled = false,
   onValidateSelfie,
+  onSaveCompanionInboxPhoto,
+  companionInboxPhotoSavingKey = null,
   captureId: _captureId,
   activeCaptureId,
   onRequestCapture,
@@ -147,6 +157,10 @@ export function CompanionsStep({
   const [editingPhotoIndex, setEditingPhotoIndex] = useState<number | null>(null);
 
   const showInboxPhotos = inboxEnabled && max > 0;
+  const canSavePhotoOnly =
+    isPostCheckin &&
+    showInboxPhotos &&
+    companionsHaveInboxPhotoUpdates(dependents, dependents.slice(0, readOnlyCount));
 
   function validateCompanionPhoto(photoBase64: string, guestId?: string) {
     if (!faceValidationEnabled || !onValidateSelfie) {
@@ -461,13 +475,30 @@ export function CompanionsStep({
             {dependents.map((dependent, index) => {
               const locked = index < readOnlyCount;
               const editingPhoto = editingPhotoIndex === index;
+              const needsInboxPhoto = showInboxPhotos && companionNeedsInboxPhoto(dependent);
+              const companionKey = `${dependent.documentNumber || dependent.name}-${index}`;
               return (
                 <li
                   key={`photo-${dependent.documentNumber}-${index}`}
                   className="rounded-xl border border-border bg-card p-4"
                 >
                   <p className="mb-3 text-sm font-medium">{dependent.name}</p>
-                  {locked ? null : editingPhoto ? (
+                  {locked && needsInboxPhoto && onSaveCompanionInboxPhoto ? (
+                    <CompanionInboxPhotoTile
+                      companion={dependent}
+                      companionKey={companionKey}
+                      saving={companionInboxPhotoSavingKey === companionKey}
+                      faceValidationEnabled={faceValidationEnabled}
+                      onValidateSelfie={onValidateSelfie}
+                      onSave={(photoBase64) =>
+                        onSaveCompanionInboxPhoto(dependent, photoBase64, companionKey)
+                      }
+                      captureId={`companion-photo-${index}`}
+                      activeCaptureId={activeCaptureId}
+                      onRequestCapture={onRequestCapture}
+                      onReleaseCapture={onReleaseCapture}
+                    />
+                  ) : locked ? null : editingPhoto ? (
                     <SelfieCapture
                       compact
                       title={t("checkin.photos.selfie")}
@@ -755,7 +786,7 @@ export function CompanionsStep({
         <Button
           type="button"
           className="tap-safe flex-1"
-          disabled={saving || (isPostCheckin && dependents.length <= readOnlyCount)}
+          disabled={saving || (isPostCheckin && dependents.length <= readOnlyCount && !canSavePhotoOnly)}
           onClick={handleContinue}
         >
           {saving ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
