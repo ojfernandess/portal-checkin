@@ -10,6 +10,7 @@ import {
   resolveInboxClientForTenant,
 } from "@/lib/inbox/tenant.server";
 import { normalizeInboxList, normalizeInboxPaginated } from "@/lib/inbox/client.server";
+import { normalizeInboxStay } from "@/lib/inbox/normalize";
 import type { InboxStaySyncStatus } from "@/lib/inbox/types";
 
 type AdminContext = TenantContext & { userId: string; isPlatformAdmin?: boolean; tenantRole?: string | null };
@@ -136,7 +137,7 @@ export const adminGetInboxStay = createServerFn({ method: "POST" })
     const { tenantId } = context as AdminContext;
     await assertAdmin(context as AdminContext);
     const { client } = await assertInboxModuleAccess(tenantId, "stays");
-    const stay = await client.getStay(data.stayId);
+    const stay = normalizeInboxStay(await client.getStay(data.stayId));
     return { stay };
   });
 
@@ -272,10 +273,12 @@ export const adminTransferInboxStayUnit = createServerFn({ method: "POST" })
     const { tenantId, userId } = context as AdminContext;
     await assertAdmin(context as AdminContext);
     const { client } = await assertInboxModuleAccess(tenantId, "stays");
-    const stay = await client.transferStayUnit(data.stayId, {
-      from_managed_unit_id: data.fromManagedUnitId,
-      to_managed_unit_id: data.toManagedUnitId,
-    });
+    const stay = normalizeInboxStay(
+      await client.transferStayUnit(data.stayId, {
+        from_managed_unit_id: data.fromManagedUnitId,
+        to_managed_unit_id: data.toManagedUnitId,
+      }),
+    );
     await writeAuditLog({
       userId,
       tenantId,

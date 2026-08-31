@@ -1,7 +1,7 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useCallback, useEffect, useState } from "react";
-import { Eye, Loader2, Plus, RefreshCw, Search } from "lucide-react";
+import { Loader2, Pencil, Plus, RefreshCw, Search } from "lucide-react";
 import { toast } from "sonner";
 import { AdminSection, AdminTableWrap } from "@/components/admin/AdminShell";
 import { useAdminTenantScope } from "@/components/admin/AdminAccountProvider";
@@ -253,7 +253,8 @@ function InboxStaysPage() {
                   cell: (row) => (
                     <Button variant="ghost" size="sm" asChild>
                       <Link to="/admin/inbox/stays/$stayId" params={{ stayId: String(row.id) }}>
-                        <Eye className="size-4" aria-hidden />
+                        <Pencil className="size-4" aria-hidden />
+                        <span className="sr-only">{t("admin.inbox.editStay")}</span>
                       </Link>
                     </Button>
                   ),

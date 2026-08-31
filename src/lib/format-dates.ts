@@ -99,3 +99,21 @@ export function isCheckoutPast(
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
   return nowMinutes > checkoutMinutes;
 }
+
+/** Converte ISO datetime para valor de `<input type="datetime-local">`. */
+export function toDateTimeLocalInputValue(value: string | null | undefined): string {
+  if (!value?.trim()) return "";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "";
+  const pad = (part: number) => String(part).padStart(2, "0");
+  return `${parsed.getFullYear()}-${pad(parsed.getMonth() + 1)}-${pad(parsed.getDate())}T${pad(parsed.getHours())}:${pad(parsed.getMinutes())}`;
+}
+
+/** Converte `<input type="datetime-local">` para ISO datetime (UTC). */
+export function fromDateTimeLocalInputValue(value: string): string | undefined {
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  const parsed = new Date(trimmed);
+  if (Number.isNaN(parsed.getTime())) return undefined;
+  return parsed.toISOString();
+}

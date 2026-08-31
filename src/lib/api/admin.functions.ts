@@ -18,6 +18,7 @@ import type { TecHospitalityTokenScope } from "./techospitality.server";
 import { mapCheckinRecordRow, type CheckinRecordRow } from "@/lib/checkin-records";
 import { buildIlikeContains } from "@/lib/security";
 import { normalizeInboxPaginated } from "@/lib/inbox/client.server";
+import { normalizeManagedUnitOptions } from "@/lib/inbox/normalize";
 import { loadTenantInboxContext, resolveInboxClientForTenant } from "@/lib/inbox/tenant.server";
 
 export type { CheckinRecordRow };
@@ -1370,6 +1371,9 @@ export const adminListInboxManagedUnits = createServerFn({ method: "POST" })
     if (!ctx.featureEnabled || !ctx.configured) {
       return { configured: false as const, units: [] as const, items: [] as const, meta: null };
     }
+    if (!ctx.modules.units && !ctx.modules.stays) {
+      throw new Error("Este módulo Inbox não está ativo para esta empresa.");
+    }
     const client = await resolveInboxClientForTenant(tenantId);
     if (!client) {
       return { configured: false as const, units: [] as const, items: [] as const, meta: null };
@@ -1377,13 +1381,14 @@ export const adminListInboxManagedUnits = createServerFn({ method: "POST" })
     const result = await client.listManagedUnits({
       status: data?.status ?? "active",
       page: data?.page,
-      per_page: data?.perPage ?? 200,
+      per_page: data?.perPage ?? 100,
     });
     const normalized = normalizeInboxPaginated(result);
+    const units = normalizeManagedUnitOptions(normalized.items);
     return {
       configured: true as const,
-      units: normalized.items,
-      items: normalized.items,
+      units,
+      items: units,
       meta: normalized.meta,
     };
   });
