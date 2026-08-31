@@ -1,6 +1,15 @@
 import type { Dependent, EmbraturForm, MainGuest, Reservation } from "@/lib/api/types";
 import { resolveTenantIdForEstablishment } from "@/lib/tenant.server";
 
+export {
+  checkinRecordIsReservation,
+  checkinRecordShowsCompanionsBadge,
+  countNamedCheckinDependents,
+  dedupeCheckinRecordsForDisplay,
+  filterNamedCheckinDependents,
+} from "@/lib/checkin-record-status";
+export type { CheckinRecordBadgeInput, CheckinRecordDisplayRow } from "@/lib/checkin-record-status";
+
 export type CheckinRecordRow = {
   id: string;
   localizer: string;
@@ -100,14 +109,11 @@ export async function saveCheckinRecord(input: SaveCheckinRecordInput): Promise<
   }
 }
 
-export async function updateCheckinRecordDependents(
-  localizer: string,
-  dependents: Dependent[],
-): Promise<boolean> {
+export async function findLatestCheckinRecordId(localizer: string): Promise<string | null> {
   try {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const code = localizer.trim().toUpperCase();
-    const { data: record, error: lookupError } = await supabaseAdmin
+    const { data: record, error } = await supabaseAdmin
       .from("checkin_records")
       .select("id")
       .eq("localizer", code)
@@ -115,23 +121,71 @@ export async function updateCheckinRecordDependents(
       .limit(1)
       .maybeSingle();
 
-    if (lookupError || !record?.id) return false;
+    if (error || !record?.id) return null;
+    return String(record.id);
+  } catch {
+    return null;
+  }
+}
+
+/** Registro original do check-in (com termos), não duplicatas de acompanhantes. */
+async function findPrimaryCheckinRecordId(localizer: string): Promise<string | null> {
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const code = localizer.trim().toUpperCase();
+    const { data: rows, error } = await supabaseAdmin
+      .from("checkin_records")
+      .select("id, terms_accepted, checked_in_at")
+      .eq("localizer", code)
+      .order("checked_in_at", { ascending: true });
+
+    if (error || !rows?.length) return null;
+
+    const withTerms = rows.find((row) => row.terms_accepted === true);
+    if (withTerms?.id) return String(withTerms.id);
+
+    return String(rows[0]!.id);
+  } catch {
+    return null;
+  }
+}
+
+/** Atualiza acompanhantes no registro existente (não cria novo check-in). */
+export async function updateCheckinRecordForCompanions(input: {
+  localizer: string;
+  dependents: Dependent[];
+}): Promise<string | null> {
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const recordId = await findPrimaryCheckinRecordId(input.localizer);
+    if (!recordId) {
+      console.error("[checkin-records] companion update: record not found for", input.localizer);
+      return null;
+    }
 
     const { error } = await supabaseAdmin
       .from("checkin_records")
-      .update({ dependents })
-      .eq("id", record.id);
+      .update({ dependents: input.dependents })
+      .eq("id", recordId);
 
     if (error) {
-      console.error("[checkin-records] dependents update failed:", error.message);
-      return false;
+      console.error("[checkin-records] companion update failed:", error.message);
+      return null;
     }
 
-    return true;
+    return recordId;
   } catch (error) {
-    console.error("[checkin-records] dependents update failed:", error);
-    return false;
+    console.error("[checkin-records] companion update failed:", error);
+    return null;
   }
+}
+
+export async function updateCheckinRecordDependents(
+  localizer: string,
+  dependents: Dependent[],
+): Promise<boolean> {
+  const recordId = await updateCheckinRecordForCompanions({ localizer, dependents });
+  return recordId != null;
 }
 
 export function mapCheckinRecordRow(row: Record<string, unknown>): CheckinRecordRow {

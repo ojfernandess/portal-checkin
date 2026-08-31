@@ -15,7 +15,7 @@ import { DEFAULT_TENANT_ID } from "@/lib/tenant.constants";
 import { normalizeReservationPayload } from "./reservation-normalizer";
 import type { Reservation } from "./types";
 import type { TecHospitalityTokenScope } from "./techospitality.server";
-import { mapCheckinRecordRow, type CheckinRecordRow } from "@/lib/checkin-records";
+import { mapCheckinRecordRow, dedupeCheckinRecordsForDisplay, type CheckinRecordRow } from "@/lib/checkin-records";
 import { buildIlikeContains } from "@/lib/security";
 import { normalizeInboxPaginated } from "@/lib/inbox/client.server";
 import { normalizeManagedUnitOptions } from "@/lib/inbox/normalize";
@@ -1951,7 +1951,9 @@ export const adminListCheckinRecords = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
 
     return {
-      records: (rows ?? []).map((row) => mapCheckinRecordRow(row as Record<string, unknown>)),
+      records: dedupeCheckinRecordsForDisplay(
+        (rows ?? []).map((row) => mapCheckinRecordRow(row as Record<string, unknown>)),
+      ),
     };
   });
 
@@ -1966,8 +1968,25 @@ export const adminGetCheckinRecord = createServerFn({ method: "POST" })
     const { tenantId } = adminContext;
 
     try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const row = await assertCheckinRecordInTenant(data.id, tenantId);
-      return { record: mapCheckinRecordRow(row) };
+      const localizer = String(row.localizer).trim().toUpperCase();
+
+      const { data: siblings, error: siblingsError } = await supabaseAdmin
+        .from("checkin_records")
+        .select("*")
+        .eq("tenant_id", tenantId)
+        .eq("localizer", localizer)
+        .order("checked_in_at", { ascending: false });
+
+      if (siblingsError) throw new Error(siblingsError.message);
+
+      const mapped = (siblings ?? []).map((sibling) =>
+        mapCheckinRecordRow(sibling as Record<string, unknown>),
+      );
+      const [merged] = dedupeCheckinRecordsForDisplay(mapped);
+
+      return { record: merged ?? mapCheckinRecordRow(row) };
     } catch {
       return { record: null };
     }

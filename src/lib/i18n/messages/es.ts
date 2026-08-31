@@ -934,6 +934,8 @@ export const es: MessageTree = {
       fnrhFilled: "Completada",
       fnrhMissing: "No completada",
       fnrhEmpty: "FNRH no registrada en este check-in.",
+      companionsCol: "Acomp.",
+      companionsBadge: "{count} acompañante(s) agregado(s) después del check-in",
     },
     usersPage: {
       title: "Equipo del panel",

@@ -8,9 +8,13 @@ import {
   type CheckinRecordRow,
 } from "@/lib/api/admin.functions";
 import { CheckinRecordDetail } from "@/components/admin/CheckinRecordDetail";
+import {
+  CheckinRecordCompanionsBadge,
+  CheckinRecordFnrhBadge,
+  CheckinRecordTermsBadge,
+} from "@/components/admin/CheckinRecordStatusBadges";
 import { AdminResponsiveTable } from "@/components/admin/AdminResponsiveTable";
 import { AdminPage, useAdminTenantScope } from "@/components/admin/AdminShell";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -20,7 +24,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { formatDateTime } from "@/lib/format-dates";
-import { hasEmbraturData } from "@/lib/embratur-display";
 import { useI18n } from "@/lib/i18n/context";
 
 export const Route = createFileRoute("/_authenticated/admin/checkins")({
@@ -132,6 +135,13 @@ function AdminCheckinsPage() {
               ),
             },
             {
+              id: "companions",
+              header: t("admin.checkinsPage.companionsCol"),
+              mobileLabel: t("admin.checkinsPage.companionsCol"),
+              className: "w-12 text-center",
+              cell: (record) => <CheckinRecordCompanionsBadge record={record} />,
+            },
+            {
               id: "localizer",
               header: t("common.localizer"),
               mobileLabel: t("common.localizer"),
@@ -153,23 +163,13 @@ function AdminCheckinsPage() {
               id: "terms",
               header: t("admin.checkinsPage.termsCol"),
               mobileLabel: t("admin.checkinsPage.termsCol"),
-              cell: (record) => (
-                <Badge variant={record.terms_accepted ? "default" : "secondary"}>
-                  {record.terms_accepted ? t("common.termsAccepted") : t("common.termsNotAccepted")}
-                </Badge>
-              ),
+              cell: (record) => <CheckinRecordTermsBadge record={record} />,
             },
             {
               id: "fnrh",
               header: t("admin.checkinsPage.fnrhCol"),
               mobileLabel: t("admin.checkinsPage.fnrhCol"),
-              cell: (record) => (
-                <Badge variant={hasEmbraturData(record.embratur) ? "default" : "secondary"}>
-                  {hasEmbraturData(record.embratur)
-                    ? t("admin.checkinsPage.fnrhFilled")
-                    : t("admin.checkinsPage.fnrhMissing")}
-                </Badge>
-              ),
+              cell: (record) => <CheckinRecordFnrhBadge record={record} />,
             },
             {
               id: "actions",

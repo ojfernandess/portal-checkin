@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { writeAuditLog } from "@/lib/audit";
-import { saveCheckinRecord } from "@/lib/checkin-records";
+import { saveCheckinRecord, updateCheckinRecordForCompanions } from "@/lib/checkin-records";
 import { resolveTenantIdForEstablishmentId } from "@/lib/tenant-pms.server";
 import { assertRateLimitAllowed, enforceRateLimit, getClientIp, recordRateLimitHit } from "@/lib/rate-limit";
 import { cloneDefaultSections, parseTermsContent, flattenTermsSections } from "@/lib/establishment-terms";
@@ -1300,20 +1300,26 @@ export const submitCheckin = createServerFn({ method: "POST" })
     const result = unwrap<Record<string, unknown>>(payload);
 
     const localizer = (data.localizer ?? data.reservationId).trim().toUpperCase();
-    const checkinRecordId = await saveCheckinRecord({
-      localizer,
-      reservationId: data.reservationId,
-      ...(data.establishmentId ? { establishmentId: data.establishmentId } : {}),
-      ...(data.establishmentName ? { establishmentName: data.establishmentName } : {}),
-      mainGuest,
-      dependents: storedDependents,
-      embratur: data.embratur as unknown as EmbraturForm,
-      reservationSnapshot: (data.reservationSnapshot as Reservation | undefined) ?? null,
-      ...(data.extraFields ? { extraFields: data.extraFields } : {}),
-      termsAcceptedAt: data.termsAcceptedAt ?? null,
-      termsVersion: data.termsVersion ?? null,
-      checkinSessionId: data.checkinSessionId ?? null,
-    });
+    const checkinRecordId =
+      purpose === "companions"
+        ? await updateCheckinRecordForCompanions({
+            localizer,
+            dependents: storedDependents,
+          })
+        : await saveCheckinRecord({
+            localizer,
+            reservationId: data.reservationId,
+            ...(data.establishmentId ? { establishmentId: data.establishmentId } : {}),
+            ...(data.establishmentName ? { establishmentName: data.establishmentName } : {}),
+            mainGuest,
+            dependents: storedDependents,
+            embratur: data.embratur as unknown as EmbraturForm,
+            reservationSnapshot: (data.reservationSnapshot as Reservation | undefined) ?? null,
+            ...(data.extraFields ? { extraFields: data.extraFields } : {}),
+            termsAcceptedAt: data.termsAcceptedAt ?? null,
+            termsVersion: data.termsVersion ?? null,
+            checkinSessionId: data.checkinSessionId ?? null,
+          });
 
     const resolvedEstablishmentId =
       data.establishmentId ??

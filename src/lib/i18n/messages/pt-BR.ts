@@ -933,6 +933,8 @@ export const ptBR = {
       fnrhFilled: "Preenchida",
       fnrhMissing: "Não preenchida",
       fnrhEmpty: "FNRH não registrada neste check-in.",
+      companionsCol: "Acomp.",
+      companionsBadge: "{count} acompanhante(s) adicionado(s) após o check-in",
     },
     usersPage: {
       title: "Equipe do painel",

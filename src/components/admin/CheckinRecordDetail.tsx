@@ -1,6 +1,6 @@
 import { CheckinRecordFnrhSection } from "@/components/admin/CheckinRecordFnrhSection";
+import { CheckinRecordStatusBadges } from "@/components/admin/CheckinRecordStatusBadges";
 import { PhoneDisplay } from "@/components/checkin/PhoneDisplay";
-import { Badge } from "@/components/ui/badge";
 import { formatDateTime, formatDateWithTime } from "@/lib/format-dates";
 import {
   formatBirthDate,
@@ -9,7 +9,12 @@ import {
   formatGuestAddress,
 } from "@/lib/guest-display";
 import { useI18n } from "@/lib/i18n/context";
+import type { Locale } from "@/lib/i18n/types";
+import type { Dependent } from "@/lib/api/types";
 import type { CheckinRecordRow } from "@/lib/checkin-records";
+import {
+  filterNamedCheckinDependents,
+} from "@/lib/checkin-records";
 
 function Field({ label, value }: { label: string; value?: React.ReactNode }) {
   if (value == null || value === "") return null;
@@ -21,11 +26,54 @@ function Field({ label, value }: { label: string; value?: React.ReactNode }) {
   );
 }
 
+function CompanionGuestFields({ dependent, locale }: { dependent: Dependent; locale: Locale }) {
+  const { t } = useI18n();
+  const showRg = dependent.documentType?.trim().toUpperCase() !== "PASSPORT";
+
+  return (
+    <dl className="grid grid-cols-2 gap-3">
+      <Field label={t("common.email")} value={dependent.email} />
+      <Field
+        label={t("common.phone")}
+        value={
+          dependent.mobilePhoneNumber ? (
+            <PhoneDisplay phone={String(dependent.mobilePhoneNumber)} />
+          ) : undefined
+        }
+      />
+      <Field
+        label={t("common.document")}
+        value={formatDocumentLine(
+          {
+            documentNumber: dependent.documentNumber,
+            documentType: dependent.documentType,
+          },
+          locale,
+        )}
+      />
+      {showRg ? (
+        <>
+          <Field label={t("guest.rg")} value={dependent.rg} />
+          <Field label={t("guest.issuingAgency")} value={dependent.expeditor} />
+        </>
+      ) : null}
+      <Field label={t("common.birthDate")} value={formatBirthDate(dependent.birthDate, locale)} />
+      <Field label={t("common.gender")} value={formatGender(dependent.gender, locale)} />
+      <Field label={t("common.profession")} value={dependent.profession} />
+      <Field label={t("common.nationality")} value={dependent.citizenship} />
+      <div className="col-span-2">
+        <Field label={t("common.address")} value={formatGuestAddress(dependent)} />
+      </div>
+    </dl>
+  );
+}
+
 export function CheckinRecordDetail({ record }: { record: CheckinRecordRow }) {
   const { locale, t } = useI18n();
   const guest = record.main_guest;
   const snapshot = record.reservation_snapshot;
   const stay = snapshot?.stay ?? snapshot;
+  const companions = filterNamedCheckinDependents(record.dependents);
 
   const unitName = snapshot?.unitName ?? snapshot?.roomName ?? snapshot?.room?.unitName;
   const categoryName = snapshot?.categoryName ?? snapshot?.room?.categoryName;
@@ -33,18 +81,12 @@ export function CheckinRecordDetail({ record }: { record: CheckinRecordRow }) {
   return (
     <div className="space-y-5 text-sm">
       <section className="space-y-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge variant={record.terms_accepted ? "default" : "secondary"}>
-            {record.terms_accepted
-              ? t("admin.checkinsPage.termsAcceptedBadge")
-              : t("admin.checkinsPage.termsMissingBadge")}
-          </Badge>
-          {record.terms_version ? (
-            <span className="text-xs text-muted-foreground">
-              {t("common.version")} {record.terms_version}
-            </span>
-          ) : null}
-        </div>
+        <CheckinRecordStatusBadges record={record} layout="detail" />
+        {record.terms_version ? (
+          <span className="text-xs text-muted-foreground">
+            {t("common.version")} {record.terms_version}
+          </span>
+        ) : null}
         <p>
           <span className="text-muted-foreground">{t("admin.checkinsPage.checkinAt")} </span>
           <span className="font-medium">{formatDateTime(record.checked_in_at, locale)}</span>
@@ -100,26 +142,20 @@ export function CheckinRecordDetail({ record }: { record: CheckinRecordRow }) {
         </dl>
       </section>
 
-      {record.dependents.length > 0 ? (
-        <section className="space-y-2">
+      {companions.length > 0 ? (
+        <section className="space-y-3">
           <h3 className="font-semibold">{t("common.companions")}</h3>
-          <ul className="space-y-2">
-            {record.dependents.map((dependent) => (
-              <li key={dependent.documentNumber || dependent.name} className="rounded-lg border border-border p-3">
-                <p className="font-medium">{dependent.name}</p>
-                <p className="text-muted-foreground">
-                  {formatDocumentLine(
-                    {
-                      documentNumber: dependent.documentNumber,
-                      documentType: dependent.documentType,
-                    },
-                    locale,
-                  )}
-                  {dependent.gender ? ` · ${formatGender(dependent.gender, locale)}` : ""}
-                </p>
-              </li>
+          <div className="space-y-3">
+            {companions.map((dependent, index) => (
+              <article
+                key={`${dependent.documentNumber || dependent.name}-${index}`}
+                className="space-y-3 rounded-lg border border-border p-3"
+              >
+                <h4 className="font-medium">{dependent.name}</h4>
+                <CompanionGuestFields dependent={dependent} locale={locale} />
+              </article>
             ))}
-          </ul>
+          </div>
         </section>
       ) : null}
 
