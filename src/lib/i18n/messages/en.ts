@@ -733,6 +733,8 @@ export const en: MessageTree = {
       staysTitle: "Stays",
       staysBody: "Stays registered in Inbox.",
       staysEmpty: "No stays found.",
+      filterByStatus: "Filter by status",
+      allStatuses: "All statuses",
       createStay: "New stay",
       stayCreated: "Stay created in Inbox.",
       verifyTitle: "Verify system sync",

@@ -737,6 +737,8 @@ export const es: MessageTree = {
       staysTitle: "Reservas",
       staysBody: "Reservas registradas en Inbox.",
       staysEmpty: "Ninguna reserva encontrada.",
+      filterByStatus: "Filtrar por estado",
+      allStatuses: "Todos los estados",
       createStay: "Nueva reserva",
       stayCreated: "Reserva creada en Inbox.",
       verifyTitle: "Verificar envío al sistema",

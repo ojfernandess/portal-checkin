@@ -32,6 +32,7 @@ import {
 } from "@/lib/api/inbox.functions";
 import { adminListInboxManagedUnits } from "@/lib/api/admin.functions";
 import { formatDateTime } from "@/lib/format-dates";
+import { INBOX_STAY_STATUS_OPTIONS, inboxStayStatusLabelKey } from "@/lib/inbox/stay-status";
 import { useI18n } from "@/lib/i18n/context";
 
 export const Route = createFileRoute("/_authenticated/admin/inbox/stays/")({
@@ -64,12 +65,18 @@ function InboxStaysPage() {
     externalId: "",
   });
   const [creating, setCreating] = useState(false);
+  const [statusFilter, setStatusFilter] = useState("all");
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const result = await listFn({ data: { perPage: 50 } });
+      const result = await listFn({
+        data: {
+          perPage: 50,
+          ...(statusFilter !== "all" ? { status: statusFilter } : {}),
+        },
+      });
       setRows(result.items ?? []);
     } catch (err) {
       setRows([]);
@@ -77,13 +84,18 @@ function InboxStaysPage() {
     } finally {
       setLoading(false);
     }
-  }, [listFn, t, tenantScope]);
+  }, [listFn, statusFilter, t, tenantScope]);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError(null);
-    void listFn({ data: { perPage: 50 } })
+    void listFn({
+      data: {
+        perPage: 50,
+        ...(statusFilter !== "all" ? { status: statusFilter } : {}),
+      },
+    })
       .then((result) => {
         if (!cancelled) setRows(result.items ?? []);
       })
@@ -99,7 +111,7 @@ function InboxStaysPage() {
     return () => {
       cancelled = true;
     };
-  }, [listFn, t, tenantScope]);
+  }, [listFn, statusFilter, t, tenantScope]);
 
   async function handleVerify() {
     if (!verifyLocalizer.trim()) return;
@@ -118,7 +130,7 @@ function InboxStaysPage() {
   async function openCreate() {
     setCreateOpen(true);
     try {
-      const result = await unitsFn({ data: { perPage: 100 } });
+      const result = await unitsFn({ data: { status: "active", perPage: 100 } });
       setUnits(result.units ?? result.items ?? []);
     } catch {
       setUnits([]);
@@ -215,6 +227,27 @@ function InboxStaysPage() {
           </div>
         }
       >
+        <div className="mb-4 flex flex-wrap items-end gap-3">
+          <div className="min-w-[12rem] space-y-1">
+            <Label htmlFor="stay-status-filter">{t("admin.inbox.filterByStatus")}</Label>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger id="stay-status-filter" className="w-full min-w-[12rem]">
+                <SelectValue placeholder={t("admin.inbox.allStatuses")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("admin.inbox.allStatuses")}</SelectItem>
+                {INBOX_STAY_STATUS_OPTIONS.map((status) => {
+                  const labelKey = inboxStayStatusLabelKey(status);
+                  return (
+                    <SelectItem key={status} value={status}>
+                      {labelKey ? t(labelKey) : status.replace(/_/g, " ")}
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
         {loading ? (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">

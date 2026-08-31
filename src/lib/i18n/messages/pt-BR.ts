@@ -735,6 +735,8 @@ export const ptBR = {
       staysTitle: "Reservas",
       staysBody: "Reservas (stays) registradas na Inbox.",
       staysEmpty: "Nenhuma reserva encontrada.",
+      filterByStatus: "Filtrar por status",
+      allStatuses: "Todos os status",
       createStay: "Nova reserva",
       stayCreated: "Reserva criada na Inbox.",
       verifyTitle: "Verificar envio ao sistema",
