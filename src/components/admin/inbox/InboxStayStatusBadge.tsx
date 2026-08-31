@@ -1,5 +1,6 @@
 import { LogIn, LogOut } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { inboxStayStatusLabelKey } from "@/lib/inbox/stay-status";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n/context";
 
@@ -55,9 +56,38 @@ export function InboxStayStatusBadge({ status, className }: Props) {
     );
   }
 
+  if (normalized === "confirmed") {
+    return (
+      <Badge
+        className={cn(
+          "border-transparent bg-blue-500/10 text-blue-700 hover:bg-blue-500/10 dark:text-blue-400",
+          className,
+        )}
+      >
+        {t("admin.inbox.stayStatusConfirmed")}
+      </Badge>
+    );
+  }
+
+  if (normalized === "cancelled" || normalized === "canceled") {
+    return (
+      <Badge
+        className={cn(
+          "border-transparent bg-red-500/10 text-red-700 hover:bg-red-500/10 dark:text-red-400",
+          className,
+        )}
+      >
+        {t("admin.inbox.stayStatusCancelled")}
+      </Badge>
+    );
+  }
+
+  const labelKey = inboxStayStatusLabelKey(normalized);
+  const label = labelKey ? t(labelKey) : formatFallbackStatus(normalized);
+
   return (
     <Badge variant="secondary" className={cn("font-normal", className)}>
-      {formatFallbackStatus(normalized)}
+      {label}
     </Badge>
   );
 }
