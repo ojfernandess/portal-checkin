@@ -155,16 +155,23 @@ async function fetchReservationByLocalizer(
   localizer: string,
   establishmentId?: string | null,
 ): Promise<Reservation | null> {
-  const { apiFetch, unwrap } = await import("@/lib/api/techospitality.server");
   const { normalizeReservationPayload } = await import("@/lib/api/reservation-normalizer");
   const { resolveTenantIdForEstablishmentId } = await import("@/lib/tenant-pms.server");
+  const { pmsFetchLocalizer, unwrapPmsPayload } = await import("@/lib/pms/index.server");
   const tenantId = await resolveTenantIdForEstablishmentId(establishmentId);
-  const payload = await apiFetch<unknown>(
-    `/api/reservations/localizer/${encodeURIComponent(localizer.toUpperCase())}`,
-    { tenantId },
-  );
-  const raw = unwrap<unknown>(payload);
-  return normalizeReservationPayload(Array.isArray(raw) ? raw[0] : raw);
+  if (!tenantId) return null;
+
+  try {
+    const result = await pmsFetchLocalizer(localizer, {
+      tenantId,
+      establishmentId,
+    });
+    const raw = await unwrapPmsPayload<unknown>(result.payload, result.provider);
+    return normalizeReservationPayload(Array.isArray(raw) ? raw[0] : raw);
+  } catch (error) {
+    console.warn("[inbox-sync] reservation lookup failed:", error);
+    return null;
+  }
 }
 
 async function waitForConfirmedReservation(

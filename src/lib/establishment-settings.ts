@@ -28,6 +28,10 @@ export type EstablishmentSettings = {
   requireBirthDateConfirmationOnReaccess: boolean;
   /** Foto exibida no banner e card da página de check-in concluído (URL ou data URL). */
   successPagePhotoUrl: string | null;
+  /** Token X-Auth-IApi-Token do PMS VB para este estabelecimento. */
+  vbApiToken: string | null;
+  /** Vincula fotos de check-in anteriores ao hóspede (lookup) via MinIO. */
+  vbPhotoLinkEnabled: boolean;
   /** Envia check-ins concluídos para a Inbox (portaria). */
   inboxEnabled: boolean;
   /** Unidade gerenciada padrão na Inbox para este estabelecimento. */
@@ -42,6 +46,8 @@ export const DEFAULT_ESTABLISHMENT_SETTINGS: EstablishmentSettings = {
   requireBirthDateConfirmation: false,
   requireBirthDateConfirmationOnReaccess: false,
   successPagePhotoUrl: null,
+  vbApiToken: null,
+  vbPhotoLinkEnabled: false,
   inboxEnabled: false,
   inboxManagedUnitId: null,
   inboxUnitMappings: [],
@@ -195,6 +201,11 @@ export function parseEstablishmentSettings(raw: unknown): EstablishmentSettings 
     requireBirthDateConfirmationOnReaccess:
       settings.requireBirthDateConfirmationOnReaccess === true,
     successPagePhotoUrl: parseSuccessPagePhotoUrl(settings.successPagePhotoUrl),
+    vbApiToken:
+      typeof settings.vbApiToken === "string" && settings.vbApiToken.trim()
+        ? settings.vbApiToken.trim()
+        : null,
+    vbPhotoLinkEnabled: settings.vbPhotoLinkEnabled === true,
     inboxEnabled: settings.inboxEnabled === true,
     inboxManagedUnitId: parseInboxManagedUnitId(settings.inboxManagedUnitId),
     inboxUnitMappings: parseInboxUnitMappings(settings.inboxUnitMappings),

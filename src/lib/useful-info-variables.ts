@@ -1,6 +1,28 @@
+import { resolveReservationUnitDisplay, resolveRoomNumber } from "@/lib/api/reservation-normalizer";
 import { formatDate } from "@/lib/format-dates";
 import type { GuestLookup, Reservation } from "@/lib/api/types";
 import type { Locale } from "@/lib/i18n/types";
+
+export type UsefulInfoPmsProvider = "vb" | "vivakey";
+
+export function resolveUsefulInfoPmsProvider(input: {
+  vbEnabled?: boolean;
+  reservation?: Reservation | null;
+}): UsefulInfoPmsProvider {
+  if (input.reservation?.pmsProvider === "vb") return "vb";
+  if (input.reservation?.pmsProvider === "vivakey") return "vivakey";
+  if (input.vbEnabled) return "vb";
+  return "vivakey";
+}
+
+export function usefulInfoVariableDescriptionKey(
+  key: UsefulInfoVariableKey,
+  provider: UsefulInfoPmsProvider,
+): string {
+  return provider === "vb"
+    ? `admin.establishmentConfig.usefulInfoVarVb.${key}`
+    : `admin.establishmentConfig.usefulInfoVar.${key}`;
+}
 
 export const USEFUL_INFO_VARIABLE_KEYS = [
   "senha",
@@ -64,26 +86,17 @@ export function usefulInfoVariableToken(key: UsefulInfoVariableKey): string {
   return `{${key}}`;
 }
 
-export function buildUsefulInfoVariableContext(
+function buildSharedUsefulInfoFields(
   reservation: Reservation,
-  mainGuest?: GuestLookup | null,
-  locale: Locale = "pt-BR",
-): Record<UsefulInfoVariableKey, string> {
+  mainGuest: GuestLookup | null | undefined,
+  locale: Locale,
+): Omit<Record<UsefulInfoVariableKey, string>, "categoria" | "unidade" | "numero_unidade"> {
   const stay = reservation.stay ?? reservation;
   const guest = mainGuest ?? reservation.mainGuest ?? reservation.responsible;
   const roomPassword = reservation.roomPassword ?? reservation.access?.roomPassword ?? null;
-  const unitName =
-    reservation.unitName ?? reservation.roomName ?? reservation.room?.unitName ?? "";
-  const categoryName = reservation.categoryName ?? reservation.room?.categoryName ?? "";
 
   return {
     senha: roomPassword != null && roomPassword !== "" ? String(roomPassword) : "",
-    categoria: categoryName.trim(),
-    unidade: unitName.trim(),
-    numero_unidade:
-      reservation.unitNumber != null && reservation.unitNumber !== ""
-        ? String(reservation.unitNumber)
-        : "",
     localizador: reservation.localizer?.trim() ?? "",
     hospede: guest?.name?.trim() ?? "",
     estabelecimento:
@@ -102,6 +115,53 @@ export function buildUsefulInfoVariableContext(
       (stay.guestsQuantity ?? reservation.guestsQuantity) != null
         ? String(stay.guestsQuantity ?? reservation.guestsQuantity)
         : "",
+  };
+}
+
+function buildVbRoomUsefulInfoFields(reservation: Reservation): Pick<
+  Record<UsefulInfoVariableKey, string>,
+  "categoria" | "unidade" | "numero_unidade"
+> {
+  const display = resolveReservationUnitDisplay(
+    reservation.pmsProvider === "vb" ? reservation : { ...reservation, pmsProvider: "vb" },
+  );
+
+  return {
+    categoria: display.suiteLabel ?? "",
+    unidade: display.accessLabel ?? display.suiteLabel ?? "",
+    numero_unidade: display.unitNumberLabel ?? "",
+  };
+}
+
+function buildVivakeyRoomUsefulInfoFields(reservation: Reservation): Pick<
+  Record<UsefulInfoVariableKey, string>,
+  "categoria" | "unidade" | "numero_unidade"
+> {
+  const unitName =
+    reservation.unitName ?? reservation.roomName ?? reservation.room?.unitName ?? "";
+  const categoryName = reservation.categoryName ?? reservation.room?.categoryName ?? "";
+
+  return {
+    categoria: categoryName.trim(),
+    unidade: unitName.trim(),
+    numero_unidade: resolveRoomNumber(reservation) ?? "",
+  };
+}
+
+export function buildUsefulInfoVariableContext(
+  reservation: Reservation,
+  mainGuest?: GuestLookup | null,
+  locale: Locale = "pt-BR",
+): Record<UsefulInfoVariableKey, string> {
+  const shared = buildSharedUsefulInfoFields(reservation, mainGuest, locale);
+  const roomFields =
+    reservation.pmsProvider === "vb"
+      ? buildVbRoomUsefulInfoFields(reservation)
+      : buildVivakeyRoomUsefulInfoFields(reservation);
+
+  return {
+    ...shared,
+    ...roomFields,
   };
 }
 

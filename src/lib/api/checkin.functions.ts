@@ -19,6 +19,10 @@ import {
 } from "@/lib/checkin-validation";
 import type { Dependent, EmbraturForm, GuestLookup, MainGuest, MainGuestLookupResponse, Reservation } from "./types";
 import { normalizeReservationPayload } from "./reservation-normalizer";
+import {
+  normalizeVbReservationDocumentTypes,
+  portalDocumentTypeToVb,
+} from "@/lib/vb-document-type";
 
 function stripDataUrl(value: string): string {
   const match = /^data:[^;]+;base64,(.+)$/i.exec(value.trim());
@@ -35,11 +39,72 @@ function parseLookupGuest(payload: unknown): GuestLookup | null {
   return null;
 }
 
-async function parseLookupGuestWithPhotos(payload: unknown): Promise<GuestLookup | null> {
+async function enrichLookupWithPortalPhotos(
+  guest: GuestLookup,
+  establishmentId?: string | null,
+): Promise<GuestLookup> {
+  if (!establishmentId) return guest;
+
+  const { loadEstablishmentSettingsRow } = await import("@/lib/establishment-settings.server");
+  const settingsRow = await loadEstablishmentSettingsRow(establishmentId);
+  if (!settingsRow?.settings.vbPhotoLinkEnabled) return guest;
+
+  const { findGuestPortalPhotos } = await import("@/lib/guest-portal-photos.server");
+  const stored = await findGuestPortalPhotos({
+    tenantId: settingsRow.tenantId,
+    establishmentId,
+    documentNumber: guest.documentNumber,
+    email: guest.email,
+  });
+  if (!stored) return guest;
+
+  const { getCheckinPhotoDisplayUrl } = await import("@/lib/s3.server");
+  const profilePhotoDisplayUrl = stored.profileObjectKey
+    ? await getCheckinPhotoDisplayUrl("profile", { url: stored.profileObjectKey })
+    : undefined;
+  const documentPhotoDisplayUrl = stored.documentObjectKey
+    ? await getCheckinPhotoDisplayUrl("document", { url: stored.documentObjectKey })
+    : undefined;
+
+  return {
+    ...guest,
+    ...(stored.profileObjectKey && !guest.profilePhotoUrl
+      ? { profilePhotoUrl: stored.profileObjectKey, profilePhotoId: stored.id }
+      : {}),
+    ...(stored.documentObjectKey && !guest.documentPhotoUrl
+      ? { documentPhotoUrl: stored.documentObjectKey, documentPhotoId: stored.id }
+      : {}),
+    profilePhotoDisplayUrl: profilePhotoDisplayUrl ?? guest.profilePhotoDisplayUrl,
+    documentPhotoDisplayUrl: documentPhotoDisplayUrl ?? guest.documentPhotoDisplayUrl,
+    portalPhotoId: stored.id,
+  };
+}
+
+function stripLookupPhotos(guest: GuestLookup): GuestLookup {
+  const next = { ...guest };
+  delete next.profilePhotoUrl;
+  delete next.profilePhotoId;
+  delete next.documentPhotoUrl;
+  delete next.documentPhotoId;
+  delete next.profilePhotoDisplayUrl;
+  delete next.documentPhotoDisplayUrl;
+  delete next.portalPhotoId;
+  return next;
+}
+
+async function parseLookupGuestWithPhotos(
+  payload: unknown,
+  establishmentId?: string | null,
+  provider?: "vb" | "vivakey",
+): Promise<GuestLookup | null> {
   const guest = parseLookupGuest(payload);
   if (!guest) return null;
+  if (provider === "vb") {
+    return stripLookupPhotos(guest);
+  }
   const { enrichGuestLookupPhotos } = await import("@/lib/s3.server");
-  return enrichGuestLookupPhotos(guest);
+  const withMedia = await enrichGuestLookupPhotos(guest);
+  return enrichLookupWithPortalPhotos(withMedia, establishmentId);
 }
 
 type MediaUploadResult = {
@@ -132,10 +197,19 @@ function normalizeGuestDocumentNumber(documentNumber: string, documentType: stri
   return trimmed.replace(/\s+/g, "").toUpperCase();
 }
 
-function formatZipCodeForApi(value: string | undefined): string {
+function formatZipCodeForApi(value: string | undefined): string | undefined {
   const digits = onlyDigits(value ?? "");
   if (digits.length === 8) return digits;
-  return stripOptionalString(value) ?? "";
+  return stripOptionalString(value);
+}
+
+function assignTrimmedField(
+  row: Record<string, unknown>,
+  key: string,
+  value: unknown,
+): void {
+  const normalized = stripOptionalString(value);
+  if (normalized !== undefined) row[key] = normalized;
 }
 
 function normalizeGuestContactFields(guest: MainGuest): MainGuest {
@@ -148,8 +222,87 @@ function normalizeGuestContactFields(guest: MainGuest): MainGuest {
     mobilePhoneNumber: normalizePhoneForApi(guest.mobilePhoneNumber) || guest.mobilePhoneNumber,
     citizenship: formatCitizenshipForApi(guest.citizenship),
     country: formatPmsCountryForAddressField(guest.country ?? guest.citizenship),
-    zipCode: formatZipCodeForApi(guest.zipCode) || guest.zipCode,
+    zipCode: formatZipCodeForApi(guest.zipCode) ?? stripOptionalString(guest.zipCode),
+    state: stripOptionalString(guest.state),
+    city: stripOptionalString(guest.city),
+    street: stripOptionalString(guest.street),
+    number: stripOptionalString(guest.number),
+    neighborhood: stripOptionalString(guest.neighborhood),
   };
+}
+
+async function resolveSubmitPmsProvider(input: {
+  tenantId: string;
+  establishmentId?: string | null;
+  pmsProvider?: "vb" | "vivakey";
+}): Promise<"vb" | "vivakey"> {
+  if (input.pmsProvider === "vb" || input.pmsProvider === "vivakey") {
+    return input.pmsProvider;
+  }
+  const { resolvePmsProvider } = await import("@/lib/pms/resolve.server");
+  return resolvePmsProvider(input.tenantId, input.establishmentId);
+}
+
+async function prepareMainGuestPayloadForPms(
+  guest: MainGuest,
+  input: {
+    tenantId: string;
+    establishmentId?: string | null;
+    pmsProvider?: "vb" | "vivakey";
+  },
+): Promise<Record<string, unknown>> {
+  const provider = await resolveSubmitPmsProvider(input);
+  const row = pickMainGuestForApi(guest);
+  if (provider === "vb") {
+    const vbDocumentType = portalDocumentTypeToVb(String(row["documentType"] ?? "CPF"));
+    if (vbDocumentType != null) row["documentType"] = vbDocumentType;
+  }
+  return row;
+}
+
+function pickDependentOrMainField(
+  dependent: Dependent,
+  mainGuest: MainGuest | undefined,
+  field: keyof Dependent & keyof MainGuest,
+): string | undefined {
+  return stripOptionalString(dependent[field]) ?? stripOptionalString(mainGuest?.[field]);
+}
+
+function appendAddressFieldsToPayload(
+  row: Record<string, unknown>,
+  source: Pick<
+    MainGuest,
+    "zipCode" | "country" | "state" | "city" | "street" | "number" | "neighborhood" | "citizenship"
+  >,
+  mainGuest?: MainGuest,
+): void {
+  const zipCode = formatZipCodeForApi(
+    pickDependentOrMainField(source as Dependent, mainGuest, "zipCode"),
+  );
+  assignTrimmedField(row, "zipCode", zipCode);
+  row["country"] = formatPmsCountryForAddressField(
+    source.country ??
+      (source as Dependent).citizenship ??
+      mainGuest?.country ??
+      mainGuest?.citizenship,
+  );
+  assignTrimmedField(row, "state", pickDependentOrMainField(source as Dependent, mainGuest, "state"));
+  assignTrimmedField(row, "city", pickDependentOrMainField(source as Dependent, mainGuest, "city"));
+  assignTrimmedField(
+    row,
+    "street",
+    pickDependentOrMainField(source as Dependent, mainGuest, "street"),
+  );
+  assignTrimmedField(
+    row,
+    "number",
+    pickDependentOrMainField(source as Dependent, mainGuest, "number"),
+  );
+  assignTrimmedField(
+    row,
+    "neighborhood",
+    pickDependentOrMainField(source as Dependent, mainGuest, "neighborhood"),
+  );
 }
 
 function pickMainGuestForApi(guest: MainGuest): Record<string, unknown> {
@@ -159,20 +312,15 @@ function pickMainGuestForApi(guest: MainGuest): Record<string, unknown> {
     email: guest.email,
     documentNumber: normalizeGuestDocumentNumber(guest.documentNumber ?? "", documentType),
     documentType,
-    mobilePhoneNumber: normalizePhoneForApi(guest.mobilePhoneNumber),
     birthDate: guest.birthDate,
     profession: guest.profession,
     citizenship: formatCitizenshipForApi(guest.citizenship),
-    zipCode: formatZipCodeForApi(guest.zipCode),
-    country: formatPmsCountryForAddressField(guest.country ?? guest.citizenship),
-    state: guest.state,
-    city: guest.city,
-    street: guest.street,
-    number: guest.number,
-    neighborhood: guest.neighborhood,
     profilePhotoUrl: guest.profilePhotoUrl,
     documentPhotoUrl: guest.documentPhotoUrl,
   };
+
+  assignTrimmedField(row, "mobilePhoneNumber", normalizePhoneForApi(guest.mobilePhoneNumber));
+  appendAddressFieldsToPayload(row, guest);
 
   if (guest.profilePhotoId != null) row["profilePhotoId"] = guest.profilePhotoId;
   if (guest.documentPhotoId != null) row["documentPhotoId"] = guest.documentPhotoId;
@@ -187,11 +335,13 @@ function pickMainGuestForApi(guest: MainGuest): Record<string, unknown> {
   return row;
 }
 
-/** Monta acompanhantes no formato do POST /checkin (check.json). */
+/** Monta acompanhantes no formato do POST /checkin (check.json). Sem fotos — Inbox only. */
 export function prepareDependentsForCheckin(
   dependents: Dependent[],
   mainGuest?: MainGuest,
+  options?: { pmsProvider?: "vb" | "vivakey" },
 ): Record<string, unknown>[] {
+  const isVb = options?.pmsProvider === "vb";
   const mainDocument = mainGuest?.documentNumber
     ? normalizeGuestDocumentNumber(
         mainGuest.documentNumber,
@@ -209,19 +359,58 @@ export function prepareDependentsForCheckin(
         documentType,
       );
       const gender = formatGenderForApi(dependent.gender);
+
+      if (!name || !email || !documentNumber || !hasGenderSelection(dependent.gender) || !gender) {
+        return null;
+      }
+      if (mainDocument && documentNumber === mainDocument) return null;
+
+      const isPassport = documentType === "PASSPORT";
+
+      if (isVb) {
+        const row: Record<string, unknown> = {
+          name,
+          email,
+          documentNumber,
+          documentType: portalDocumentTypeToVb(documentType) ?? documentType,
+          gender,
+          fnrhId: null,
+        };
+
+        if (!isPassport) {
+          const rg = pickDependentOrMainField(dependent, mainGuest, "rg");
+          const expeditor = pickDependentOrMainField(dependent, mainGuest, "expeditor");
+          if (rg) row["rg"] = rg;
+          if (expeditor) row["expeditor"] = expeditor;
+        }
+
+        const birthDate = pickDependentOrMainField(dependent, mainGuest, "birthDate");
+        const phone = normalizePhoneForApi(
+          pickDependentOrMainField(dependent, mainGuest, "mobilePhoneNumber"),
+        );
+
+        if (birthDate) row["birthDate"] = birthDate;
+        assignTrimmedField(row, "mobilePhoneNumber", phone);
+        row["profession"] =
+          pickDependentOrMainField(dependent, mainGuest, "profession") ?? "N/A";
+        row["citizenship"] = formatCitizenshipForApi(
+          dependent.citizenship ?? mainGuest?.citizenship,
+        );
+        appendAddressFieldsToPayload(row, dependent, mainGuest);
+
+        if (dependent.dependentId != null && String(dependent.dependentId).trim() !== "") {
+          const id = Number(dependent.dependentId);
+          if (Number.isInteger(id) && id > 0) row["dependentId"] = id;
+        }
+
+        return row;
+      }
+
       const birthDate = stripOptionalString(dependent.birthDate);
       const phone = normalizePhoneForApi(dependent.mobilePhoneNumber);
       const zipCode = formatZipCodeForApi(dependent.zipCode);
 
-      if (
-        !name ||
-        !email ||
-        !documentNumber ||
-        !hasGenderSelection(dependent.gender) ||
-        !birthDate ||
-        !phone ||
-        !zipCode
-      ) {
+      if (!birthDate || !phone || !zipCode) {
         return null;
       }
       if (
@@ -233,9 +422,7 @@ export function prepareDependentsForCheckin(
       ) {
         return null;
       }
-      if (mainDocument && documentNumber === mainDocument) return null;
 
-      const isPassport = documentType === "PASSPORT";
       const row: Record<string, unknown> = {
         name,
         email,
@@ -253,16 +440,10 @@ export function prepareDependentsForCheckin(
       }
 
       row["birthDate"] = birthDate;
-      row["mobilePhoneNumber"] = phone;
+      assignTrimmedField(row, "mobilePhoneNumber", phone);
       row["profession"] = stripOptionalString(dependent.profession) ?? "N/A";
       row["citizenship"] = formatCitizenshipForApi(dependent.citizenship);
-      row["zipCode"] = zipCode;
-      row["country"] = formatPmsCountryForAddressField(dependent.country ?? dependent.citizenship);
-      row["state"] = stripOptionalString(dependent.state)!;
-      row["city"] = stripOptionalString(dependent.city)!;
-      row["street"] = stripOptionalString(dependent.street)!;
-      row["number"] = stripOptionalString(dependent.number)!;
-      row["neighborhood"] = stripOptionalString(dependent.neighborhood)!;
+      appendAddressFieldsToPayload(row, dependent);
       row["fnrhId"] = null;
 
       if (dependent.dependentId != null && String(dependent.dependentId).trim() !== "") {
@@ -298,6 +479,42 @@ export function sanitizeDependentsForStorage(dependents: Dependent[]): Dependent
   });
 }
 
+const MEDIA_FORMAT_LABEL = /^(jpeg|jpg|png|webp|gif|heic|heif)$/i;
+
+function isMediaFormatLabel(value: string): boolean {
+  return MEDIA_FORMAT_LABEL.test(value.trim());
+}
+
+function readMediaField(value: unknown): string | undefined {
+  if (value == null || value === "") return undefined;
+  const normalized = String(value).trim();
+  if (!normalized || isMediaFormatLabel(normalized)) return undefined;
+  return normalized;
+}
+
+function resolveUploadedMediaReference(
+  source: Record<string, unknown>,
+  type: "profile" | "document",
+): { url: string; mediaId?: string | number } {
+  const mediaId = (source["mediaId"] ?? source["id"]) as string | number | undefined;
+  const candidates = [
+    source["url"],
+    source["fileUrl"],
+    type === "profile" ? source["profilePhotoUrl"] : source["documentPhotoUrl"],
+  ];
+
+  for (const raw of candidates) {
+    const value = readMediaField(raw);
+    if (value) return { url: value, mediaId };
+  }
+
+  if (mediaId != null && String(mediaId).trim() !== "") {
+    return { url: String(mediaId), mediaId };
+  }
+
+  return { url: "", mediaId };
+}
+
 function parseMediaUpload(payload: unknown, type: "profile" | "document"): MediaUploadResult {
   const row = payload as Record<string, unknown>;
   const nestedRaw = row["media"] ?? row["result"];
@@ -306,19 +523,17 @@ function parseMediaUpload(payload: unknown, type: "profile" | "document"): Media
       ? (nestedRaw as Record<string, unknown>)
       : undefined;
   const source = nested ? { ...row, ...nested } : row;
-  const mediaId = source["mediaId"] ?? source["id"];
-  const url = String(
-    source["url"] ??
-      source["fileUrl"] ??
-      (type === "profile" ? source["profilePhotoUrl"] : source["documentPhotoUrl"]) ??
-      "",
-  );
+  const { url, mediaId } = resolveUploadedMediaReference(source, type);
+  const profilePhotoUrl =
+    type === "profile" ? url : readMediaField(source["profilePhotoUrl"]);
+  const documentPhotoUrl =
+    type === "document" ? url : readMediaField(source["documentPhotoUrl"]);
 
   return {
-    mediaId: mediaId as string | number | undefined,
+    mediaId,
     url,
-    profilePhotoUrl: type === "profile" ? url : (source["profilePhotoUrl"] as string | undefined),
-    documentPhotoUrl: type === "document" ? url : (source["documentPhotoUrl"] as string | undefined),
+    profilePhotoUrl,
+    documentPhotoUrl,
     profilePhotoId:
       type === "profile"
         ? ((source["profilePhotoId"] ?? mediaId) as string | number | undefined)
@@ -334,42 +549,77 @@ async function resolveCheckinTenantId(establishmentId?: string | null): Promise<
   return resolveTenantIdForEstablishmentId(establishmentId);
 }
 
+function applyPortalEstablishmentContext(
+  reservation: Reservation | null,
+  context: { portalEstablishmentId?: string | null; provider: "vb" | "vivakey" },
+): Reservation | null {
+  if (!reservation) return null;
+
+  const pmsEstablishmentId =
+    reservation.establishment?.establishmentId ?? reservation.establishmentId;
+  let next: Reservation = { ...reservation, pmsProvider: context.provider };
+
+  if (context.portalEstablishmentId) {
+    next.establishmentId = context.portalEstablishmentId;
+  }
+
+  if (
+    pmsEstablishmentId != null &&
+    String(pmsEstablishmentId) !== String(next.establishmentId ?? "")
+  ) {
+    next.pmsEstablishmentId = pmsEstablishmentId;
+  }
+
+  if (context.provider === "vb") {
+    next = normalizeVbReservationDocumentTypes(next);
+  }
+
+  return next;
+}
+
 async function fetchReservationByLocalizer(
   localizer: string,
   establishmentIdHint?: string | null,
 ): Promise<Reservation | null> {
-  const { apiFetch, unwrap } = await import("./techospitality.server");
+  const { pmsFetchLocalizer, unwrapPmsPayload } = await import("@/lib/pms/index.server");
   const { resolveReservationEstablishmentId } = await import("@/lib/establishment-registry.server");
 
   let tenantId = await resolveCheckinTenantId(establishmentIdHint);
-  const payload = await apiFetch<unknown>(
-    `/api/reservations/localizer/${encodeURIComponent(localizer.toUpperCase())}`,
-    { tenantId },
-  );
-  const raw = unwrap<unknown>(payload);
-  const reservation = Array.isArray(raw)
+  let result = await pmsFetchLocalizer(localizer, {
+    tenantId,
+    establishmentId: establishmentIdHint,
+  });
+  let raw = await unwrapPmsPayload<unknown>(result.payload, result.provider);
+  let reservation = Array.isArray(raw)
     ? normalizeReservationPayload(raw[0])
     : normalizeReservationPayload(raw);
 
-  if (reservation && !establishmentIdHint) {
-    const establishmentId = resolveReservationEstablishmentId(reservation);
-    if (establishmentId) {
-      const resolvedTenantId = await resolveCheckinTenantId(String(establishmentId));
-      if (resolvedTenantId !== tenantId) {
-        tenantId = resolvedTenantId;
-        const retryPayload = await apiFetch<unknown>(
-          `/api/reservations/localizer/${encodeURIComponent(localizer.toUpperCase())}`,
-          { tenantId },
-        );
-        const retryRaw = unwrap<unknown>(retryPayload);
-        return Array.isArray(retryRaw)
-          ? normalizeReservationPayload(retryRaw[0])
-          : normalizeReservationPayload(retryRaw);
-      }
+  const discoveredEstablishmentId =
+    result.establishmentId ?? resolveReservationEstablishmentId(reservation);
+  if (discoveredEstablishmentId && !establishmentIdHint) {
+    const resolvedTenantId = await resolveCheckinTenantId(String(discoveredEstablishmentId));
+    if (resolvedTenantId !== tenantId || result.provider === "vb") {
+      tenantId = resolvedTenantId;
+      result = await pmsFetchLocalizer(localizer, {
+        tenantId,
+        establishmentId: String(discoveredEstablishmentId),
+      });
+      raw = await unwrapPmsPayload<unknown>(result.payload, result.provider);
+      reservation = Array.isArray(raw)
+        ? normalizeReservationPayload(raw[0])
+        : normalizeReservationPayload(raw);
     }
   }
 
-  return reservation;
+  const portalEstablishmentId =
+    result.establishmentId ??
+    establishmentIdHint ??
+    resolveReservationEstablishmentId(reservation);
+
+  return applyPortalEstablishmentContext(reservation, {
+    portalEstablishmentId: portalEstablishmentId ? String(portalEstablishmentId) : null,
+    provider: result.provider,
+  });
 }
 
 function clientIpBucket(prefix: string): string {
@@ -761,7 +1011,7 @@ export const lookupGuest = createServerFn({ method: "POST" })
     const { assertRegisteredEstablishmentAccess } = await import("@/lib/establishment-registry.server");
     await assertRegisteredEstablishmentAccess(data.establishmentId);
     const tenantId = await resolveCheckinTenantId(data.establishmentId);
-    const { apiFetch, unwrap } = await import("./techospitality.server");
+    const { pmsLookupGuest, unwrapPmsPayload } = await import("@/lib/pms/index.server");
     const query: Record<string, string> =
       "email" in data
         ? { email: data.email.trim().toLowerCase() }
@@ -772,12 +1022,12 @@ export const lookupGuest = createServerFn({ method: "POST" })
     }
 
     try {
-      const payload = await apiFetch<unknown>("/api/reservations/hub/main-guest/lookup", {
-        query,
+      const result = await pmsLookupGuest(query, {
         tenantId,
+        establishmentId: data.establishmentId,
       });
-      const parsed = unwrap<unknown>(payload);
-      return parseLookupGuestWithPhotos(parsed);
+      const parsed = await unwrapPmsPayload<unknown>(result.payload, result.provider);
+      return parseLookupGuestWithPhotos(parsed, data.establishmentId, result.provider);
     } catch {
       return null;
     }
@@ -810,6 +1060,8 @@ export const uploadCheckinMedia = createServerFn({ method: "POST" })
         data: z.string().min(50),
         type: z.enum(["profile", "document"]),
         establishmentId: z.string().trim().min(1).max(64).optional(),
+        localizer: z.string().trim().min(1).max(40).optional(),
+        pmsProvider: z.enum(["vb", "vivakey"]).optional(),
       })
       .parse(input),
   )
@@ -818,29 +1070,34 @@ export const uploadCheckinMedia = createServerFn({ method: "POST" })
     const { assertRegisteredEstablishmentAccess } = await import("@/lib/establishment-registry.server");
     await assertRegisteredEstablishmentAccess(data.establishmentId);
     const tenantId = await resolveCheckinTenantId(data.establishmentId);
-    const { apiFetch, unwrap } = await import("./techospitality.server");
-    const payload = await apiFetch<unknown>(
-      `/api/reservations/hub/${encodeURIComponent(data.reservationId)}/checkin/media`,
-      {
-        method: "POST",
-        body: { data: stripDataUrl(data.data), type: data.type },
-        tenantId,
-      },
-    );
-    const result = unwrap<unknown>(payload);
-    if (typeof result === "string") {
-      return parseMediaUpload({ url: result }, data.type);
+    const { pmsUploadCheckinMedia } = await import("@/lib/pms/index.server");
+    const payload = await pmsUploadCheckinMedia({
+      reservationId: data.reservationId,
+      data: stripDataUrl(data.data),
+      type: data.type,
+      tenantId,
+      establishmentId: data.establishmentId,
+      localizer: data.localizer ?? data.reservationId,
+      pmsProvider: data.pmsProvider,
+    });
+    if (typeof payload === "string") {
+      return parseMediaUpload({ url: payload }, data.type);
     }
-    return parseMediaUpload(result, data.type);
+    return parseMediaUpload(payload, data.type);
   });
 
-export const getEmbraturReference = createServerFn({ method: "GET" }).handler(async () => {
-  const tenantId = await resolveCheckinTenantId(null);
-  const { apiFetch, unwrap } = await import("./techospitality.server");
-  const payload = await apiFetch<unknown>("/api/reservations/hub/embratur-reference", { tenantId });
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return unwrap<Record<string, any>>(payload);
-});
+export const getEmbraturReference = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    z.object({ establishmentId: z.string().trim().min(1).max(64).optional() }).parse(input ?? {}),
+  )
+  .handler(async ({ data }) => {
+    const tenantId = await resolveCheckinTenantId(data.establishmentId ?? null);
+    const { pmsGetEmbraturReference } = await import("@/lib/pms/index.server");
+    return pmsGetEmbraturReference({
+      tenantId,
+      establishmentId: data.establishmentId ?? null,
+    });
+  });
 
 function asEmbraturForm(value: unknown): EmbraturForm | null {
   if (!value || typeof value !== "object") return null;
@@ -891,9 +1148,95 @@ function asDependentList(value: unknown): Dependent[] {
     .filter((item) => item.name.trim());
 }
 
+function isUsablePmsPhotoUrl(value: unknown): boolean {
+  const normalized = stripOptionalString(value);
+  if (!normalized) return false;
+  if (normalized.startsWith("data:")) return false;
+  if (isMediaFormatLabel(normalized)) return false;
+  if (/^\d+$/.test(normalized)) return false;
+  return true;
+}
+
+type MainGuestPhotoSource = Pick<
+  MainGuest,
+  "profilePhotoUrl" | "documentPhotoUrl" | "profilePhotoId" | "documentPhotoId"
+>;
+
+function pickMainGuestPhotoRef(
+  sources: Array<MainGuestPhotoSource | undefined>,
+  kind: "profile" | "document",
+): { url?: string; id?: string | number } {
+  const urlKey = kind === "profile" ? "profilePhotoUrl" : "documentPhotoUrl";
+  const idKey = kind === "profile" ? "profilePhotoId" : "documentPhotoId";
+  let fallbackId: string | number | undefined;
+
+  for (const source of sources) {
+    if (!source) continue;
+    const candidateUrl = stripOptionalString(source[urlKey]);
+    if (isUsablePmsPhotoUrl(candidateUrl)) {
+      return {
+        url: candidateUrl,
+        id: source[idKey] ?? fallbackId,
+      };
+    }
+    if (source[idKey] != null && String(source[idKey]).trim() !== "") {
+      fallbackId = source[idKey];
+    }
+  }
+
+  return fallbackId != null ? { id: fallbackId } : {};
+}
+
+/** Preserva paths/IDs originais do PMS — não troca por mediaId duplicado ou URL de exibição. */
+function applyMainGuestPhotoRefs(
+  guest: MainGuest,
+  sources: Array<MainGuestPhotoSource | undefined>,
+): MainGuest {
+  const profile = pickMainGuestPhotoRef(sources, "profile");
+  const document = pickMainGuestPhotoRef(sources, "document");
+  const next: MainGuest = { ...guest };
+  delete next.profilePhotoDisplayUrl;
+  delete next.documentPhotoDisplayUrl;
+
+  if (profile.url) {
+    next.profilePhotoUrl = profile.url;
+    if (profile.id != null) next.profilePhotoId = profile.id;
+  } else if (profile.id != null) {
+    next.profilePhotoId = profile.id;
+    if (!isUsablePmsPhotoUrl(next.profilePhotoUrl)) delete next.profilePhotoUrl;
+  }
+
+  if (document.url) {
+    next.documentPhotoUrl = document.url;
+    if (document.id != null) next.documentPhotoId = document.id;
+  } else if (document.id != null) {
+    next.documentPhotoId = document.id;
+    if (!isUsablePmsPhotoUrl(next.documentPhotoUrl)) delete next.documentPhotoUrl;
+  }
+
+  return next;
+}
+
+function prepareMainGuestForCompanionSubmit(
+  mainGuestInput: MainGuest,
+  reservation?: Reservation | null,
+  snapshotMainGuest?: MainGuest | null,
+): MainGuest {
+  const guest = applyMainGuestPhotoRefs(mainGuestInput, [
+    reservation?.mainGuest,
+    snapshotMainGuest ?? undefined,
+    mainGuestInput,
+  ]);
+  return normalizeGuestContactFields(guest);
+}
+
 function hasCompanionPhotoRefs(guest: MainGuest): boolean {
-  const hasProfile = Boolean(guest.profilePhotoUrl?.trim() || guest.profilePhotoId != null);
-  const hasDocument = Boolean(guest.documentPhotoUrl?.trim() || guest.documentPhotoId != null);
+  const hasProfile = Boolean(
+    isUsablePmsPhotoUrl(guest.profilePhotoUrl) || guest.profilePhotoId != null,
+  );
+  const hasDocument = Boolean(
+    isUsablePmsPhotoUrl(guest.documentPhotoUrl) || guest.documentPhotoId != null,
+  );
   return hasProfile && hasDocument;
 }
 
@@ -909,15 +1252,10 @@ async function enrichMainGuestPhotosForCompanions(guest: MainGuest): Promise<Mai
     const enriched = await enrichGuestLookupPhotos(guest);
     return {
       ...guest,
-      ...enriched,
-      profilePhotoUrl:
-        enriched.profilePhotoDisplayUrl ??
-        enriched.profilePhotoUrl ??
-        guest.profilePhotoUrl,
-      documentPhotoUrl:
-        enriched.documentPhotoDisplayUrl ??
-        enriched.documentPhotoUrl ??
-        guest.documentPhotoUrl,
+      profilePhotoDisplayUrl:
+        enriched.profilePhotoDisplayUrl ?? guest.profilePhotoDisplayUrl,
+      documentPhotoDisplayUrl:
+        enriched.documentPhotoDisplayUrl ?? guest.documentPhotoDisplayUrl,
       profilePhotoId: enriched.profilePhotoId ?? guest.profilePhotoId,
       documentPhotoId: enriched.documentPhotoId ?? guest.documentPhotoId,
     };
@@ -1030,6 +1368,12 @@ export const getCompletedCheckinContext = createServerFn({ method: "POST" })
       dependents = asDependentList(snapshot?.dependents?.length ? snapshot.dependents : reservation?.dependents);
     }
 
+    mainGuest = applyMainGuestPhotoRefs(mainGuest, [
+      reservation?.mainGuest,
+      snapshot?.mainGuest,
+      (record?.main_guest as MainGuest | undefined) ?? undefined,
+      mainGuest,
+    ]);
     mainGuest = await enrichMainGuestPhotosForCompanions(mainGuest);
 
     // Se ainda faltarem fotos, tenta lookup pelo documento/e-mail do hóspede principal.
@@ -1042,30 +1386,34 @@ export const getCompletedCheckinContext = createServerFn({ method: "POST" })
           const tenantId = await resolveCheckinTenantId(
             establishmentId ? String(establishmentId) : null,
           );
-          const { apiFetch } = await import("./techospitality.server");
+          const { pmsLookupGuest, unwrapPmsPayload } = await import("@/lib/pms/index.server");
           const query: Record<string, string> = {};
           if (documentNumber) query.documentNumber = documentNumber;
           if (email) query.email = email;
-          const payload = await apiFetch<unknown>("/api/reservations/hub/main-guest/lookup", {
-            query,
+          const lookupResult = await pmsLookupGuest(query, {
             tenantId,
+            establishmentId: establishmentId ? String(establishmentId) : null,
           });
-          const lookedUp = await parseLookupGuestWithPhotos(payload);
+          const payload = await unwrapPmsPayload<unknown>(
+            lookupResult.payload,
+            lookupResult.provider,
+          );
+          const lookedUp = await parseLookupGuestWithPhotos(
+            payload,
+            establishmentId ? String(establishmentId) : null,
+          );
           if (lookedUp) {
-            mainGuest = {
-              ...mainGuest,
-              ...lookedUp,
-              profilePhotoUrl:
-                lookedUp.profilePhotoDisplayUrl ??
-                lookedUp.profilePhotoUrl ??
-                mainGuest.profilePhotoUrl,
-              documentPhotoUrl:
-                lookedUp.documentPhotoDisplayUrl ??
-                lookedUp.documentPhotoUrl ??
-                mainGuest.documentPhotoUrl,
-              profilePhotoId: lookedUp.profilePhotoId ?? mainGuest.profilePhotoId,
-              documentPhotoId: lookedUp.documentPhotoId ?? mainGuest.documentPhotoId,
-            };
+            mainGuest = applyMainGuestPhotoRefs(
+              {
+                ...mainGuest,
+                ...lookedUp,
+                profilePhotoDisplayUrl:
+                  lookedUp.profilePhotoDisplayUrl ?? mainGuest.profilePhotoDisplayUrl,
+                documentPhotoDisplayUrl:
+                  lookedUp.documentPhotoDisplayUrl ?? mainGuest.documentPhotoDisplayUrl,
+              },
+              [lookedUp, reservation?.mainGuest, snapshot?.mainGuest, mainGuest],
+            );
           }
         }
       } catch (error) {
@@ -1186,35 +1534,38 @@ export const submitCheckin = createServerFn({ method: "POST" })
     const { assertRegisteredEstablishmentAccess, resolveReservationEstablishmentId } = await import(
       "@/lib/establishment-registry.server"
     );
-    await assertRegisteredEstablishmentAccess(
-      data.establishmentId ??
-        resolveReservationEstablishmentId(
-          (data.reservationSnapshot as Reservation | undefined) ?? null,
-        ),
-    );
+    const snapshot = data.reservationSnapshot as Reservation | undefined;
     const resolvedEstablishmentIdForTenant =
-      data.establishmentId ??
-      resolveReservationEstablishmentId(
-        (data.reservationSnapshot as Reservation | undefined) ?? null,
-      );
+      data.establishmentId?.trim() ||
+      resolveReservationEstablishmentId(snapshot) ||
+      null;
+
+    await assertRegisteredEstablishmentAccess(resolvedEstablishmentIdForTenant);
+
     const tenantId = await resolveCheckinTenantId(
       resolvedEstablishmentIdForTenant ? String(resolvedEstablishmentIdForTenant) : null,
     );
-    const { apiFetch, unwrap } = await import("./techospitality.server");
+    const pmsProvider = snapshot?.pmsProvider;
+    const localizerCode = (data.localizer ?? data.reservationId).trim().toUpperCase();
+    const { pmsSubmitCheckin, unwrapPmsPayload } = await import("@/lib/pms/index.server");
+    const { resolvePmsProvider } = await import("@/lib/pms/resolve.server");
     const labels = buildCheckinErrorLabelsPt();
     const mainGuestInput = data.mainGuest as MainGuest;
     const dependentsInput = data.dependents as Dependent[];
     const embraturInput = data.embratur as EmbraturForm;
 
-    const snapshot = data.reservationSnapshot as Reservation | undefined;
+    let liveReservationForCompanions: Reservation | null = null;
     if (purpose === "companions") {
-      const localizerCode = (data.localizer ?? data.reservationId).trim().toUpperCase();
-      const live =
-        snapshot ?? (await fetchReservationByLocalizer(localizerCode).catch(() => null));
-      if (live?.isCancelled === true) {
+      liveReservationForCompanions =
+        snapshot ??
+        (await fetchReservationByLocalizer(
+          localizerCode,
+          resolvedEstablishmentIdForTenant ? String(resolvedEstablishmentIdForTenant) : null,
+        ).catch(() => null));
+      if (liveReservationForCompanions?.isCancelled === true) {
         throw new Error("Esta reserva está cancelada. Não é possível adicionar acompanhantes.");
       }
-      if (live?.isPendingCancellation === true) {
+      if (liveReservationForCompanions?.isPendingCancellation === true) {
         throw new Error(
           "Esta reserva possui cancelamento pendente. Não é possível adicionar acompanhantes.",
         );
@@ -1254,12 +1605,24 @@ export const submitCheckin = createServerFn({ method: "POST" })
       throw new Error("Informe ao menos um acompanhante para continuar.");
     }
 
-    const mainGuest = prepareMainGuestForCheckin(
-      mainGuestInput,
-      data.registeredPhotos,
-      data.photosReplaced,
-    );
-    const preparedDependents = prepareDependentsForCheckin(dependentsInput, mainGuest);
+    const snapshotMainGuest =
+      (snapshot?.mainGuest as MainGuest | undefined) ??
+      ((data.reservationSnapshot as { mainGuest?: MainGuest } | undefined)?.mainGuest);
+    const mainGuest =
+      purpose === "companions"
+        ? prepareMainGuestForCompanionSubmit(
+            mainGuestInput,
+            liveReservationForCompanions ?? snapshot ?? null,
+            snapshotMainGuest ?? null,
+          )
+        : prepareMainGuestForCheckin(
+            mainGuestInput,
+            data.registeredPhotos,
+            data.photosReplaced,
+          );
+    const preparedDependents = prepareDependentsForCheckin(dependentsInput, mainGuest, {
+      pmsProvider,
+    });
     if (dependentsInput.length > 0 && preparedDependents.length === 0) {
       const companionIssues = validateDependents(dependentsInput, mainGuest);
       throw new Error(
@@ -1275,9 +1638,17 @@ export const submitCheckin = createServerFn({ method: "POST" })
     const storedDependents = sanitizeDependentsForStorage(dependentsInput);
 
     if (dependentsInput.length > 0 && preparedDependents.length < dependentsInput.length) {
-      console.warn(
-        "[checkin] Alguns acompanhantes foram omitidos do payload PMS:",
-        dependentsInput.length - preparedDependents.length,
+      const omitted = dependentsInput.length - preparedDependents.length;
+      const message = `Não foi possível enviar ${omitted} acompanhante(s) ao PMS. Revise os dados e tente novamente.`;
+      if (pmsProvider === "vb") {
+        throw new Error(message);
+      }
+      console.warn("[checkin] Alguns acompanhantes foram omitidos do payload PMS:", omitted);
+    }
+
+    if (pmsProvider === "vb" && preparedDependents.length > 0) {
+      console.info(
+        `[checkin] VB check-in com ${preparedDependents.length} acompanhante(s) no payload`,
       );
     }
 
@@ -1287,27 +1658,39 @@ export const submitCheckin = createServerFn({ method: "POST" })
       validatedCheckin: true,
       approveCheckin: true,
       sentToReception: true,
-      mainGuest: pickMainGuestForApi(mainGuest),
+      mainGuest: await prepareMainGuestPayloadForPms(mainGuest, {
+        tenantId,
+        establishmentId: resolvedEstablishmentIdForTenant
+          ? String(resolvedEstablishmentIdForTenant)
+          : null,
+        pmsProvider,
+      }),
       embratur: data.embratur as unknown as EmbraturForm,
     };
     if (preparedDependents.length > 0) {
       body["dependents"] = preparedDependents;
     }
-    const payload = await apiFetch<unknown>(
-      `/api/reservations/hub/${encodeURIComponent(data.reservationId)}/checkin`,
-      { method: "POST", body, tenantId },
+    const submitResult = await pmsSubmitCheckin(localizerCode, body, {
+      tenantId,
+      establishmentId: resolvedEstablishmentIdForTenant
+        ? String(resolvedEstablishmentIdForTenant)
+        : null,
+      pmsProvider,
+    });
+    const result = await unwrapPmsPayload<Record<string, unknown>>(
+      submitResult.payload,
+      submitResult.provider,
     );
-    const result = unwrap<Record<string, unknown>>(payload);
+    const submittedPmsProvider = submitResult.provider;
 
-    const localizer = (data.localizer ?? data.reservationId).trim().toUpperCase();
     const checkinRecordId =
       purpose === "companions"
         ? await updateCheckinRecordForCompanions({
-            localizer,
+            localizer: localizerCode,
             dependents: storedDependents,
           })
         : await saveCheckinRecord({
-            localizer,
+            localizer: localizerCode,
             reservationId: data.reservationId,
             ...(data.establishmentId ? { establishmentId: data.establishmentId } : {}),
             ...(data.establishmentName ? { establishmentName: data.establishmentName } : {}),
@@ -1332,20 +1715,47 @@ export const submitCheckin = createServerFn({ method: "POST" })
         const { syncCompanionGuestsToInbox } = await import("@/lib/inbox-sync.server");
         await syncCompanionGuestsToInbox({
           establishmentId: String(resolvedEstablishmentId),
-          localizer,
+          localizer: localizerCode,
           dependents: storedDependents,
         });
       } else {
         const { syncCheckinToInbox } = await import("@/lib/inbox-sync.server");
         await syncCheckinToInbox({
           establishmentId: String(resolvedEstablishmentId),
-          localizer,
+          localizer: localizerCode,
           reservationId: data.reservationId,
           mainGuest,
           dependents: storedDependents,
           reservationSnapshot: (data.reservationSnapshot as Reservation | undefined) ?? null,
           checkinRecordId,
         });
+
+        const provider =
+          submittedPmsProvider ??
+          pmsProvider ??
+          (await resolvePmsProvider(tenantId, String(resolvedEstablishmentId)));
+        if (provider === "vb") {
+          const { loadEstablishmentSettingsRow } = await import("@/lib/establishment-settings.server");
+          const settingsRow = await loadEstablishmentSettingsRow(String(resolvedEstablishmentId));
+          if (settingsRow?.settings.vbPhotoLinkEnabled) {
+            const { resolveObjectKey } = await import("@/lib/s3.server");
+            const { upsertGuestPortalPhotos } = await import("@/lib/guest-portal-photos.server");
+            await upsertGuestPortalPhotos({
+              tenantId,
+              establishmentId: String(resolvedEstablishmentId),
+              documentNumber: mainGuest.documentNumber,
+              email: mainGuest.email,
+              profileObjectKey: resolveObjectKey("profile", {
+                url: mainGuest.profilePhotoUrl,
+                id: mainGuest.profilePhotoId,
+              }) ?? null,
+              documentObjectKey: resolveObjectKey("document", {
+                url: mainGuest.documentPhotoUrl,
+                id: mainGuest.documentPhotoId,
+              }) ?? null,
+            });
+          }
+        }
       }
     }
 
@@ -1371,7 +1781,7 @@ export const submitCheckin = createServerFn({ method: "POST" })
         entityId: data.reservationId,
         newData: {
           dependentsCount: dependentsInput.length,
-          localizer,
+          localizer: localizerCode,
         },
       });
     }

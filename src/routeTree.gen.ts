@@ -25,6 +25,7 @@ import { Route as AuthenticatedAdminSecurityRouteImport } from './routes/_authen
 import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin/users'
 import { Route as AuthenticatedPlatformAdminsRouteImport } from './routes/_authenticated/platform/admins'
 import { Route as AuthenticatedPlatformDashboardRouteImport } from './routes/_authenticated/platform/dashboard'
+import { Route as AuthenticatedPlatformMinioRouteImport } from './routes/_authenticated/platform/minio'
 import { Route as AuthenticatedAdminEstablishmentsIndexRouteImport } from './routes/_authenticated/admin/establishments/index'
 import { Route as AuthenticatedAdminEstablishmentsEstablishmentIdRouteImport } from './routes/_authenticated/admin/establishments/$establishmentId'
 import { Route as AuthenticatedAdminInboxIndexRouteImport } from './routes/_authenticated/admin/inbox/index'
@@ -125,6 +126,12 @@ const AuthenticatedPlatformDashboardRoute =
     path: '/dashboard',
     getParentRoute: () => AuthenticatedPlatformRouteRoute,
   } as any)
+const AuthenticatedPlatformMinioRoute =
+  AuthenticatedPlatformMinioRouteImport.update({
+    id: '/minio',
+    path: '/minio',
+    getParentRoute: () => AuthenticatedPlatformRouteRoute,
+  } as any)
 const AuthenticatedAdminEstablishmentsIndexRoute =
   AuthenticatedAdminEstablishmentsIndexRouteImport.update({
     id: '/establishments/',
@@ -214,6 +221,7 @@ export interface FileRoutesByFullPath {
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/platform/admins': typeof AuthenticatedPlatformAdminsRoute
   '/platform/dashboard': typeof AuthenticatedPlatformDashboardRoute
+  '/platform/minio': typeof AuthenticatedPlatformMinioRoute
   '/admin/establishments/$establishmentId': typeof AuthenticatedAdminEstablishmentsEstablishmentIdRoute
   '/admin/inbox/portfolio': typeof AuthenticatedAdminInboxPortfolioRoute
   '/platform/tenants/$tenantNumber': typeof AuthenticatedPlatformTenantsTenantNumberRoute
@@ -242,6 +250,7 @@ export interface FileRoutesByTo {
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/platform/admins': typeof AuthenticatedPlatformAdminsRoute
   '/platform/dashboard': typeof AuthenticatedPlatformDashboardRoute
+  '/platform/minio': typeof AuthenticatedPlatformMinioRoute
   '/admin/establishments/$establishmentId': typeof AuthenticatedAdminEstablishmentsEstablishmentIdRoute
   '/admin/inbox/portfolio': typeof AuthenticatedAdminInboxPortfolioRoute
   '/platform/tenants/$tenantNumber': typeof AuthenticatedPlatformTenantsTenantNumberRoute
@@ -273,6 +282,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
   '/_authenticated/platform/admins': typeof AuthenticatedPlatformAdminsRoute
   '/_authenticated/platform/dashboard': typeof AuthenticatedPlatformDashboardRoute
+  '/_authenticated/platform/minio': typeof AuthenticatedPlatformMinioRoute
   '/_authenticated/admin/establishments/$establishmentId': typeof AuthenticatedAdminEstablishmentsEstablishmentIdRoute
   '/_authenticated/admin/inbox/portfolio': typeof AuthenticatedAdminInboxPortfolioRoute
   '/_authenticated/platform/tenants/$tenantNumber': typeof AuthenticatedPlatformTenantsTenantNumberRoute
@@ -304,6 +314,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/platform/admins'
     | '/platform/dashboard'
+    | '/platform/minio'
     | '/admin/establishments/$establishmentId'
     | '/admin/inbox/portfolio'
     | '/platform/tenants/$tenantNumber'
@@ -332,6 +343,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/platform/admins'
     | '/platform/dashboard'
+    | '/platform/minio'
     | '/admin/establishments/$establishmentId'
     | '/admin/inbox/portfolio'
     | '/platform/tenants/$tenantNumber'
@@ -362,6 +374,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/users'
     | '/_authenticated/platform/admins'
     | '/_authenticated/platform/dashboard'
+    | '/_authenticated/platform/minio'
     | '/_authenticated/admin/establishments/$establishmentId'
     | '/_authenticated/admin/inbox/portfolio'
     | '/_authenticated/platform/tenants/$tenantNumber'
@@ -495,6 +508,13 @@ declare module '@tanstack/react-router' {
       path: '/dashboard'
       fullPath: '/platform/dashboard'
       preLoaderRoute: typeof AuthenticatedPlatformDashboardRouteImport
+      parentRoute: typeof AuthenticatedPlatformRouteRoute
+    }
+    '/_authenticated/platform/minio': {
+      id: '/_authenticated/platform/minio'
+      path: '/minio'
+      fullPath: '/platform/minio'
+      preLoaderRoute: typeof AuthenticatedPlatformMinioRouteImport
       parentRoute: typeof AuthenticatedPlatformRouteRoute
     }
     '/_authenticated/admin/establishments/': {
@@ -655,6 +675,7 @@ const AuthenticatedAdminRouteRouteWithChildren =
 interface AuthenticatedPlatformRouteRouteChildren {
   AuthenticatedPlatformAdminsRoute: typeof AuthenticatedPlatformAdminsRoute
   AuthenticatedPlatformDashboardRoute: typeof AuthenticatedPlatformDashboardRoute
+  AuthenticatedPlatformMinioRoute: typeof AuthenticatedPlatformMinioRoute
   AuthenticatedPlatformTenantsTenantNumberRoute: typeof AuthenticatedPlatformTenantsTenantNumberRoute
   AuthenticatedPlatformTenantsIndexRoute: typeof AuthenticatedPlatformTenantsIndexRoute
 }
@@ -663,6 +684,7 @@ const AuthenticatedPlatformRouteRouteChildren: AuthenticatedPlatformRouteRouteCh
   {
     AuthenticatedPlatformAdminsRoute: AuthenticatedPlatformAdminsRoute,
     AuthenticatedPlatformDashboardRoute: AuthenticatedPlatformDashboardRoute,
+    AuthenticatedPlatformMinioRoute: AuthenticatedPlatformMinioRoute,
     AuthenticatedPlatformTenantsTenantNumberRoute:
       AuthenticatedPlatformTenantsTenantNumberRoute,
     AuthenticatedPlatformTenantsIndexRoute:

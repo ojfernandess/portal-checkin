@@ -28,18 +28,20 @@ function readEnv(name: string): string | undefined {
 }
 
 function readS3Config(): S3Config | null {
-  const accessKeyId = readEnv("AWS_ACCESS_KEY_ID");
-  const secretAccessKey = readEnv("AWS_SECRET_ACCESS_KEY");
-  const bucket = readEnv("AWS_S3_BUCKET");
+  const accessKeyId = readEnv("MINIO_ACCESS_KEY") ?? readEnv("AWS_ACCESS_KEY_ID");
+  const secretAccessKey = readEnv("MINIO_SECRET_KEY") ?? readEnv("AWS_SECRET_ACCESS_KEY");
+  const bucket = readEnv("MINIO_BUCKET") ?? readEnv("AWS_S3_BUCKET");
   if (!accessKeyId || !secretAccessKey || !bucket) return null;
 
   return {
     accessKeyId,
     secretAccessKey,
-    region: readEnv("AWS_REGION") ?? "sa-east-1",
-    endpoint: readEnv("AWS_S3_ENDPOINT"),
+    region: readEnv("MINIO_REGION") ?? readEnv("AWS_REGION") ?? "sa-east-1",
+    endpoint: readEnv("MINIO_ENDPOINT") ?? readEnv("AWS_S3_ENDPOINT"),
     bucket,
-    forcePathStyle: readEnv("AWS_S3_FORCE_PATH_STYLE") !== "false",
+    forcePathStyle:
+      readEnv("MINIO_FORCE_PATH_STYLE") !== "false" &&
+      readEnv("AWS_S3_FORCE_PATH_STYLE") !== "false",
   };
 }
 
@@ -70,8 +72,19 @@ function isPlaceholderMediaUrl(url?: string | null): boolean {
   }
 }
 
+function isStorageObjectKey(value?: string | null): boolean {
+  const trimmed = value?.trim();
+  if (!trimmed) return false;
+  return (
+    trimmed.startsWith("profile-photos/") ||
+    trimmed.startsWith("document-photos/") ||
+    trimmed.startsWith("minio:")
+  );
+}
+
 function isUsableMediaUrl(url?: string | null): boolean {
   if (!url?.trim() || isPlaceholderMediaUrl(url)) return false;
+  if (isStorageObjectKey(url)) return true;
   if (url.startsWith("data:")) return true;
   try {
     const parsed = new URL(url);
@@ -136,6 +149,15 @@ export function resolveObjectKey(
   options: { url?: string | null; id?: string | number | null },
 ): string | undefined {
   const bucket = readS3Bucket();
+  const rawUrl = options.url?.trim();
+
+  if (rawUrl?.startsWith("minio:")) {
+    return rawUrl.slice("minio:".length);
+  }
+
+  if (rawUrl && isStorageObjectKey(rawUrl)) {
+    return normalizeKeyPrefix(type, rawUrl.replace(/^minio:/, ""));
+  }
 
   if (options.url && isUsableMediaUrl(options.url) && bucket) {
     const fromUrl = extractObjectKey(options.url, bucket);
@@ -461,12 +483,53 @@ export async function resolvePhotoBase64(
 }
 
 /** Resolve foto para envio multipart ou photo_base64 (Inbox, etc.). */
+export async function uploadCheckinPhotoObject(
+  type: "profile" | "document",
+  input: { establishmentId: string; localizer: string; base64Data: string },
+): Promise<string> {
+  const config = readS3Config();
+  if (!config) {
+    throw new Error(
+      "Armazenamento MinIO/S3 não configurado. Defina MINIO_* ou AWS_S3_* no ambiente.",
+    );
+  }
+
+  const base64 = stripDataUrlPrefix(input.base64Data);
+  const buffer = Buffer.from(base64, "base64");
+  if (!buffer.byteLength) {
+    throw new Error("Foto inválida para upload.");
+  }
+
+  const prefix = type === "profile" ? profilePhotoPrefix() : documentPhotoPrefix();
+  const safeLocalizer = input.localizer.trim().toUpperCase().replace(/[^A-Z0-9-]/g, "");
+  const key = `${prefix}vb/${input.establishmentId}/${safeLocalizer}/${Date.now()}-${type}.jpg`;
+
+  const { PutObjectCommand } = await import("@aws-sdk/client-s3");
+  const client = await getS3Client(config);
+  await client.send(
+    new PutObjectCommand({
+      Bucket: config.bucket,
+      Key: key,
+      Body: buffer,
+      ContentType: "image/jpeg",
+    }),
+  );
+
+  return key;
+}
+
 export async function resolvePhotoForUpload(
   type: "profile" | "document",
   options: { url?: string | null; id?: string | number | null },
 ): Promise<ResolvedPhotoUpload | undefined> {
   const mediaId = options.id ?? extractMediaIdFromUrl(options.url);
   const rawUrl = options.url?.trim();
+
+  if (rawUrl && isStorageObjectKey(rawUrl)) {
+    const key = rawUrl.startsWith("minio:") ? rawUrl.slice("minio:".length) : rawUrl;
+    const dataUrl = await getObjectAsDataUrl(key);
+    if (dataUrl) return parseDataUrl(dataUrl);
+  }
 
   if (rawUrl?.startsWith("data:")) {
     return parseDataUrl(rawUrl);

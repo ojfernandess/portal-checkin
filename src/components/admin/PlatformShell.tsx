@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import {
   Building2,
   ChevronRight,
+  HardDrive,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -124,6 +125,7 @@ export function PlatformShell({ title, subtitle, account, breadcrumbs, children 
   const navItems: NavItem[] = [
     { to: "/platform/dashboard", label: t("platform.dashboard"), icon: LayoutDashboard },
     { to: "/platform/tenants", label: t("platform.tenants"), icon: Building2 },
+    { to: "/platform/minio", label: t("platform.minio"), icon: HardDrive },
     { to: "/platform/admins", label: t("platform.admins"), icon: ShieldCheck },
   ];
 

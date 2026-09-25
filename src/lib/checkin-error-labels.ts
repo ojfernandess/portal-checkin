@@ -60,6 +60,7 @@ export function buildCheckinErrorLabels(t: TranslateFn): CheckinErrorLabels {
     apiReviewCompanions: t("checkin.errors.apiReviewCompanions"),
     apiIncompleteMainGuest: t("checkin.errors.apiIncompleteMainGuest"),
     apiIncompleteCompanions: t("checkin.errors.apiIncompleteCompanions"),
+    apiInvalidImageFormat: t("checkin.photos.invalidFormat"),
   };
 }
 
@@ -113,5 +114,7 @@ export function buildCheckinErrorLabelsPt(): CheckinErrorLabels {
     apiReviewCompanions: "Revise os dados dos acompanhantes (etapa Acompanhantes).",
     apiIncompleteMainGuest: "Revise os dados do hóspede principal. Campo(s) pendente(s): {fields}.",
     apiIncompleteCompanions: "Revise os dados dos acompanhantes. Campo(s) pendente(s): {fields}.",
+    apiInvalidImageFormat:
+      "O formato da imagem é inválido. Tire uma nova foto ou envie um arquivo JPG ou PNG.",
   };
 }

@@ -285,7 +285,7 @@ export const platformGetTenant = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     if (!tenant) throw new Error("Empresa não encontrada.");
 
-    const [{ data: features }, { data: pmsRow }] = await Promise.all([
+    const [{ data: features }, { data: pmsRow }, { data: pmsVbRow }] = await Promise.all([
       supabaseAdmin
         .from("tenant_features")
         .select("feature_key, enabled, config")
@@ -296,9 +296,16 @@ export const platformGetTenant = createServerFn({ method: "POST" })
         .eq("tenant_id", tenantUuid)
         .eq("provider", "vivakey")
         .maybeSingle(),
+      supabaseAdmin
+        .from("tenant_pms_configs")
+        .select("provider, enabled, config")
+        .eq("tenant_id", tenantUuid)
+        .eq("provider", "vb")
+        .maybeSingle(),
     ]);
 
     const pmsConfig = normalizeTenantPmsConfig(pmsRow?.config);
+    const pmsVbConfig = normalizeTenantPmsConfig(pmsVbRow?.config);
     const tokens = pmsConfig.tokens ?? {};
     const { parseTenantSettings } = await import("@/lib/tenant-settings");
     const { loadTenantInboxContext } = await import("@/lib/inbox/tenant.server");
@@ -355,6 +362,18 @@ export const platformGetTenant = createServerFn({ method: "POST" })
         },
         hasConfig: Boolean(pmsRow),
       } satisfies PlatformPmsConfigView,
+      pmsVb: {
+        provider: "vb",
+        enabled: pmsVbRow?.enabled !== false,
+        baseUrl: pmsVbConfig.baseUrl ?? "",
+        tokens: {
+          api: pmsVbConfig.tokens?.api ?? "",
+        },
+        masked: {
+          api: maskToken(pmsVbConfig.tokens?.api),
+        },
+        hasConfig: Boolean(pmsVbRow),
+      },
       inbox: {
         featureEnabled: inbox.featureEnabled,
         configured: inbox.configured,
@@ -496,18 +515,20 @@ export const platformSaveTenantPmsConfig = createServerFn({ method: "POST" })
           })
           .optional(),
         mergeTokens: z.boolean().default(true),
+        provider: z.enum(["vivakey", "vb"]).default("vivakey"),
       })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const tenantUuid = await resolveTenantUuidByPublicNumber(data.publicNumber);
+    const provider = data.provider;
 
     const { data: existingRow } = await supabaseAdmin
       .from("tenant_pms_configs")
       .select("config")
       .eq("tenant_id", tenantUuid)
-      .eq("provider", "vivakey")
+      .eq("provider", provider)
       .maybeSingle();
 
     const existingConfig = normalizeTenantPmsConfig(existingRow?.config);
@@ -532,7 +553,7 @@ export const platformSaveTenantPmsConfig = createServerFn({ method: "POST" })
     const { error } = await supabaseAdmin.from("tenant_pms_configs").upsert(
       {
         tenant_id: tenantUuid,
-        provider: "vivakey",
+        provider,
         enabled: data.enabled,
         config,
         updated_at: new Date().toISOString(),
@@ -1012,4 +1033,39 @@ export const platformRemovePlatformAdmin = createServerFn({ method: "POST" })
     });
 
     return { ok: true as const };
+  });
+
+export const platformGetMinioConfig = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth, requirePlatformAdmin])
+  .handler(async () => {
+    const { readMinioOnlyConfig } = await import("@/lib/minio-test.server");
+    return readMinioOnlyConfig();
+  });
+
+export const platformTestMinio = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth, requirePlatformAdmin])
+  .handler(async ({ context }) => {
+    const { runMinioStorageTest } = await import("@/lib/minio-test.server");
+    const report = await runMinioStorageTest();
+
+    await writeAuditLog({
+      userId: context.userId,
+      tenantId: null,
+      action: "platform.minio.test",
+      entityType: "minio",
+      entityId: report.testRunId,
+      newData: {
+        ok: report.ok,
+        bucket: report.config.bucket,
+        endpoint: report.config.endpoint,
+        uploads: report.uploads.map((item) => ({
+          kind: item.kind,
+          key: item.key,
+          verified: item.verified,
+        })),
+        error: report.error,
+      },
+    });
+
+    return report;
   });

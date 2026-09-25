@@ -48,7 +48,8 @@ export const Route = createFileRoute("/_authenticated/platform/tenants/$tenantNu
 });
 
 const FEATURE_LABELS: Record<string, string> = {
-  pms_vivakey: "PMS Vivakey",
+  pms_vivakey: "PMS",
+  pms_vb: "PMS VB (Vinibarr)",
   portaria_inbox: "Portaria Inbox",
   zepiris_photo_validation: "Validação inteligente de fotos",
 };
@@ -105,6 +106,11 @@ function PlatformTenantDetailPage() {
   const [pmsBaseUrl, setPmsBaseUrl] = useState("");
   const [pmsTokens, setPmsTokens] = useState<Record<string, string>>({});
   const [pmsMasked, setPmsMasked] = useState<Record<string, string>>({});
+
+  const [pmsVbEnabled, setPmsVbEnabled] = useState(false);
+  const [pmsVbBaseUrl, setPmsVbBaseUrl] = useState("");
+  const [pmsVbApiToken, setPmsVbApiToken] = useState("");
+  const [pmsVbMaskedApiToken, setPmsVbMaskedApiToken] = useState("");
 
   const [inboxClientId, setInboxClientId] = useState("");
   const [inboxClientSecret, setInboxClientSecret] = useState("");
@@ -180,6 +186,10 @@ function PlatformTenantDetailPage() {
       setPmsBaseUrl(detail.pms.baseUrl);
       setPmsTokens({});
       setPmsMasked(detail.pms.masked);
+      setPmsVbEnabled(detail.pmsVb.enabled);
+      setPmsVbBaseUrl(detail.pmsVb.baseUrl);
+      setPmsVbApiToken("");
+      setPmsVbMaskedApiToken(detail.pmsVb.masked.api);
       setInboxClientId("");
       setInboxClientSecret("");
       setInboxBaseUrl(detail.inbox.baseUrl);
@@ -240,6 +250,10 @@ function PlatformTenantDetailPage() {
     setPmsBaseUrl(detail.pms.baseUrl);
     setPmsTokens({});
     setPmsMasked(detail.pms.masked);
+    setPmsVbEnabled(detail.pmsVb.enabled);
+    setPmsVbBaseUrl(detail.pmsVb.baseUrl);
+    setPmsVbApiToken("");
+    setPmsVbMaskedApiToken(detail.pmsVb.masked.api);
     setInboxClientId("");
     setInboxClientSecret("");
     setInboxBaseUrl(detail.inbox.baseUrl);
@@ -320,9 +334,32 @@ function PlatformTenantDetailPage() {
           baseUrl: pmsBaseUrl.trim() || undefined,
           tokens: pmsTokens,
           mergeTokens: true,
+          provider: "vivakey",
         },
       });
       toast.success(t("platform.tenantDetail.pmsSaved"));
+      await load();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("errors.saveFailed"));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleSaveVbPms() {
+    setSaving(true);
+    try {
+      await pmsFn({
+        data: {
+          publicNumber,
+          enabled: pmsVbEnabled,
+          baseUrl: pmsVbBaseUrl.trim() || undefined,
+          tokens: pmsVbApiToken.trim() ? { api: pmsVbApiToken.trim() } : {},
+          mergeTokens: true,
+          provider: "vb",
+        },
+      });
+      toast.success(t("platform.tenantDetail.pmsVbSaved"));
       await load();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t("errors.saveFailed"));
@@ -573,6 +610,43 @@ function PlatformTenantDetailPage() {
                 ))}
               </div>
               <Button disabled={saving} onClick={() => void handleSavePms()}>
+                {saving ? t("common.loading") : t("common.save")}
+              </Button>
+            </PlatformCard>
+
+            <PlatformCard className="mt-6 space-y-4">
+              <div>
+                <p className="font-medium">{t("platform.tenantDetail.pmsVbTitle")}</p>
+                <p className="text-xs text-muted-foreground">{t("platform.tenantDetail.pmsVbHint")}</p>
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="font-medium">{t("platform.tenantDetail.pmsEnabled")}</p>
+                  <p className="text-xs text-muted-foreground">{t("platform.tenantDetail.pmsVbEnabledHint")}</p>
+                </div>
+                <Switch checked={pmsVbEnabled} onCheckedChange={setPmsVbEnabled} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="pms-vb-base-url">{t("platform.tenantDetail.pmsBaseUrl")}</Label>
+                <Input
+                  id="pms-vb-base-url"
+                  placeholder="http://api.vinibarr.com.br/v1"
+                  value={pmsVbBaseUrl}
+                  onChange={(event) => setPmsVbBaseUrl(event.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="pms-vb-api-token">{t("platform.tenantDetail.pmsVbFallbackToken")}</Label>
+                <Input
+                  id="pms-vb-api-token"
+                  type="password"
+                  autoComplete="off"
+                  placeholder={pmsVbMaskedApiToken || t("platform.tenantDetail.pmsVbFallbackTokenHint")}
+                  value={pmsVbApiToken}
+                  onChange={(event) => setPmsVbApiToken(event.target.value)}
+                />
+              </div>
+              <Button disabled={saving} onClick={() => void handleSaveVbPms()}>
                 {saving ? t("common.loading") : t("common.save")}
               </Button>
             </PlatformCard>

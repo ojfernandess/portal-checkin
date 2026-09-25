@@ -60,6 +60,7 @@ export type CheckinErrorLabels = {
   apiReviewCompanions: string;
   apiIncompleteMainGuest: string;
   apiIncompleteCompanions: string;
+  apiInvalidImageFormat: string;
 };
 
 function normalizeDoc(value: string, documentType: string): string {
@@ -210,6 +211,23 @@ export function validatePhotos(profileUrl?: string | null, documentUrl?: string 
   return issues;
 }
 
+/** Valida referências de foto já enviadas ao PMS (URL e/ou mediaId). */
+export function validatePhotoRefs(
+  profileUrl?: string | null,
+  documentUrl?: string | null,
+  options?: {
+    profilePhotoId?: string | number | null;
+    documentPhotoId?: string | number | null;
+  },
+): CheckinIssue[] {
+  const issues: CheckinIssue[] = [];
+  const hasProfile = Boolean(profileUrl?.trim() || options?.profilePhotoId != null);
+  const hasDocument = Boolean(documentUrl?.trim() || options?.documentPhotoId != null);
+  if (!hasProfile) issues.push({ step: "photos", field: "profilePhoto" });
+  if (!hasDocument) issues.push({ step: "photos", field: "documentPhoto" });
+  return issues;
+}
+
 export function formatCheckinIssues(issues: CheckinIssue[], labels: CheckinErrorLabels): string {
   if (issues.length === 0) return labels.apiGeneric;
 
@@ -345,8 +363,21 @@ function parseApiMissingFields(message: string): {
 }
 
 export function humanizeCheckinApiError(message: string, labels: CheckinErrorLabels): string {
-  const raw = stripApiErrorCodes(message.trim());
-  const lower = raw.toLowerCase();
+  const trimmed = message.trim();
+  const lower = trimmed.toLowerCase();
+
+  if (
+    /INVALID_IMAGE_FORMAT/i.test(trimmed) ||
+    lower.includes("não corresponde ao mime") ||
+    lower.includes("nao corresponde ao mime") ||
+    lower.includes("does not match the reported mime") ||
+    lower.includes("no coincide con el mime")
+  ) {
+    return labels.apiInvalidImageFormat;
+  }
+
+  const raw = stripApiErrorCodes(trimmed);
+  const normalized = raw.toLowerCase();
 
   const missing = parseApiMissingFields(raw);
   if (missing) {
@@ -358,32 +389,32 @@ export function humanizeCheckinApiError(message: string, labels: CheckinErrorLab
   }
 
   if (
-    lower.includes("main_guest_incomplete") ||
-    (lower.includes("mainguest") && lower.includes("incompleto"))
+    normalized.includes("main_guest_incomplete") ||
+    (normalized.includes("mainguest") && normalized.includes("incompleto"))
   ) {
     return `${labels.apiGeneric}\n${labels.apiReviewGuest}`;
   }
 
   if (
-    lower.includes("failed to perform reservation checkin") ||
-    lower.includes("falha ao realizar check-in")
+    normalized.includes("failed to perform reservation checkin") ||
+    normalized.includes("falha ao realizar check-in")
   ) {
     return `${labels.apiGeneric}\n${labels.apiReviewGuest}\n${labels.apiReviewCompanions}`;
   }
 
   for (const hint of API_FIELD_HINTS) {
-    if (hint.pattern.test(raw) || hint.pattern.test(lower)) {
+    if (hint.pattern.test(raw) || hint.pattern.test(normalized)) {
       return `${labels.apiGeneric}\n${labels.stepLine
         .replace("{step}", labels.steps[hint.step])
         .replace("{fields}", labels.fields[hint.field])}`;
     }
   }
 
-  if (lower.includes("dependent") || lower.includes("acompanhante")) {
+  if (normalized.includes("dependent") || normalized.includes("acompanhante")) {
     return `${labels.apiGeneric}\n${labels.apiReviewCompanions}`;
   }
 
-  if (lower.includes("mainguest") || lower.includes("hóspede") || lower.includes("hospede")) {
+  if (normalized.includes("mainguest") || normalized.includes("hóspede") || normalized.includes("hospede")) {
     return `${labels.apiGeneric}\n${labels.apiReviewGuest}`;
   }
 

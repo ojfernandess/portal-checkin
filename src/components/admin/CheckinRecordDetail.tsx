@@ -26,7 +26,15 @@ function Field({ label, value }: { label: string; value?: React.ReactNode }) {
   );
 }
 
-function CompanionGuestFields({ dependent, locale }: { dependent: Dependent; locale: Locale }) {
+function CompanionGuestFields({
+  dependent,
+  locale,
+  documentDisplayOptions,
+}: {
+  dependent: Dependent;
+  locale: Locale;
+  documentDisplayOptions?: { pmsProvider: "vb" | "vivakey" };
+}) {
   const { t } = useI18n();
   const showRg = dependent.documentType?.trim().toUpperCase() !== "PASSPORT";
 
@@ -49,6 +57,7 @@ function CompanionGuestFields({ dependent, locale }: { dependent: Dependent; loc
             documentType: dependent.documentType,
           },
           locale,
+          documentDisplayOptions,
         )}
       />
       {showRg ? (
@@ -74,6 +83,9 @@ export function CheckinRecordDetail({ record }: { record: CheckinRecordRow }) {
   const snapshot = record.reservation_snapshot;
   const stay = snapshot?.stay ?? snapshot;
   const companions = filterNamedCheckinDependents(record.dependents);
+  const documentDisplayOptions = snapshot?.pmsProvider
+    ? { pmsProvider: snapshot.pmsProvider }
+    : undefined;
 
   const unitName = snapshot?.unitName ?? snapshot?.roomName ?? snapshot?.room?.unitName;
   const categoryName = snapshot?.categoryName ?? snapshot?.room?.categoryName;
@@ -131,7 +143,10 @@ export function CheckinRecordDetail({ record }: { record: CheckinRecordRow }) {
               ) : undefined
             }
           />
-          <Field label={t("common.document")} value={formatDocumentLine(guest, locale)} />
+          <Field
+            label={t("common.document")}
+            value={formatDocumentLine(guest, locale, documentDisplayOptions)}
+          />
           <Field label={t("common.birthDate")} value={formatBirthDate(guest.birthDate, locale)} />
           <Field label={t("common.gender")} value={formatGender(guest.gender, locale)} />
           <Field label={t("common.profession")} value={guest.profession} />
@@ -152,7 +167,11 @@ export function CheckinRecordDetail({ record }: { record: CheckinRecordRow }) {
                 className="space-y-3 rounded-lg border border-border p-3"
               >
                 <h4 className="font-medium">{dependent.name}</h4>
-                <CompanionGuestFields dependent={dependent} locale={locale} />
+                <CompanionGuestFields
+                  dependent={dependent}
+                  locale={locale}
+                  documentDisplayOptions={documentDisplayOptions}
+                />
               </article>
             ))}
           </div>

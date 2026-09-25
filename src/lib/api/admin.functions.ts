@@ -1274,6 +1274,8 @@ export const adminSaveSettings = createServerFn({ method: "POST" })
             }),
           )
           .optional(),
+        vbApiToken: z.string().trim().max(500).nullable().optional(),
+        vbPhotoLinkEnabled: z.boolean().optional(),
       })
       .parse(input),
   )
@@ -1323,6 +1325,15 @@ export const adminSaveSettings = createServerFn({ method: "POST" })
         : {}),
       ...(data.usefulInfoItems !== undefined
         ? { usefulInfoItems: sanitizeUsefulInfoItems(data.usefulInfoItems) }
+        : {}),
+      ...(data.vbApiToken !== undefined
+        ? {
+            vbApiToken:
+              data.vbApiToken && data.vbApiToken.trim() ? data.vbApiToken.trim() : null,
+          }
+        : {}),
+      ...(data.vbPhotoLinkEnabled !== undefined
+        ? { vbPhotoLinkEnabled: data.vbPhotoLinkEnabled }
         : {}),
     };
 

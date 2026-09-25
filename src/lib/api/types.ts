@@ -38,6 +38,10 @@ export type Reservation = {
   reservationId?: number | string;
   localizer?: string;
   establishmentId?: number | string;
+  /** ID do estabelecimento no PMS de origem (ex.: VB retorna 1). */
+  pmsEstablishmentId?: number | string;
+  /** PMS usado na consulta desta reserva (roteamento de hub/media/check-in). */
+  pmsProvider?: "vb" | "vivakey";
   establishmentName?: string;
   reservationUnitId?: number;
   unitId?: number;
@@ -60,12 +64,20 @@ export type Reservation = {
   balanceDue?: number;
   isPaid?: boolean;
   label?: string;
+  /** Código numérico do PMS (ex.: VB 3=confirmada, 4=cancelada, 6=check-in concluído). */
+  reservationStatus?: number;
   isCancelled?: boolean;
   isPendingCancellation?: boolean;
   responsible?: { name?: string; email?: string; documentNumber?: string };
   mainGuest?: GuestLookup;
   dependents?: Dependent[];
-  room?: { capacity?: number; unitName?: string; categoryName?: string };
+  room?: {
+    capacity?: number;
+    unitName?: string;
+    unitNumber?: string;
+    roomNumber?: string;
+    categoryName?: string;
+  };
   stay?: ReservationStay;
   financial?: ReservationFinancial;
   establishment?: {
@@ -171,9 +183,18 @@ export type EmbraturForm = {
 };
 
 export function isAlreadyCheckedIn(r: Reservation | null): boolean {
-  const c = r?.checkin;
+  if (!r) return false;
+  if (Number(r.reservationStatus) === 6) return true;
+
+  const c = r.checkin;
   if (!c) return false;
-  return Number(c.checkin_mobile) === 1 || Number(c.checkinApi) === 1 || Number(c.checkinManual) === 1;
+
+  return (
+    Number(c.checkin_mobile) === 1 ||
+    Number(c.checkinApi) === 1 ||
+    Number(c.checkinManual) === 1 ||
+    Number(c.checkin) === 1
+  );
 }
 
 /** Check-in aprovado/confirmado no PMS (approveCheckin → hasCheckinApproved = 1). */

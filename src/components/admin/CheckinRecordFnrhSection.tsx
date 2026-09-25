@@ -29,7 +29,7 @@ export function CheckinRecordFnrhSection({ form }: { form: EmbraturForm | null }
 
     let cancelled = false;
 
-    void loadReference()
+    void loadReference({ data: {} })
       .then((raw) => {
         if (cancelled) return;
         const reference = normalizeEmbratur(raw);

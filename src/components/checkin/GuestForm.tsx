@@ -53,7 +53,7 @@ export function GuestForm({ foreign, initial, onSubmit, onBack }: Props) {
   useEffect(() => {
     let active = true;
     setCountriesLoading(true);
-    void loadReference()
+    void loadReference({ data: {} })
       .then((raw) => {
         if (!active) return;
         const options = toPmsCountryOptions(normalizeEmbratur(raw).countries);

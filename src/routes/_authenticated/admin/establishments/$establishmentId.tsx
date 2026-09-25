@@ -89,6 +89,8 @@ function EstablishmentConfigPage() {
   const [inboxManagedUnitId, setInboxManagedUnitId] = useState<number | null>(null);
   const [inboxUnitMappings, setInboxUnitMappings] = useState<InboxUnitMapping[]>([]);
   const [usefulInfoItems, setUsefulInfoItems] = useState<UsefulInfoItem[]>([]);
+  const [vbApiToken, setVbApiToken] = useState("");
+  const [vbPhotoLinkEnabled, setVbPhotoLinkEnabled] = useState(false);
   const [inboxUnits, setInboxUnits] = useState<InboxManagedUnitOption[]>([]);
   const [inboxConfigured, setInboxConfigured] = useState(false);
   const [inboxUnitsLoading, setInboxUnitsLoading] = useState(false);
@@ -122,6 +124,8 @@ function EstablishmentConfigPage() {
         setInboxManagedUnitId(settings.settings.inboxManagedUnitId);
         setInboxUnitMappings(settings.settings.inboxUnitMappings);
         setUsefulInfoItems(settings.settings.usefulInfoItems);
+        setVbApiToken(settings.settings.vbApiToken ?? "");
+        setVbPhotoLinkEnabled(settings.settings.vbPhotoLinkEnabled);
       })
       .finally(() => setLoading(false));
   }, [establishmentId, getEstablishment, getTerms, getContact, listFields, getSettings]);
@@ -212,6 +216,8 @@ function EstablishmentConfigPage() {
           inboxManagedUnitId,
           inboxUnitMappings,
           usefulInfoItems,
+          vbApiToken: vbApiToken.trim() || null,
+          vbPhotoLinkEnabled,
         },
       });
       toast.success(t("admin.establishmentConfig.settingsSaved"));
@@ -364,6 +370,41 @@ function EstablishmentConfigPage() {
               </div>
             </div>
 
+            <div className="space-y-3 rounded-xl border border-border p-4">
+              <div className="space-y-1">
+                <p className="text-sm font-medium">{t("admin.establishmentConfig.vbPmsTitle")}</p>
+                <p className="text-xs text-muted-foreground">
+                  {t("admin.establishmentConfig.vbPmsHint")}
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="vbApiToken">{t("admin.establishmentConfig.vbApiToken")}</Label>
+                <Input
+                  id="vbApiToken"
+                  type="password"
+                  value={vbApiToken}
+                  onChange={(e) => setVbApiToken(e.target.value)}
+                  placeholder={t("admin.establishmentConfig.vbApiTokenPlaceholder")}
+                  autoComplete="off"
+                />
+              </div>
+              <label className="flex items-start gap-3">
+                <Checkbox
+                  checked={vbPhotoLinkEnabled}
+                  onCheckedChange={(checked) => setVbPhotoLinkEnabled(checked === true)}
+                  className="mt-0.5"
+                />
+                <span className="space-y-1">
+                  <span className="block text-sm font-medium">
+                    {t("admin.establishmentConfig.vbPhotoLinkEnabled")}
+                  </span>
+                  <span className="block text-xs text-muted-foreground">
+                    {t("admin.establishmentConfig.vbPhotoLinkEnabledHint")}
+                  </span>
+                </span>
+              </label>
+            </div>
+
             <label className="flex items-start gap-3 rounded-xl border border-border p-4">
               <Checkbox
                 checked={requireBirthDateConfirmation}
@@ -390,6 +431,7 @@ function EstablishmentConfigPage() {
               saving={savingSettings}
               onChange={setUsefulInfoItems}
               onSave={() => void handleSaveSettings()}
+              vbEnabled={Boolean(vbApiToken.trim())}
             />
           </TabsContent>
 

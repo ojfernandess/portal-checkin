@@ -51,7 +51,7 @@ import {
   type CompletedCheckinContext,
 } from "@/lib/api/checkin.functions";
 import { normalizeEmbratur } from "@/lib/embratur";
-import { mergeCheckinResult, mergeGuests, preserveReservationDetails } from "@/lib/api/reservation-normalizer";
+import { mergeSuccessReservationFromLocalizer } from "@/lib/api/reservation-normalizer";
 import { isAlreadyCheckedIn, type Dependent, type EmbraturForm, type GuestLookup, type MainGuest, type Reservation } from "@/lib/api/types";
 import { isValidCpf, isValidEmail, maskCpf } from "@/lib/validators";
 import { type TermsSection } from "@/lib/establishment-terms";
@@ -73,6 +73,7 @@ import { useI18n } from "@/lib/i18n/context";
 import {
   companionsHaveInboxPhotoUpdates,
 } from "@/lib/companion-inbox-photos";
+import { normalizeImageDataUrlToJpeg } from "@/lib/checkin-photo-normalize";
 
 export type CheckinPortalProps = {
   initialLocalizer?: string;
@@ -216,6 +217,15 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
     toast.error(title || t("checkin.errors.apiGeneric"), description ? { description } : undefined);
   }
 
+  function showPhotoUploadError(error: unknown) {
+    const labels = buildCheckinErrorLabels(t);
+    const message =
+      error instanceof Error
+        ? humanizeCheckinApiError(error.message, labels)
+        : t("checkin.photos.uploadFailed");
+    toast.error(message);
+  }
+
   const navigate = useNavigate();
   const find = useServerFn(findReservation);
   const refreshReservation = useServerFn(getReservationDetails);
@@ -324,6 +334,11 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
   function resetRegisteredPhotoEdits(found: GuestLookup) {
     setEditRegisteredSelfie(false);
     setEditRegisteredDocPhoto(false);
+    if (reservation?.pmsProvider === "vb") {
+      setSelfie(null);
+      setDocPhoto(null);
+      return;
+    }
     setSelfie(registeredDisplayUrl(found, "profile"));
     setDocPhoto(registeredDisplayUrl(found, "document"));
   }
@@ -353,6 +368,7 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
   const [editRegisteredSelfie, setEditRegisteredSelfie] = useState(false);
   const [editRegisteredDocPhoto, setEditRegisteredDocPhoto] = useState(false);
   const [activeCameraId, setActiveCameraId] = useState<string | null>(null);
+  const isVbPmsCheckin = reservation?.pmsProvider === "vb";
   const [reference, setReference] = useState<Reference | null>(null);
   const [embratur, setEmbratur] = useState<EmbraturForm>(EMPTY_EMBRATUR);
   const [extraFields, setExtraFields] = useState<CheckinExtraField[]>([]);
@@ -379,6 +395,12 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
     null,
   );
   const [companionInboxPhotoSavingKey, setCompanionInboxPhotoSavingKey] = useState<string | null>(null);
+  const successLocalizerRefreshKeyRef = useRef<string | null>(null);
+  const dependentsRef = useRef<Dependent[]>([]);
+
+  useEffect(() => {
+    dependentsRef.current = dependents;
+  }, [dependents]);
 
   const reservationId = String(reservation?.localizer ?? reservation?.reservationId ?? localizer);
   const guestsQuantity = Math.max(
@@ -400,9 +422,21 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
     if (!value) return null;
     if (!isDataUrl(value)) return { url: value };
 
+    let uploadPayload = value;
+    if (reservation?.pmsProvider === "vb") {
+      uploadPayload = await normalizeImageDataUrlToJpeg(value);
+    }
+
     const establishmentId = String(reservation?.establishmentId ?? "").trim() || undefined;
     const result = await upload({
-      data: { reservationId, data: value, type, establishmentId },
+      data: {
+        reservationId,
+        data: uploadPayload,
+        type,
+        establishmentId,
+        localizer: reservation?.localizer ?? reservationId,
+        pmsProvider: reservation?.pmsProvider,
+      },
     });
     return {
       url:
@@ -423,19 +457,19 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
     const next: MainGuest = { ...current };
 
     if (profile) {
-      if (!profile.url) {
+      if (!profile.url && profile.id == null) {
         throw new Error(t("checkin.photos.uploadFailed"));
       }
-      next.profilePhotoUrl = profile.url;
+      next.profilePhotoUrl = profile.url || (profile.id != null ? String(profile.id) : "");
       if (profile.id != null) next.profilePhotoId = profile.id;
       else if (isDataUrl(current.profilePhotoUrl ?? null)) next.profilePhotoId = undefined;
     }
 
     if (document) {
-      if (!document.url) {
+      if (!document.url && document.id == null) {
         throw new Error(t("checkin.photos.uploadFailed"));
       }
-      next.documentPhotoUrl = document.url;
+      next.documentPhotoUrl = document.url || (document.id != null ? String(document.id) : "");
       if (document.id != null) next.documentPhotoId = document.id;
       else if (isDataUrl(current.documentPhotoUrl ?? null)) next.documentPhotoId = undefined;
     }
@@ -456,7 +490,14 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
   }
 
   async function loadEmbraturStep() {
-    const raw = await loadReference();
+    const raw = await loadReference({
+      data: {
+        establishmentId:
+          reservation?.establishmentId != null
+            ? String(reservation.establishmentId)
+            : undefined,
+      },
+    });
     const normalized = normalizeEmbratur(raw);
     setReference(normalized);
     setEmbratur((prev) => ({
@@ -584,6 +625,36 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
     void searchByCode(code);
   }, [autoSearch, initialLocalizer]);
 
+  useEffect(() => {
+    if (step !== 8) {
+      successLocalizerRefreshKeyRef.current = null;
+      return;
+    }
+
+    const code = String(reservation?.localizer ?? localizer).trim().toUpperCase();
+    if (code.length < 3) return;
+
+    const refreshKey = `${code}:${checkinAlreadyDone ? "reaccess" : "fresh"}`;
+    if (successLocalizerRefreshKeyRef.current === refreshKey) return;
+    successLocalizerRefreshKeyRef.current = refreshKey;
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const refreshed = await refreshReservation({ data: { localizer: code } });
+        if (cancelled || !refreshed) return;
+        setReservation((current) => mergeSuccessReservationFromLocalizer(current, refreshed));
+        await loadEstablishmentConfig(refreshed);
+      } catch {
+        // Mantém snapshot atual se o refresh falhar.
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [step, reservation?.localizer, localizer, checkinAlreadyDone]);
+
   async function handleSearch(event: React.FormEvent) {
     event.preventDefault();
     const code = localizer.trim().toUpperCase();
@@ -658,8 +729,12 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
       setSubStep("verifyBirthDate");
       return;
     }
-    rememberRegisteredPhotos(found);
-    resetRegisteredPhotoEdits(found);
+    if (found.profilePhotoUrl?.trim() || found.documentPhotoUrl?.trim()) {
+      rememberRegisteredPhotos(found);
+      resetRegisteredPhotoEdits(found);
+    } else {
+      clearRegisteredPhotoState();
+    }
     setGuest(found);
     setSubStep("confirm");
   }
@@ -675,8 +750,12 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
       return;
     }
     setBirthDateConfirmError("");
-    rememberRegisteredPhotos(lookupResult);
-    resetRegisteredPhotoEdits(lookupResult);
+    if (lookupResult.profilePhotoUrl?.trim() || lookupResult.documentPhotoUrl?.trim()) {
+      rememberRegisteredPhotos(lookupResult);
+      resetRegisteredPhotoEdits(lookupResult);
+    } else {
+      clearRegisteredPhotoState();
+    }
     setGuest(lookupResult);
     setSubStep("confirm");
   }
@@ -819,7 +898,7 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
         setDocPhoto(uploaded.documentPhotoUrl ?? null);
         await loadEmbraturStep();
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : t("checkin.photos.uploadFailed"));
+        showPhotoUploadError(error);
       } finally {
         setLoading(false);
       }
@@ -889,7 +968,7 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
       setDocPhoto(uploaded.documentPhotoUrl ?? null);
       await loadEmbraturStep();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : t("checkin.photos.uploadFailed"));
+      showPhotoUploadError(error);
     } finally {
       setLoading(false);
     }
@@ -897,6 +976,17 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
 
   async function handleConfirmLookup() {
     if (!lookupResult) return;
+
+    if (isVbPmsCheckin) {
+      setGuest(stripRegisteredPhotoFields({ ...lookupResult }));
+      clearRegisteredPhotoState();
+      setSelfie(null);
+      setDocPhoto(null);
+      setEditRegisteredSelfie(false);
+      setEditRegisteredDocPhoto(false);
+      setSubStep("form");
+      return;
+    }
 
     const profileDisplayUrl = registeredDisplayUrl(lookupResult, "profile");
     const documentDisplayUrl = registeredDisplayUrl(lookupResult, "document");
@@ -926,7 +1016,7 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
       setEditRegisteredDocPhoto(false);
       setSubStep("form");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : t("checkin.photos.uploadFailed"));
+      showPhotoUploadError(error);
     } finally {
       setLoading(false);
     }
@@ -934,9 +1024,10 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
 
   async function handleSubmit() {
     const labels = buildCheckinErrorLabels(t);
+    const companionsForSubmit = dependentsRef.current;
     const issues = [
       ...validateMainGuest(guest, { foreign }),
-      ...validateDependents(dependents, guest),
+      ...validateDependents(companionsForSubmit, guest),
       ...validateEmbraturForm(embratur),
       ...validatePhotos(guest.profilePhotoUrl ?? selfie, guest.documentPhotoUrl ?? docPhoto),
     ];
@@ -948,7 +1039,7 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
     setLoading(true);
     let checkinResult: Record<string, unknown> | null = null;
     let mainGuest = guest;
-    const submittedDependents = dependents;
+    const submittedDependents = dependentsRef.current;
     try {
       mainGuest = await resolveGuestForSubmit(guest);
       setGuest(mainGuest);
@@ -1018,29 +1109,26 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
     try {
       const refreshed = await refreshReservation({ data: { localizer: code } });
       if (refreshed) {
-        const merged = mergeCheckinResult(refreshed, checkinResult);
-        setReservation(
-          preserveReservationDetails(prior ?? refreshed, {
-            ...merged,
-            mainGuest: mergeGuests(mainGuest, merged.mainGuest),
-            dependents: merged.dependents?.length ? merged.dependents : submittedDependents,
-          }),
+        const successReservation = mergeSuccessReservationFromLocalizer(
+          prior ?? refreshed,
+          refreshed,
+          checkinResult,
+          { dependents: submittedDependents },
         );
-        await loadEstablishmentConfig(merged);
+        setReservation(successReservation);
+        await loadEstablishmentConfig(successReservation);
       } else if (prior) {
         setReservation(
-          preserveReservationDetails(prior, {
-            ...mergeCheckinResult(prior, checkinResult),
-            mainGuest: mergeGuests(mainGuest, prior.mainGuest),
+          mergeSuccessReservationFromLocalizer(prior, prior, checkinResult, {
+            dependents: submittedDependents,
           }),
         );
       }
     } catch {
       if (prior) {
         setReservation(
-          preserveReservationDetails(prior, {
-            ...mergeCheckinResult(prior, checkinResult),
-            mainGuest: mergeGuests(mainGuest, prior.mainGuest),
+          mergeSuccessReservationFromLocalizer(prior, prior, checkinResult, {
+            dependents: submittedDependents,
           }),
         );
       }
@@ -1235,12 +1323,6 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
             embratur: postCompanionsContext.embratur as unknown as Record<string, unknown>,
             dependents: companionsToSave as unknown as Record<string, unknown>[],
             purpose: "companions",
-            registeredPhotos: {
-              ...(mainGuest.profilePhotoUrl ? { profileUrl: mainGuest.profilePhotoUrl } : {}),
-              ...(mainGuest.profilePhotoId != null ? { profileId: mainGuest.profilePhotoId } : {}),
-              ...(mainGuest.documentPhotoUrl ? { documentUrl: mainGuest.documentPhotoUrl } : {}),
-              ...(mainGuest.documentPhotoId != null ? { documentId: mainGuest.documentPhotoId } : {}),
-            },
           },
         });
       } else if (hasPhotoUpdates && establishmentSettings.inboxEnabled) {
@@ -1257,10 +1339,8 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
       const refreshed = await refreshReservation({ data: { localizer: code } });
       if (refreshed) {
         setReservation(
-          preserveReservationDetails(reservation, {
-            ...refreshed,
+          mergeSuccessReservationFromLocalizer(reservation, refreshed, undefined, {
             dependents: companionsToSave,
-            mainGuest: mergeGuests(mainGuest, refreshed.mainGuest),
           }),
         );
       }
@@ -1368,7 +1448,10 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
                   <h2 className="font-display text-lg">{t("checkin.confirmation.title")}</h2>
                   <p className="text-sm text-muted-foreground">
                     {t("checkin.confirmation.bodyPrefix")}{" "}
-                    <strong className="text-foreground">{reservation.responsible?.name ?? "—"}</strong>.
+                    <strong className="text-foreground">
+                      {reservation.responsible?.name ?? reservation.mainGuest?.name ?? "—"}
+                    </strong>
+                    .
                   </p>
                   <p className="text-sm leading-relaxed text-muted-foreground">
                     {t("checkin.confirmation.bodyHint")}
@@ -1517,7 +1600,9 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
             <section className="space-y-5">
               <header className="space-y-1">
                 <h2 className="font-display text-2xl">{t("checkin.lookup.foundTitle")}</h2>
-                <p className="text-sm text-muted-foreground">{t("checkin.lookup.foundBody")}</p>
+                <p className="text-sm text-muted-foreground">
+                  {isVbPmsCheckin ? t("checkin.lookup.foundBodyVb") : t("checkin.lookup.foundBody")}
+                </p>
               </header>
 
               <article className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-card">
@@ -1528,6 +1613,11 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
                   <p className="font-code text-sm">{lookupResult.documentNumber}</p>
                 </div>
 
+                {isVbPmsCheckin ? (
+                  <p className="border-t border-border pt-4 text-sm text-muted-foreground">
+                    {t("checkin.lookup.foundPhotosRequiredLater")}
+                  </p>
+                ) : (
                 <div className="space-y-3 border-t border-border pt-4">
                   <div className="grid grid-cols-2 gap-3">
                     <RegisteredPhotoTile
@@ -1579,6 +1669,7 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
                   </div>
                   <RegisteredSelfieQualityNotice />
                 </div>
+                )}
               </article>
 
               <div className="flex gap-3">
@@ -1677,7 +1768,10 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
               onChange={setDependents}
               onBack={() => setSubStep("form")}
               onContinue={(next) => {
-                if (next) setDependents(next);
+                if (next) {
+                  dependentsRef.current = next;
+                  setDependents(next);
+                }
                 void goToPhotosOrEmbratur();
               }}
             />
@@ -1810,7 +1904,7 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
               <>
                 <SuccessScreen
                   reservation={displayReservation}
-                  mainGuest={mergeGuests(displayReservation.mainGuest, guest)}
+                  mainGuest={displayReservation.mainGuest ?? guest}
                   dependents={
                     addingPostCompanions
                       ? postCompanionsDraft
@@ -1862,6 +1956,7 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
                         onBack={resetPostCompanionsEditor}
                         onContinue={(next) => {
                           if (next) {
+                            dependentsRef.current = next;
                             setPostCompanionsDraft(next);
                             setDependents(next);
                           }

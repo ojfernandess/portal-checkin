@@ -1,3 +1,9 @@
+import {
+  applyVbCheckedInStatus,
+  normalizeCheckinFlags,
+  resolveReservationStatusFlags,
+  VB_RESERVATION_STATUS,
+} from "@/lib/reservation-status";
 import type { Dependent, GuestLookup, Reservation } from "./types";
 
 type Address = {
@@ -82,9 +88,45 @@ function parseMainGuest(raw: unknown): GuestLookup | undefined {
   return guest.name || guest.email || guest.documentNumber ? guest : undefined;
 }
 
+function isMeaningfulGuestField(value: unknown): boolean {
+  if (value === undefined || value === null) return false;
+  if (typeof value === "string" && value.trim() === "") return false;
+  return true;
+}
+
 export function mergeGuests(...guests: Array<GuestLookup | undefined>): GuestLookup | undefined {
-  const merged = Object.assign({}, ...guests.filter(Boolean)) as GuestLookup;
+  const merged = {} as GuestLookup;
+  for (const guest of guests) {
+    if (!guest) continue;
+    for (const [key, value] of Object.entries(guest)) {
+      if (isMeaningfulGuestField(value)) {
+        (merged as Record<string, unknown>)[key] = value;
+      }
+    }
+  }
   return merged.name || merged.email || merged.documentNumber ? merged : undefined;
+}
+
+/** TecHospitality usa `responsible`; PMS VB expõe `guest` / `mainGuest`. */
+function buildResponsible(
+  explicit: Record<string, unknown> | null,
+  mainGuest: GuestLookup | undefined,
+): Reservation["responsible"] | undefined {
+  if (explicit && (explicit.name || explicit.email || explicit.documentNumber)) {
+    return {
+      name: str(explicit.name),
+      email: str(explicit.email),
+      documentNumber: str(explicit.documentNumber),
+    };
+  }
+
+  if (!mainGuest) return undefined;
+
+  return {
+    name: mainGuest.name,
+    email: mainGuest.email,
+    documentNumber: mainGuest.documentNumber,
+  };
 }
 
 function isFlatReservationPayload(root: Record<string, unknown>): boolean {
@@ -170,7 +212,12 @@ export function preserveReservationDetails(
     categoryId: overlay.categoryId ?? base.categoryId,
     categoryName: overlay.categoryName ?? base.categoryName,
     capacity: overlay.capacity ?? base.capacity ?? base.room?.capacity,
-    establishmentId: overlay.establishmentId ?? base.establishmentId,
+    establishmentId:
+      base.pmsProvider === "vb" && base.establishmentId
+        ? base.establishmentId
+        : overlay.establishmentId ?? base.establishmentId,
+    pmsProvider: overlay.pmsProvider ?? base.pmsProvider,
+    pmsEstablishmentId: overlay.pmsEstablishmentId ?? base.pmsEstablishmentId,
     establishmentName: overlay.establishmentName ?? base.establishmentName,
     establishment: overlay.establishment ?? base.establishment,
     stay: overlay.stay ?? base.stay,
@@ -280,6 +327,27 @@ export function normalizeReservationPayload(payload: unknown): Reservation | nul
     parseDependents(root.companions) ??
     parseDependents(root.guests);
 
+  const reservationStatus = num(status?.reservationStatus) ?? num(root.reservationStatus);
+  const statusLabel = str(status?.label) ?? str(root.label);
+  const statusFlags = resolveReservationStatusFlags({
+    reservationStatus,
+    label: statusLabel,
+    isCancelled: status?.isCancelled === true || root.isCancelled === true,
+    isPendingCancellation:
+      status?.isPendingCancellation === true || root.isPendingCancellation === true,
+  });
+  const normalizedCheckin = applyVbCheckedInStatus(
+    reservationStatus,
+    normalizeCheckinFlags(checkin) ?? (root.checkin as Reservation["checkin"]),
+  );
+
+  // VB: `guest` traz documento/telefone; `mainGuest` costuma trazer só id/nome — ordem importa.
+  const mainGuest = mergeGuests(
+    parseMainGuest(root.mainGuest),
+    parseMainGuest(guest),
+    parseMainGuest(root.guest),
+  );
+
   const normalized: Reservation = {
     reservationId: num(reservation?.reservationId) ?? num(root.reservationId),
     localizer: str(reservation?.localizer) ?? str(root.localizer),
@@ -315,28 +383,23 @@ export function normalizeReservationPayload(payload: unknown): Reservation | nul
     totalPaid: num(financial?.totalPaid) ?? num(root.totalPaid),
     balanceDue: num(financial?.balanceDue) ?? num(root.balanceDue),
     isPaid: financial?.isPaid === true || root.isPaid === true,
-    label: str(status?.label) ?? str(root.label),
-    isCancelled: status?.isCancelled === true || root.isCancelled === true,
-    isPendingCancellation:
-      status?.isPendingCancellation === true || root.isPendingCancellation === true,
-    responsible: responsible
-      ? {
-          name: str(responsible.name),
-          email: str(responsible.email),
-          documentNumber: str(responsible.documentNumber),
-        }
-      : root.responsible as Reservation["responsible"],
-    mainGuest: mergeGuests(
-      parseMainGuest(guest),
-      parseMainGuest(root.guest),
-      parseMainGuest(root.mainGuest),
-    ),
+    label: statusLabel,
+    reservationStatus: statusFlags.reservationStatus,
+    isCancelled: statusFlags.isCancelled,
+    isPendingCancellation: statusFlags.isPendingCancellation,
+    responsible: buildResponsible(responsible, mainGuest) ?? (root.responsible as Reservation["responsible"]),
+    mainGuest,
     room: {
       capacity: num(unit?.capacity) ?? num(room?.capacity) ?? num(root.capacity),
       unitName:
         str(unit?.unitName) ??
         str(room?.roomName) ??
         str(root.unitName),
+      unitNumber:
+        str(unit?.unitNumber) ??
+        str(room?.roomNumber) ??
+        str(root.unitNumber),
+      roomNumber: str(room?.roomNumber) ?? str(unit?.unitNumber) ?? str(root.unitNumber),
       categoryName:
         str(unit?.categoryName) ??
         str(room?.categoryName) ??
@@ -371,7 +434,7 @@ export function normalizeReservationPayload(payload: unknown): Reservation | nul
           isPaid: financial.isPaid === true,
         }
       : (root.financial as Reservation["financial"]),
-    checkin: checkin ? (checkin as Reservation["checkin"]) : (root.checkin as Reservation["checkin"]),
+    checkin: normalizedCheckin,
     dependents,
     access: access
       ? { roomPassword: roomPassword ?? null }
@@ -379,6 +442,54 @@ export function normalizeReservationPayload(payload: unknown): Reservation | nul
   };
 
   return normalized;
+}
+
+export type ReservationUnitDisplay = {
+  /** Suíte / unidade — categoria do quarto (VB: categoryName). */
+  suiteLabel: string | null;
+  /** Nº da unidade — número do quarto (unitNumber / roomNumber). */
+  unitNumberLabel: string | null;
+  /** Bloco de acesso — categoria + número. */
+  accessLabel: string | null;
+};
+
+/** Número físico do quarto (VB: room.roomNumber, room.units[].unitNumber). */
+export function resolveRoomNumber(reservation: Reservation): string | null {
+  const room = reservation.room as
+    | { unitNumber?: string | number; roomNumber?: string | number }
+    | undefined;
+  const candidates = [reservation.unitNumber, room?.unitNumber, room?.roomNumber];
+
+  for (const value of candidates) {
+    if (value == null || value === "") continue;
+    const normalized = String(value).trim();
+    if (normalized) return normalized;
+  }
+
+  return null;
+}
+
+export function resolveReservationUnitDisplay(reservation: Reservation): ReservationUnitDisplay {
+  const unitNumberLabel = resolveRoomNumber(reservation);
+
+  if (reservation.pmsProvider === "vb") {
+    const categoryName = reservation.categoryName ?? reservation.room?.categoryName;
+    const suiteLabel = categoryName?.trim() || null;
+    const accessLabel =
+      [suiteLabel, unitNumberLabel].filter(Boolean).join(" · ") || suiteLabel;
+
+    return { suiteLabel, unitNumberLabel, accessLabel };
+  }
+
+  const unitName = reservation.unitName ?? reservation.roomName ?? reservation.room?.unitName;
+  const categoryName = reservation.categoryName ?? reservation.room?.categoryName;
+  const suiteLabel = [categoryName, unitName].filter(Boolean).join(" ") || unitName?.trim() || null;
+
+  return {
+    suiteLabel,
+    unitNumberLabel,
+    accessLabel: unitName?.trim() || null,
+  };
 }
 
 /** Mescla dados retornados após POST check-in (senha do quarto, flags, hub). */
@@ -390,7 +501,7 @@ export function mergeCheckinResult(
   if (!root) return reservation;
 
   const data = asRecord(root.data);
-  const hubRaw = root.hub ?? data?.hub;
+  const hubRaw = root.hub ?? data?.hub ?? (data?.reservation ? data : null);
   const hub = hubRaw ? normalizeReservationPayload(hubRaw) : null;
   const checkin = asRecord(root.checkin) ?? asRecord(data?.checkin);
 
@@ -403,13 +514,54 @@ export function mergeCheckinResult(
   const merged = hub ? mergeDefinedReservation(reservation, hub) : reservation;
   const withDetails = preserveReservationDetails(reservation, merged);
 
+  let mergedCheckin = {
+    ...withDetails.checkin,
+    ...(normalizeCheckinFlags(checkin) ?? (checkin as Reservation["checkin"])),
+  };
+
+  if (reservation.pmsProvider === "vb") {
+    mergedCheckin =
+      applyVbCheckedInStatus(VB_RESERVATION_STATUS.CHECKED_IN, mergedCheckin) ?? mergedCheckin;
+  }
+
   return {
     ...withDetails,
+    ...(reservation.pmsProvider === "vb"
+      ? {
+          reservationStatus: VB_RESERVATION_STATUS.CHECKED_IN,
+          pmsProvider: "vb" as const,
+        }
+      : {}),
     mainGuest: mergeGuests(withDetails.mainGuest, reservation.mainGuest),
     roomPassword: roomPassword ?? withDetails.roomPassword ?? null,
-    checkin: {
-      ...withDetails.checkin,
-      ...(checkin as Reservation["checkin"]),
-    },
+    checkin: mergedCheckin,
+  };
+}
+
+/** Monta a reserva da tela de conclusão priorizando GET /localizer (como TecHospitality). */
+export function mergeSuccessReservationFromLocalizer(
+  portalContext: Reservation | null | undefined,
+  localizerData: Reservation,
+  checkinPostResult?: unknown,
+  options?: { dependents?: Dependent[] },
+): Reservation {
+  const fromLocalizer = checkinPostResult
+    ? mergeCheckinResult(localizerData, checkinPostResult)
+    : localizerData;
+  const base = portalContext ?? fromLocalizer;
+  const merged = preserveReservationDetails(base, fromLocalizer);
+
+  return {
+    ...merged,
+    ...(options?.dependents?.length ? { dependents: options.dependents } : {}),
+    mainGuest: mergeGuests(fromLocalizer.mainGuest, merged.mainGuest),
+    access: fromLocalizer.access ?? merged.access,
+    checkin: fromLocalizer.checkin ?? merged.checkin,
+    roomPassword: fromLocalizer.roomPassword ?? merged.roomPassword,
+    label: fromLocalizer.label ?? merged.label,
+    reservationStatus: fromLocalizer.reservationStatus ?? merged.reservationStatus,
+    categoryName: fromLocalizer.categoryName ?? merged.categoryName,
+    unitNumber: fromLocalizer.unitNumber ?? merged.unitNumber,
+    room: fromLocalizer.room ?? merged.room,
   };
 }

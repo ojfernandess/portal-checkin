@@ -29,16 +29,21 @@ import { toast } from "sonner";
 import { WhatsAppIcon } from "@/components/icons/WhatsAppIcon";
 import { PhoneDisplay } from "@/components/checkin/PhoneDisplay";
 import { CompanionInboxPhotoTile } from "@/components/checkin/CompanionInboxPhotoTile";
-import { isReservationPaid, paymentBadgeClass } from "@/components/checkin/ReservationCard";
+import {
+  isReservationPaid,
+  paymentBadgeClass,
+  reservationStatusBadgeClass,
+} from "@/components/checkin/ReservationCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatDate, formatDateTime, formatDateWithTime, isCheckoutPast } from "@/lib/format-dates";
 import { getGoogleMapsUrl } from "@/lib/establishment-address";
-import { formatDocumentLine } from "@/lib/guest-display";
+import { formatDocumentLine, resolveGuestPhone } from "@/lib/guest-display";
 import { useI18n } from "@/lib/i18n/context";
 import { localeToDateLocale, type Locale } from "@/lib/i18n/types";
 import { buildWhatsAppUrl } from "@/lib/phone-display";
 import { cn } from "@/lib/utils";
+import { mergeGuests, resolveReservationUnitDisplay } from "@/lib/api/reservation-normalizer";
 import type { Dependent, GuestLookup, Reservation } from "@/lib/api/types";
 import { companionNeedsInboxPhoto } from "@/lib/companion-inbox-photos";
 import type { ExclusiveCameraProps } from "@/lib/camera-utils";
@@ -161,21 +166,37 @@ function InfoTile({
   icon,
   label,
   value,
+  highlight = false,
 }: {
   icon: React.ReactNode;
   label: string;
   value?: React.ReactNode;
+  highlight?: boolean;
 }) {
   if (value == null || value === "") return null;
   return (
-    <div className="min-w-0 space-y-1">
+    <div
+      className={cn(
+        "min-w-0 space-y-1",
+        highlight && "rounded-xl border border-primary/25 bg-primary/[0.06] p-3 sm:p-3.5",
+      )}
+    >
       <div className="flex items-center gap-1.5 text-muted-foreground">
         <span className="shrink-0" aria-hidden>
           {icon}
         </span>
-        <p className="text-xs">{label}</p>
+        <p className={cn("text-xs", highlight && "font-medium text-primary/80")}>{label}</p>
       </div>
-      <p className="text-sm font-semibold text-foreground wrap-anywhere">{value}</p>
+      <p
+        className={cn(
+          "wrap-anywhere text-foreground",
+          highlight
+            ? "font-display text-3xl font-bold leading-none tracking-tight text-primary sm:text-4xl"
+            : "text-sm font-semibold",
+        )}
+      >
+        {value}
+      </p>
     </div>
   );
 }
@@ -342,8 +363,20 @@ export function SuccessScreen({
   onReleaseCapture,
 }: Props) {
   const { locale, t } = useI18n();
-  const guest = mainGuest ?? reservation.mainGuest ?? reservation.responsible;
+  const documentDisplayOptions = reservation.pmsProvider
+    ? { pmsProvider: reservation.pmsProvider }
+    : undefined;
+  const guest =
+    mergeGuests(
+      reservation.mainGuest,
+      mainGuest ?? undefined,
+      reservation.responsible as GuestLookup | undefined,
+    ) ??
+    mainGuest ??
+    reservation.mainGuest ??
+    reservation.responsible;
   const guestName = guest?.name ?? "";
+  const guestPhone = resolveGuestPhone(guest);
   const registeredCompanions = useMemo(
     () =>
       (dependents.length > 0 ? dependents : reservation.dependents ?? []).filter((dependent) =>
@@ -369,10 +402,13 @@ export function SuccessScreen({
   const price = formatMoney(reservation.financial?.price ?? reservation.price, locale);
   const roomPassword = reservation.roomPassword ?? reservation.access?.roomPassword ?? null;
 
-  const unitName = reservation.unitName ?? reservation.roomName ?? reservation.room?.unitName;
-  const accessUnit = unitName?.trim() || null;
-  const categoryName = reservation.categoryName ?? reservation.room?.categoryName;
-  const unitDisplay = [categoryName, unitName].filter(Boolean).join(" ") || unitName;
+  const unitDisplayInfo = useMemo(
+    () => resolveReservationUnitDisplay(reservation),
+    [reservation],
+  );
+  const unitDisplay = unitDisplayInfo.suiteLabel;
+  const unitNumberDisplay = unitDisplayInfo.unitNumberLabel;
+  const accessUnit = unitDisplayInfo.accessLabel;
 
   const isCancelled = reservation.isCancelled === true;
   const checkoutPast = isCheckoutPast(checkoutDate, checkoutTime);
@@ -386,11 +422,16 @@ export function SuccessScreen({
     !reservation.isPendingCancellation &&
     remainingCompanionSlots > 0;
   const showRoomPassword = !isCancelled && !checkoutPast && roomPassword != null && roomPassword !== "";
+  const showRoomNumber = !isCancelled && !checkoutPast && !!unitNumberDisplay;
   const checkinTimeLabel = checkinTime?.trim() || "15:00";
   const showInboxFacialNotice =
     inboxPortariaEnabled && !isCancelled && !checkoutPast && !hideGuestDetails;
   const showAccessBlock =
-    isCancelled || showRoomPassword || (!checkoutPast && !!accessUnit) || showInboxFacialNotice;
+    isCancelled ||
+    showRoomPassword ||
+    showRoomNumber ||
+    (!checkoutPast && !!unitDisplay) ||
+    showInboxFacialNotice;
 
   const checkinWhen = reservation.checkin?.localizedDate
     ? formatDateTime(String(reservation.checkin.localizedDate), locale)
@@ -469,6 +510,102 @@ export function SuccessScreen({
 
   return (
     <div className="content-stack app-container">
+      {/* Acesso à acomodação */}
+      {showAccessBlock ? (
+        isCancelled ? (
+          <CardShell className="border-destructive/40 bg-destructive/5 p-5">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="mt-0.5 size-5 shrink-0 text-destructive" aria-hidden />
+              <p className="text-sm text-destructive">{t("checkin.success.cancelledAccessNotice")}</p>
+            </div>
+          </CardShell>
+        ) : (
+          <CardShell>
+            <div className="flex items-center gap-2 bg-primary px-5 py-3.5 text-primary-foreground">
+              <KeyRound className="size-5 shrink-0" aria-hidden />
+              <h4 className="font-display text-base">{t("checkin.success.accessTitle")}</h4>
+            </div>
+            <div className="p-4 sm:p-5">
+              <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-start sm:gap-x-5 sm:gap-y-4 lg:gap-x-8">
+                {unitDisplay ? (
+                  <div className="min-w-0 sm:max-w-[14rem] sm:flex-none lg:max-w-[16rem]">
+                    <p className="text-xs text-muted-foreground">{t("common.category")}</p>
+                    <p className="mt-0.5 font-display text-base leading-snug wrap-anywhere sm:text-lg">
+                      {unitDisplay}
+                    </p>
+                  </div>
+                ) : accessUnit ? (
+                  <div className="min-w-0 sm:max-w-[14rem] sm:flex-none lg:max-w-[16rem]">
+                    <p className="text-xs text-muted-foreground">{t("common.unit")}</p>
+                    <p className="mt-0.5 font-display text-base leading-snug wrap-anywhere sm:text-lg">
+                      {accessUnit}
+                    </p>
+                  </div>
+                ) : null}
+                {showRoomNumber ? (
+                  <div className="min-w-0 sm:flex-none sm:max-w-[11rem]">
+                    <p className="text-xs text-muted-foreground">{t("checkin.success.roomNumberLabel")}</p>
+                    <p
+                      className="mt-1 font-display text-[1.75rem] font-semibold leading-none tabular-nums tracking-tight text-foreground sm:text-3xl"
+                      aria-label={`${t("checkin.success.roomNumberLabel")}: ${unitNumberDisplay}`}
+                    >
+                      {unitNumberDisplay}
+                    </p>
+                  </div>
+                ) : null}
+                {showRoomPassword ? (
+                  <div className="min-w-0 sm:flex-none sm:max-w-[14rem] lg:max-w-[16rem]">
+                    <p className="text-xs text-muted-foreground">{t("checkin.success.accessPassword")}</p>
+                    <p className="mt-0.5 font-code text-xl font-semibold tracking-wide wrap-anywhere sm:text-2xl">
+                      {roomPassword}
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-2 gap-2 print:hidden"
+                      onClick={() => void copyPassword()}
+                    >
+                      <Copy className="size-4" aria-hidden />
+                      {t("checkin.success.copyPassword")}
+                    </Button>
+                  </div>
+                ) : null}
+                {showInboxFacialNotice ? (
+                  <div
+                    className={cn(
+                      "min-w-0 rounded-lg border border-primary/15 bg-gradient-to-br from-primary/[0.04] to-primary/[0.07] p-3 sm:p-3.5",
+                      accessUnit || showRoomPassword
+                        ? "sm:flex-1 sm:basis-[220px] lg:basis-[280px]"
+                        : "w-full",
+                    )}
+                  >
+                    <div className="flex min-w-0 items-start gap-2.5">
+                      <span
+                        className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary sm:size-9"
+                        aria-hidden
+                      >
+                        <ScanFace className="size-4 sm:size-[1.125rem]" strokeWidth={1.75} />
+                      </span>
+                      <div className="min-w-0 space-y-0.5">
+                        <p className="font-display text-sm font-semibold leading-snug text-foreground">
+                          {t("checkin.success.inboxFacialAccessTitle")}
+                        </p>
+                        <p className="text-xs leading-relaxed text-muted-foreground sm:text-sm">
+                          {t("checkin.success.inboxFacialAccessBody", { time: checkinTimeLabel })}
+                        </p>
+                        <p className="text-[11px] leading-relaxed text-muted-foreground/90 sm:text-xs">
+                          {t("checkin.success.inboxFacialAccessHint")}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </CardShell>
+        )
+      ) : null}
+
       {/* Hero de sucesso */}
       <section className="relative overflow-hidden rounded-2xl border border-emerald-100 bg-[#f3faf6] shadow-sm">
         <div className="flex flex-col sm:flex-row sm:items-stretch">
@@ -586,91 +723,14 @@ export function SuccessScreen({
               />
               <InfoTile
                 icon={<DoorOpen className="size-3.5" />}
-                label={t("checkin.success.unitNumberLabel")}
-                value={reservation.unitNumber}
+                label={t("checkin.success.roomNumberLabel")}
+                value={unitNumberDisplay}
+                highlight
               />
             </div>
           </div>
         </div>
       </CardShell>
-
-      {/* Acesso à acomodação */}
-      {showAccessBlock ? (
-        isCancelled ? (
-          <CardShell className="border-destructive/40 bg-destructive/5 p-5">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="mt-0.5 size-5 shrink-0 text-destructive" aria-hidden />
-              <p className="text-sm text-destructive">{t("checkin.success.cancelledAccessNotice")}</p>
-            </div>
-          </CardShell>
-        ) : (
-          <CardShell>
-            <div className="flex items-center gap-2 bg-primary px-5 py-3.5 text-primary-foreground">
-              <KeyRound className="size-5 shrink-0" aria-hidden />
-              <h4 className="font-display text-base">{t("checkin.success.accessTitle")}</h4>
-            </div>
-            <div className="p-4 sm:p-5">
-              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:gap-x-5 sm:gap-y-3 lg:gap-x-8">
-                {accessUnit ? (
-                  <div className="min-w-0 sm:max-w-[12rem] sm:flex-none lg:max-w-[14rem]">
-                    <p className="text-xs text-muted-foreground">{t("common.unit")}</p>
-                    <p className="mt-0.5 font-display text-base leading-snug wrap-anywhere sm:text-lg">
-                      {accessUnit}
-                    </p>
-                  </div>
-                ) : null}
-                {showRoomPassword ? (
-                  <div className="min-w-0 sm:flex-none sm:max-w-[14rem] lg:max-w-[16rem]">
-                    <p className="text-xs text-muted-foreground">{t("checkin.success.accessPassword")}</p>
-                    <p className="mt-0.5 font-code text-xl font-semibold tracking-wide wrap-anywhere sm:text-2xl">
-                      {roomPassword}
-                    </p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="mt-2 gap-2 print:hidden"
-                      onClick={() => void copyPassword()}
-                    >
-                      <Copy className="size-4" aria-hidden />
-                      {t("checkin.success.copyPassword")}
-                    </Button>
-                  </div>
-                ) : null}
-                {showInboxFacialNotice ? (
-                  <div
-                    className={cn(
-                      "min-w-0 rounded-lg border border-primary/15 bg-gradient-to-br from-primary/[0.04] to-primary/[0.07] p-3 sm:p-3.5",
-                      accessUnit || showRoomPassword
-                        ? "sm:flex-1 sm:basis-[220px] lg:basis-[280px]"
-                        : "w-full",
-                    )}
-                  >
-                    <div className="flex min-w-0 items-start gap-2.5">
-                      <span
-                        className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary sm:size-9"
-                        aria-hidden
-                      >
-                        <ScanFace className="size-4 sm:size-[1.125rem]" strokeWidth={1.75} />
-                      </span>
-                      <div className="min-w-0 space-y-0.5">
-                        <p className="font-display text-sm font-semibold leading-snug text-foreground">
-                          {t("checkin.success.inboxFacialAccessTitle")}
-                        </p>
-                        <p className="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-                          {t("checkin.success.inboxFacialAccessBody", { time: checkinTimeLabel })}
-                        </p>
-                        <p className="text-[11px] leading-relaxed text-muted-foreground/90 sm:text-xs">
-                          {t("checkin.success.inboxFacialAccessHint")}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-            </div>
-          </CardShell>
-        )
-      ) : null}
 
       {/* Hóspede, pagamento e timeline */}
       <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
@@ -684,17 +744,21 @@ export function SuccessScreen({
                 <p className="text-xs text-muted-foreground">{t("common.name")}</p>
                 <p className="font-medium wrap-anywhere">{guestName || "—"}</p>
               </div>
-              {!hideGuestDetails && guest?.mobilePhoneNumber ? (
+              {!hideGuestDetails ? (
                 <div>
                   <p className="text-xs text-muted-foreground">{t("common.phone")}</p>
-                  <PhoneDisplay phone={guest.mobilePhoneNumber} className="font-medium" />
+                  {guestPhone ? (
+                    <PhoneDisplay phone={guestPhone} className="font-medium" />
+                  ) : (
+                    <p className="font-medium">—</p>
+                  )}
                 </div>
               ) : null}
               {!hideGuestDetails ? (
                 <div>
                   <p className="text-xs text-muted-foreground">{t("common.document")}</p>
                   <p className="font-medium wrap-anywhere">
-                    {formatDocumentLine(guest, locale) || "—"}
+                    {formatDocumentLine(guest, locale, documentDisplayOptions) || "—"}
                   </p>
                 </div>
               ) : null}
@@ -758,6 +822,7 @@ export function SuccessScreen({
                                   documentType: companion.documentType,
                                 },
                                 locale,
+                                documentDisplayOptions,
                               ) || "—"}
                             </p>
                           </div>
@@ -879,7 +944,7 @@ export function SuccessScreen({
                 {reservation.label ? (
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-sm text-muted-foreground">{t("checkin.success.paymentStatus")}</span>
-                    <Badge className={successPaymentBadgeClass(reservation, reservation.label)}>
+                    <Badge className={reservationStatusBadgeClass(reservation, reservation.label)}>
                       {reservation.label}
                     </Badge>
                   </div>

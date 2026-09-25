@@ -21,12 +21,18 @@ import {
   type UsefulInfoItem,
   type UsefulInfoItemKind,
 } from "@/lib/establishment-settings";
+import {
+  resolveUsefulInfoPmsProvider,
+  type UsefulInfoPmsProvider,
+} from "@/lib/useful-info-variables";
 
 type Props = {
   items: UsefulInfoItem[];
   saving: boolean;
   onChange: (items: UsefulInfoItem[]) => void;
   onSave: () => void;
+  /** Estabelecimento com token PMS VB configurado. */
+  vbEnabled?: boolean;
 };
 
 type ActiveField = "value" | "secret";
@@ -73,6 +79,7 @@ function UsefulInfoItemEditor({
   item,
   index,
   total,
+  pmsProvider,
   onUpdate,
   onRemove,
   onMove,
@@ -80,11 +87,13 @@ function UsefulInfoItemEditor({
   item: UsefulInfoItem;
   index: number;
   total: number;
+  pmsProvider: UsefulInfoPmsProvider;
   onUpdate: (patch: Partial<UsefulInfoItem>) => void;
   onRemove: () => void;
   onMove: (direction: -1 | 1) => void;
 }) {
   const { t } = useI18n();
+  const isVb = pmsProvider === "vb";
   const valueRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
   const secretRef = useRef<HTMLInputElement>(null);
   const [activeField, setActiveField] = useState<ActiveField>("value");
@@ -195,8 +204,16 @@ function UsefulInfoItemEditor({
               />
               <p className="text-xs leading-relaxed text-muted-foreground">
                 {item.kind === "access"
-                  ? t("admin.establishmentConfig.usefulInfoAccessStepsHint")
-                  : t("admin.establishmentConfig.usefulInfoParkingDetailsHint")}
+                  ? t(
+                      isVb
+                        ? "admin.establishmentConfig.usefulInfoAccessStepsHintVb"
+                        : "admin.establishmentConfig.usefulInfoAccessStepsHint",
+                    )
+                  : t(
+                      isVb
+                        ? "admin.establishmentConfig.usefulInfoParkingDetailsHintVb"
+                        : "admin.establishmentConfig.usefulInfoParkingDetailsHint",
+                    )}
               </p>
             </>
           ) : (
@@ -238,15 +255,22 @@ function UsefulInfoItemEditor({
           </div>
         ) : null}
         <div className="sm:col-span-2">
-          <UsefulInfoVariablePicker onInsert={insertToken} />
+          <UsefulInfoVariablePicker onInsert={insertToken} pmsProvider={pmsProvider} />
         </div>
       </div>
     </li>
   );
 }
 
-export function EstablishmentUsefulInfoEditor({ items, saving, onChange, onSave }: Props) {
+export function EstablishmentUsefulInfoEditor({
+  items,
+  saving,
+  onChange,
+  onSave,
+  vbEnabled = false,
+}: Props) {
   const { t } = useI18n();
+  const pmsProvider = resolveUsefulInfoPmsProvider({ vbEnabled });
 
   function updateItem(id: string, patch: Partial<UsefulInfoItem>) {
     onChange(items.map((item) => (item.id === id ? { ...item, ...patch } : item)));
@@ -279,8 +303,14 @@ export function EstablishmentUsefulInfoEditor({ items, saving, onChange, onSave 
   return (
     <div className="space-y-5">
       <div className="space-y-3">
-        <p className="text-sm text-muted-foreground">{t("admin.establishmentConfig.usefulInfoBody")}</p>
-        <UsefulInfoVariablesLegend />
+        <p className="text-sm text-muted-foreground">
+          {t(
+            pmsProvider === "vb"
+              ? "admin.establishmentConfig.usefulInfoBodyVb"
+              : "admin.establishmentConfig.usefulInfoBody",
+          )}
+        </p>
+        <UsefulInfoVariablesLegend pmsProvider={pmsProvider} />
       </div>
 
       {items.length === 0 ? (
@@ -296,6 +326,7 @@ export function EstablishmentUsefulInfoEditor({ items, saving, onChange, onSave 
               item={item}
               index={index}
               total={items.length}
+              pmsProvider={pmsProvider}
               onUpdate={(patch) => updateItem(item.id, patch)}
               onRemove={() => removeItem(item.id)}
               onMove={(direction) => moveItem(item.id, direction)}
