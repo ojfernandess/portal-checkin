@@ -232,8 +232,8 @@ export async function pmsUploadCheckinMedia(
     }
   }
 
-  const { apiFetch } = await import("@/lib/api/techospitality.server");
-  return apiFetch<unknown>(
+  const { apiFetch, unwrap } = await import("@/lib/api/techospitality.server");
+  const payload = await apiFetch<unknown>(
     `/api/reservations/hub/${encodeURIComponent(localizer)}/checkin/media`,
     {
       method: "POST",
@@ -242,4 +242,5 @@ export async function pmsUploadCheckinMedia(
       tokenScope: options.tokenScope,
     },
   );
+  return unwrap(payload);
 }

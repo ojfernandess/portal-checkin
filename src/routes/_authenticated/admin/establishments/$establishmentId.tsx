@@ -23,6 +23,7 @@ import {
   type InboxManagedUnitOption,
 } from "@/components/admin/EstablishmentInboxPanel";
 import { EstablishmentUsefulInfoEditor } from "@/components/admin/EstablishmentUsefulInfoEditor";
+import { EstablishmentWhatsAppPanel } from "@/components/admin/EstablishmentWhatsAppPanel";
 import { AdminPage, useAdminAccount } from "@/components/admin/AdminShell";
 import { PhoneDisplay } from "@/components/checkin/PhoneDisplay";
 import { Button } from "@/components/ui/button";
@@ -94,6 +95,11 @@ function EstablishmentConfigPage() {
   const [inboxUnits, setInboxUnits] = useState<InboxManagedUnitOption[]>([]);
   const [inboxConfigured, setInboxConfigured] = useState(false);
   const [inboxUnitsLoading, setInboxUnitsLoading] = useState(false);
+  const [whatsappNotifyEnabled, setWhatsappNotifyEnabled] = useState(false);
+  const [whatsappTemplateId, setWhatsappTemplateId] = useState<string | null>(null);
+  const [whatsappTemplateName, setWhatsappTemplateName] = useState<string | null>(null);
+  const [whatsappTemplateVariableCount, setWhatsappTemplateVariableCount] = useState(0);
+  const [whatsappTemplateVariableKeys, setWhatsappTemplateVariableKeys] = useState<string[]>([]);
   const [savingSettings, setSavingSettings] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -126,6 +132,11 @@ function EstablishmentConfigPage() {
         setUsefulInfoItems(settings.settings.usefulInfoItems);
         setVbApiToken(settings.settings.vbApiToken ?? "");
         setVbPhotoLinkEnabled(settings.settings.vbPhotoLinkEnabled);
+        setWhatsappNotifyEnabled(settings.settings.whatsappNotifyEnabled);
+        setWhatsappTemplateId(settings.settings.whatsappTemplateId);
+        setWhatsappTemplateName(settings.settings.whatsappTemplateName);
+        setWhatsappTemplateVariableCount(settings.settings.whatsappTemplateVariableCount);
+        setWhatsappTemplateVariableKeys(settings.settings.whatsappTemplateVariableKeys);
       })
       .finally(() => setLoading(false));
   }, [establishmentId, getEstablishment, getTerms, getContact, listFields, getSettings]);
@@ -218,6 +229,11 @@ function EstablishmentConfigPage() {
           usefulInfoItems,
           vbApiToken: vbApiToken.trim() || null,
           vbPhotoLinkEnabled,
+          whatsappNotifyEnabled,
+          whatsappTemplateId,
+          whatsappTemplateName,
+          whatsappTemplateVariableCount,
+          whatsappTemplateVariableKeys,
         },
       });
       toast.success(t("admin.establishmentConfig.settingsSaved"));
@@ -276,6 +292,7 @@ function EstablishmentConfigPage() {
             <TabsTrigger value="usefulInfo">{t("admin.establishmentConfig.tabUsefulInfo")}</TabsTrigger>
             <TabsTrigger value="security">{t("admin.establishmentConfig.tabSecurity")}</TabsTrigger>
             <TabsTrigger value="inbox">{t("admin.establishmentConfig.tabInbox")}</TabsTrigger>
+            <TabsTrigger value="whatsapp">{t("admin.establishmentConfig.tabWhatsApp")}</TabsTrigger>
             <TabsTrigger value="fields">{t("admin.establishmentConfig.tabFields")}</TabsTrigger>
           </TabsList>
 
@@ -456,6 +473,28 @@ function EstablishmentConfigPage() {
             </label>
             <Button disabled={savingSettings} onClick={() => void handleSaveSettings()}>
               {t("admin.establishmentConfig.saveSecuritySettings")}
+            </Button>
+          </TabsContent>
+
+          <TabsContent value="whatsapp" className="mt-6 space-y-4">
+            <EstablishmentWhatsAppPanel
+              establishmentId={establishmentId}
+              establishmentName={establishmentName}
+              enabled={whatsappNotifyEnabled}
+              onEnabledChange={setWhatsappNotifyEnabled}
+              templateId={whatsappTemplateId}
+              onTemplateChange={(template) => {
+                setWhatsappTemplateId(template?.id ?? null);
+                setWhatsappTemplateName(template?.name ?? null);
+                if (template) setWhatsappTemplateVariableCount(template.bodyVariableCount);
+              }}
+              variableKeys={whatsappTemplateVariableKeys}
+              onVariableKeysChange={setWhatsappTemplateVariableKeys}
+              variableCount={whatsappTemplateVariableCount}
+              onVariableCountChange={setWhatsappTemplateVariableCount}
+            />
+            <Button disabled={savingSettings} onClick={() => void handleSaveSettings()}>
+              {savingSettings ? t("common.loading") : t("admin.establishmentConfig.saveWhatsAppSettings")}
             </Button>
           </TabsContent>
 

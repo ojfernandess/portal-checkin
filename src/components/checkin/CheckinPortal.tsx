@@ -1417,13 +1417,32 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
   }
 
   return (
-    <div className={cn("min-h-screen pb-16", step === 8 ? "bg-[#F8F9FA]" : "bg-background")}>
-      <header className="border-b border-border bg-primary py-4 text-primary-foreground">
-        <div className="page-shell flex items-center justify-between gap-4">
-          <BrandLogo className="max-h-12 shrink-0 sm:max-h-14" />
-          <div className="hidden min-w-0 flex-1 text-center sm:block">
-            <p className="truncate font-display text-lg tracking-wide">{t("checkin.header.title")}</p>
-            <p className="truncate text-xs text-primary-foreground/70">{t("checkin.header.subtitle")}</p>
+    <div className={cn("min-h-screen pb-16", step === 8 ? "bg-[#F7F8FA]" : "bg-background")}>
+      <header
+        className={cn(
+          "border-b border-border bg-primary text-primary-foreground",
+          step === 8 ? "py-2.5 shadow-sm" : "py-4",
+        )}
+      >
+        <div
+          className={cn(
+            "flex items-center justify-between gap-4",
+            step === 8 ? "success-page-shell" : "page-shell",
+          )}
+        >
+          <BrandLogo className={cn("shrink-0", step === 8 ? "max-h-9 sm:max-h-10" : "max-h-12 sm:max-h-14")} />
+          <div className={cn("min-w-0 flex-1 text-center", step === 8 ? "block" : "hidden sm:block")}>
+            <p
+              className={cn(
+                "truncate font-sans font-semibold tracking-tight",
+                step === 8 ? "text-sm sm:text-base" : "font-display text-lg tracking-wide",
+              )}
+            >
+              {t("checkin.header.title")}
+            </p>
+            <p className="truncate text-[11px] text-primary-foreground/70 sm:text-xs">
+              {t("checkin.header.subtitle")}
+            </p>
           </div>
           <LanguageSwitcher
             showLabelOnMobile

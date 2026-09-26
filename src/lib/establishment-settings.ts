@@ -40,6 +40,16 @@ export type EstablishmentSettings = {
   inboxUnitMappings: InboxUnitMapping[];
   /** Comodidades, Wi-Fi e demais informações na seção "Informações úteis" do check-in concluído. */
   usefulInfoItems: UsefulInfoItem[];
+  /** Envia template WhatsApp ao hóspede após check-in concluído. */
+  whatsappNotifyEnabled: boolean;
+  /** ID do template (AgentsLabs Chat API). */
+  whatsappTemplateId: string | null;
+  /** Nome do template selecionado (somente exibição). */
+  whatsappTemplateName: string | null;
+  /** Quantidade de variáveis do corpo do template Meta. */
+  whatsappTemplateVariableCount: number;
+  /** Mapeamento ordenado {{1}}, {{2}}… → variáveis do check-in. */
+  whatsappTemplateVariableKeys: string[];
 };
 
 export const DEFAULT_ESTABLISHMENT_SETTINGS: EstablishmentSettings = {
@@ -52,6 +62,11 @@ export const DEFAULT_ESTABLISHMENT_SETTINGS: EstablishmentSettings = {
   inboxManagedUnitId: null,
   inboxUnitMappings: [],
   usefulInfoItems: [],
+  whatsappNotifyEnabled: false,
+  whatsappTemplateId: null,
+  whatsappTemplateName: null,
+  whatsappTemplateVariableCount: 0,
+  whatsappTemplateVariableKeys: [],
 };
 
 export const MAX_USEFUL_INFO_ITEMS = 20;
@@ -210,6 +225,24 @@ export function parseEstablishmentSettings(raw: unknown): EstablishmentSettings 
     inboxManagedUnitId: parseInboxManagedUnitId(settings.inboxManagedUnitId),
     inboxUnitMappings: parseInboxUnitMappings(settings.inboxUnitMappings),
     usefulInfoItems: parseUsefulInfoItems(settings.usefulInfoItems),
+    whatsappNotifyEnabled: settings.whatsappNotifyEnabled === true,
+    whatsappTemplateId:
+      typeof settings.whatsappTemplateId === "string" && settings.whatsappTemplateId.trim()
+        ? settings.whatsappTemplateId.trim()
+        : null,
+    whatsappTemplateName:
+      typeof settings.whatsappTemplateName === "string" && settings.whatsappTemplateName.trim()
+        ? settings.whatsappTemplateName.trim()
+        : null,
+    whatsappTemplateVariableCount: Number.isFinite(Number(settings.whatsappTemplateVariableCount))
+      ? Math.max(0, Math.min(20, Number(settings.whatsappTemplateVariableCount)))
+      : 0,
+    whatsappTemplateVariableKeys: Array.isArray(settings.whatsappTemplateVariableKeys)
+      ? settings.whatsappTemplateVariableKeys
+          .map((item) => String(item ?? "").trim())
+          .filter(Boolean)
+          .slice(0, 20)
+      : [],
   };
 }
 

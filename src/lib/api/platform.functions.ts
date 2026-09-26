@@ -316,6 +316,8 @@ export const platformGetTenant = createServerFn({ method: "POST" })
     );
     const branding = parseTenantSettings(tenant.settings);
     const inbox = await loadTenantInboxContext(tenantUuid);
+    const { loadTenantWhatsAppChatContext } = await import("@/lib/whatsapp-chat/tenant.server");
+    const whatsapp = await loadTenantWhatsAppChatContext(tenantUuid);
     const zepiris = await loadTenantZepirisContext(tenantUuid);
     const runtime = readZepirisRuntimeConfig();
     const zepirisOperational =
@@ -381,6 +383,13 @@ export const platformGetTenant = createServerFn({ method: "POST" })
         maskedClientId: inbox.maskedClientId,
         hasClientSecret: inbox.hasClientSecret,
         modules: inbox.modules,
+      },
+      whatsapp: {
+        configured: whatsapp.configured,
+        maskedApiToken: whatsapp.maskedApiToken,
+        organizationId: whatsapp.organizationId,
+        inboxId: whatsapp.inboxId,
+        baseUrl: whatsapp.baseUrl,
       },
       zepiris: {
         featureEnabled: zepiris.featureEnabled,
@@ -627,6 +636,48 @@ export const platformSaveTenantInboxConfig = createServerFn({ method: "POST" })
     });
 
     return { ok: true as const, inbox: refreshed };
+  });
+
+export const platformSaveTenantWhatsAppChatConfig = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth, requirePlatformAdmin])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        publicNumber: tenantPublicNumberSchema,
+        whatsappChatApiToken: z.string().max(512).nullable().optional(),
+        whatsappOrganizationId: z.string().max(64).nullable().optional(),
+        whatsappInboxId: z.string().max(64).nullable().optional(),
+        whatsappChatBaseUrl: z.string().max(512).nullable().optional(),
+        clearWhatsAppChatApiToken: z.boolean().optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const tenantUuid = await resolveTenantUuidByPublicNumber(data.publicNumber);
+    const { saveTenantWhatsAppChatSettings } = await import("@/lib/whatsapp-chat/tenant.server");
+
+    const refreshed = await saveTenantWhatsAppChatSettings(tenantUuid, {
+      whatsappChatApiToken: data.whatsappChatApiToken,
+      whatsappOrganizationId: data.whatsappOrganizationId,
+      whatsappInboxId: data.whatsappInboxId,
+      whatsappChatBaseUrl: data.whatsappChatBaseUrl,
+      clearWhatsAppChatApiToken: data.clearWhatsAppChatApiToken,
+    });
+
+    await writeAuditLog({
+      userId: context.userId,
+      tenantId: tenantUuid,
+      action: "platform.tenant.whatsapp",
+      entityType: "tenants",
+      entityId: tenantUuid,
+      newData: {
+        configured: refreshed.configured,
+        organizationId: refreshed.organizationId,
+        inboxId: refreshed.inboxId,
+      },
+    });
+
+    return { ok: true as const, whatsapp: refreshed };
   });
 
 export const platformSaveTenantZepirisConfig = createServerFn({ method: "POST" })

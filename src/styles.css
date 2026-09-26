@@ -128,6 +128,28 @@
   padding-inline: var(--shell-padding-inline, 1.25rem);
 }
 
+@utility success-stay-hub {
+  font-family: var(--font-sans);
+
+  & h1,
+  & h2,
+  & h3,
+  & h4 {
+    font-family: var(--font-sans);
+    letter-spacing: -0.015em;
+  }
+}
+
+@utility success-mobile-bar-spacer {
+  padding-bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px));
+}
+
+@media (min-width: 640px) {
+  .success-mobile-bar-spacer {
+    padding-bottom: 0;
+  }
+}
+
 @keyframes selfie-oval-pulse {
   0%,
   100% {

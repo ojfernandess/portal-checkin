@@ -31,6 +31,7 @@ import {
   platformListTenantMembers,
   platformRemoveTenantMember,
   platformSaveTenantInboxConfig,
+  platformSaveTenantWhatsAppChatConfig,
   platformSaveTenantZepirisConfig,
   platformSaveTenantPmsConfig,
   platformSaveTenantLogo,
@@ -82,6 +83,7 @@ function PlatformTenantDetailPage() {
   const featuresFn = useServerFn(platformUpdateTenantFeatures);
   const pmsFn = useServerFn(platformSaveTenantPmsConfig);
   const inboxFn = useServerFn(platformSaveTenantInboxConfig);
+  const whatsappFn = useServerFn(platformSaveTenantWhatsAppChatConfig);
   const zepirisFn = useServerFn(platformSaveTenantZepirisConfig);
   const saveLogoFn = useServerFn(platformSaveTenantLogo);
   const membersFn = useServerFn(platformListTenantMembers);
@@ -117,6 +119,13 @@ function PlatformTenantDetailPage() {
   const [inboxBaseUrl, setInboxBaseUrl] = useState("");
   const [inboxHasSecret, setInboxHasSecret] = useState(false);
   const [inboxMaskedClientId, setInboxMaskedClientId] = useState<string | null>(null);
+  const [whatsappApiToken, setWhatsappApiToken] = useState("");
+  const [whatsappOrganizationId, setWhatsappOrganizationId] = useState("");
+  const [whatsappInboxId, setWhatsappInboxId] = useState("");
+  const [whatsappBaseUrl, setWhatsappBaseUrl] = useState("");
+  const [whatsappConfigured, setWhatsappConfigured] = useState(false);
+  const [whatsappMaskedApiToken, setWhatsappMaskedApiToken] = useState<string | null>(null);
+
   const [inboxModules, setInboxModules] = useState<InboxModules>({
     portfolio: true,
     units: true,
@@ -166,6 +175,12 @@ function PlatformTenantDetailPage() {
       setInboxHasSecret(false);
       setInboxMaskedClientId(null);
       setInboxModules({ ...DEFAULT_INBOX_MODULES });
+      setWhatsappApiToken("");
+      setWhatsappOrganizationId("");
+      setWhatsappInboxId("");
+      setWhatsappBaseUrl("");
+      setWhatsappConfigured(false);
+      setWhatsappMaskedApiToken(null);
 
       const [detail, membersResult] = await Promise.all([
         getFn({ data: { publicNumber } }),
@@ -196,6 +211,12 @@ function PlatformTenantDetailPage() {
       setInboxHasSecret(detail.inbox.hasClientSecret);
       setInboxMaskedClientId(detail.inbox.maskedClientId);
       setInboxModules(detail.inbox.modules);
+      setWhatsappApiToken("");
+      setWhatsappOrganizationId(detail.whatsapp.organizationId ?? "");
+      setWhatsappInboxId(detail.whatsapp.inboxId ?? "");
+      setWhatsappBaseUrl(detail.whatsapp.baseUrl ?? "");
+      setWhatsappConfigured(detail.whatsapp.configured);
+      setWhatsappMaskedApiToken(detail.whatsapp.maskedApiToken);
       setZepirisOperational(detail.zepiris.operational);
       setZepirisGloballyEnabled(detail.zepiris.globallyEnabled);
       setZepirisApiKeyConfigured(detail.zepiris.apiKeyConfigured);
@@ -260,6 +281,12 @@ function PlatformTenantDetailPage() {
     setInboxHasSecret(detail.inbox.hasClientSecret);
     setInboxMaskedClientId(detail.inbox.maskedClientId);
     setInboxModules(detail.inbox.modules);
+    setWhatsappApiToken("");
+    setWhatsappOrganizationId(detail.whatsapp.organizationId ?? "");
+    setWhatsappInboxId(detail.whatsapp.inboxId ?? "");
+    setWhatsappBaseUrl(detail.whatsapp.baseUrl ?? "");
+    setWhatsappConfigured(detail.whatsapp.configured);
+    setWhatsappMaskedApiToken(detail.whatsapp.maskedApiToken);
     setZepirisOperational(detail.zepiris.operational);
     setZepirisGloballyEnabled(detail.zepiris.globallyEnabled);
     setZepirisApiKeyConfigured(detail.zepiris.apiKeyConfigured);
@@ -391,6 +418,29 @@ function PlatformTenantDetailPage() {
     }
   }
 
+  async function handleSaveWhatsApp() {
+    setSaving(true);
+    try {
+      await whatsappFn({
+        data: {
+          publicNumber,
+          whatsappChatApiToken: whatsappApiToken.trim() || null,
+          clearWhatsAppChatApiToken: whatsappApiToken === "__CLEAR__",
+          whatsappOrganizationId: whatsappOrganizationId.trim() || null,
+          whatsappInboxId: whatsappInboxId.trim() || null,
+          whatsappChatBaseUrl: whatsappBaseUrl.trim() || null,
+        },
+      });
+      toast.success(t("platform.tenantDetail.whatsappSaved"));
+      setWhatsappApiToken("");
+      await load();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("errors.saveFailed"));
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function handleSaveZepiris() {
     setSaving(true);
     try {
@@ -497,6 +547,7 @@ function PlatformTenantDetailPage() {
           <TabsTrigger value="features">{t("platform.tenantDetail.tabFeatures")}</TabsTrigger>
           <TabsTrigger value="pms">{t("platform.tenantDetail.tabPms")}</TabsTrigger>
           <TabsTrigger value="inbox">{t("platform.tenantDetail.tabInbox")}</TabsTrigger>
+          <TabsTrigger value="whatsapp">{t("platform.tenantDetail.tabWhatsApp")}</TabsTrigger>
           <TabsTrigger value="zepiris">{t("platform.tenantDetail.tabZepiris")}</TabsTrigger>
           <TabsTrigger value="members">{t("platform.tenantDetail.tabMembers")}</TabsTrigger>
         </TabsList>
@@ -725,6 +776,86 @@ function PlatformTenantDetailPage() {
                 </Button>
               </PlatformCard>
             )}
+          </PlatformSection>
+        </TabsContent>
+
+        <TabsContent value="whatsapp">
+          <PlatformSection
+            title={t("platform.tenantDetail.whatsappTitle")}
+            description={t("platform.tenantDetail.whatsappHint")}
+          >
+            <PlatformCard className="space-y-6">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="whatsapp-api-token">{t("platform.tenantDetail.whatsappApiToken")}</Label>
+                  <Input
+                    id="whatsapp-api-token"
+                    type="password"
+                    autoComplete="off"
+                    value={whatsappApiToken}
+                    onChange={(event) => setWhatsappApiToken(event.target.value)}
+                    placeholder={
+                      whatsappMaskedApiToken || t("platform.tenantDetail.whatsappApiTokenPlaceholder")
+                    }
+                  />
+                  {whatsappConfigured ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setWhatsappApiToken("__CLEAR__")}
+                    >
+                      {t("platform.tenantDetail.whatsappClearToken")}
+                    </Button>
+                  ) : null}
+                  <p className="text-xs text-muted-foreground">
+                    {t("platform.tenantDetail.whatsappApiTokenHint")}
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="whatsapp-organization-id">
+                    {t("platform.tenantDetail.whatsappOrganizationId")}
+                  </Label>
+                  <Input
+                    id="whatsapp-organization-id"
+                    value={whatsappOrganizationId}
+                    onChange={(event) => setWhatsappOrganizationId(event.target.value)}
+                    placeholder="00000000-0000-0000-0000-000000000000"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="whatsapp-inbox-id">{t("platform.tenantDetail.whatsappInboxId")}</Label>
+                  <Input
+                    id="whatsapp-inbox-id"
+                    value={whatsappInboxId}
+                    onChange={(event) => setWhatsappInboxId(event.target.value)}
+                    placeholder="00000000-0000-0000-0000-000000000000"
+                  />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="whatsapp-base-url">{t("platform.tenantDetail.whatsappBaseUrl")}</Label>
+                  <Input
+                    id="whatsapp-base-url"
+                    value={whatsappBaseUrl}
+                    onChange={(event) => setWhatsappBaseUrl(event.target.value)}
+                    placeholder="https://chat.agentslabs.cloud"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1 border-t border-border pt-4 text-sm">
+                <p className="font-medium">{t("platform.tenantDetail.whatsappStatus")}</p>
+                <p className="text-muted-foreground">
+                  {whatsappConfigured
+                    ? t("platform.tenantDetail.whatsappConfigured")
+                    : t("platform.tenantDetail.whatsappNotConfigured")}
+                </p>
+              </div>
+
+              <Button disabled={saving} onClick={() => void handleSaveWhatsApp()}>
+                {saving ? t("common.loading") : t("common.save")}
+              </Button>
+            </PlatformCard>
           </PlatformSection>
         </TabsContent>
 

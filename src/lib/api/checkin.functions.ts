@@ -492,11 +492,30 @@ function readMediaField(value: unknown): string | undefined {
   return normalized;
 }
 
+function flattenMediaUploadPayload(payload: unknown): Record<string, unknown> {
+  if (payload == null) return {};
+  if (typeof payload === "string") return { url: payload };
+  if (typeof payload !== "object") return {};
+
+  let source = { ...(payload as Record<string, unknown>) };
+  for (let depth = 0; depth < 3; depth++) {
+    const nestedRaw = source["data"] ?? source["media"] ?? source["result"];
+    if (!nestedRaw || typeof nestedRaw !== "object" || Array.isArray(nestedRaw)) break;
+    source = { ...source, ...(nestedRaw as Record<string, unknown>) };
+  }
+  return source;
+}
+
 function resolveUploadedMediaReference(
   source: Record<string, unknown>,
   type: "profile" | "document",
 ): { url: string; mediaId?: string | number } {
-  const mediaId = (source["mediaId"] ?? source["id"]) as string | number | undefined;
+  const mediaId = (source["mediaId"] ??
+    source["id"] ??
+    (type === "profile" ? source["profilePhotoId"] : source["documentPhotoId"])) as
+    | string
+    | number
+    | undefined;
   const candidates = [
     source["url"],
     source["fileUrl"],
@@ -516,13 +535,7 @@ function resolveUploadedMediaReference(
 }
 
 function parseMediaUpload(payload: unknown, type: "profile" | "document"): MediaUploadResult {
-  const row = payload as Record<string, unknown>;
-  const nestedRaw = row["media"] ?? row["result"];
-  const nested =
-    nestedRaw && typeof nestedRaw === "object"
-      ? (nestedRaw as Record<string, unknown>)
-      : undefined;
-  const source = nested ? { ...row, ...nested } : row;
+  const source = flattenMediaUploadPayload(payload);
   const { url, mediaId } = resolveUploadedMediaReference(source, type);
   const profilePhotoUrl =
     type === "profile" ? url : readMediaField(source["profilePhotoUrl"]);
@@ -1080,10 +1093,24 @@ export const uploadCheckinMedia = createServerFn({ method: "POST" })
       localizer: data.localizer ?? data.reservationId,
       pmsProvider: data.pmsProvider,
     });
-    if (typeof payload === "string") {
-      return parseMediaUpload({ url: payload }, data.type);
+    const parsed = parseMediaUpload(payload, data.type);
+    const resolvedUrl =
+      data.type === "profile"
+        ? (parsed.profilePhotoUrl ?? parsed.url)
+        : (parsed.documentPhotoUrl ?? parsed.url);
+    const resolvedId =
+      data.type === "profile"
+        ? (parsed.profilePhotoId ?? parsed.mediaId)
+        : (parsed.documentPhotoId ?? parsed.mediaId);
+
+    if (!resolvedUrl?.trim() && resolvedId == null) {
+      console.error("[checkin] Upload de mídia sem referência retornada pelo PMS:", payload);
+      throw new Error(
+        "O servidor não retornou a referência da foto enviada. Tente capturar novamente.",
+      );
     }
-    return parseMediaUpload(payload, data.type);
+
+    return parsed;
   });
 
 export const getEmbraturReference = createServerFn({ method: "POST" })
@@ -1729,6 +1756,24 @@ export const submitCheckin = createServerFn({ method: "POST" })
           reservationSnapshot: (data.reservationSnapshot as Reservation | undefined) ?? null,
           checkinRecordId,
         });
+
+        try {
+          const { mergeCheckinResult } = await import("./reservation-normalizer");
+          const { sendCheckinWhatsAppNotification } = await import("@/lib/whatsapp-chat/notify.server");
+          const snapshot = (data.reservationSnapshot as Reservation | undefined) ?? null;
+          const reservationForNotify =
+            snapshot && result ? mergeCheckinResult(snapshot, result) : snapshot;
+          await sendCheckinWhatsAppNotification({
+            tenantId,
+            establishmentId: String(resolvedEstablishmentId),
+            localizer: localizerCode,
+            mainGuest,
+            reservationSnapshot: reservationForNotify,
+            checkinRecordId,
+          });
+        } catch (error) {
+          console.error("[checkin] Falha ao enviar WhatsApp pós-check-in:", error);
+        }
 
         const provider =
           submittedPmsProvider ??

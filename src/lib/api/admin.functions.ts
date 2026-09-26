@@ -1276,6 +1276,11 @@ export const adminSaveSettings = createServerFn({ method: "POST" })
           .optional(),
         vbApiToken: z.string().trim().max(500).nullable().optional(),
         vbPhotoLinkEnabled: z.boolean().optional(),
+        whatsappNotifyEnabled: z.boolean().optional(),
+        whatsappTemplateId: z.string().trim().max(120).nullable().optional(),
+        whatsappTemplateName: z.string().trim().max(120).nullable().optional(),
+        whatsappTemplateVariableCount: z.number().int().min(0).max(20).optional(),
+        whatsappTemplateVariableKeys: z.array(z.string().trim().max(40)).max(20).optional(),
       })
       .parse(input),
   )
@@ -1286,6 +1291,7 @@ export const adminSaveSettings = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { parseEstablishmentSettings, MAX_SUCCESS_PAGE_PHOTO_BYTES, sanitizeUsefulInfoItems } =
       await import("@/lib/establishment-settings");
+    const { sanitizeWhatsAppTemplateVariableKeys } = await import("@/lib/whatsapp-chat/notify.server");
     const email = await getStaffEmail(adminContext);
 
     await assertEstablishmentInTenant(data.establishmentId, tenantId);
@@ -1335,6 +1341,35 @@ export const adminSaveSettings = createServerFn({ method: "POST" })
       ...(data.vbPhotoLinkEnabled !== undefined
         ? { vbPhotoLinkEnabled: data.vbPhotoLinkEnabled }
         : {}),
+      ...(data.whatsappNotifyEnabled !== undefined
+        ? { whatsappNotifyEnabled: data.whatsappNotifyEnabled }
+        : {}),
+      ...(data.whatsappTemplateId !== undefined
+        ? {
+            whatsappTemplateId:
+              data.whatsappTemplateId && data.whatsappTemplateId.trim()
+                ? data.whatsappTemplateId.trim()
+                : null,
+          }
+        : {}),
+      ...(data.whatsappTemplateName !== undefined
+        ? {
+            whatsappTemplateName:
+              data.whatsappTemplateName && data.whatsappTemplateName.trim()
+                ? data.whatsappTemplateName.trim()
+                : null,
+          }
+        : {}),
+      ...(data.whatsappTemplateVariableCount !== undefined
+        ? { whatsappTemplateVariableCount: data.whatsappTemplateVariableCount }
+        : {}),
+      ...(data.whatsappTemplateVariableKeys !== undefined
+        ? {
+            whatsappTemplateVariableKeys: sanitizeWhatsAppTemplateVariableKeys(
+              data.whatsappTemplateVariableKeys,
+            ),
+          }
+        : {}),
     };
 
     const { error } = await supabaseAdmin.from("establishment_settings").upsert(
@@ -1361,6 +1396,74 @@ export const adminSaveSettings = createServerFn({ method: "POST" })
     });
 
     return { ok: true as const };
+  });
+
+export const adminGetWhatsAppChatStatus = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth, requireTenantContext])
+  .handler(async ({ context }) => {
+    await assertAdmin(context);
+    const { tenantId } = context as AdminHandlerContext;
+    const { loadTenantWhatsAppChatContext } = await import("@/lib/whatsapp-chat/tenant.server");
+    return loadTenantWhatsAppChatContext(tenantId);
+  });
+
+export const adminListWhatsAppTemplates = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth, requireTenantContext])
+  .handler(async ({ context }) => {
+    await assertAdmin(context);
+    const { tenantId } = context as AdminHandlerContext;
+    const { resolveWhatsAppChatConfigForTenant } = await import("@/lib/whatsapp-chat/tenant.server");
+    const { listWhatsAppChatTemplates } = await import("@/lib/whatsapp-chat/client.server");
+
+    const config = await resolveWhatsAppChatConfigForTenant(tenantId);
+    if (!config) {
+      throw new Error(
+        "Integração WhatsApp não configurada. Informe token, organização e inbox no painel da plataforma ou variáveis de ambiente.",
+      );
+    }
+
+    const templates = await listWhatsAppChatTemplates(config);
+    return { templates };
+  });
+
+export const adminPreviewWhatsAppCheckinTemplate = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth, requireTenantContext])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        establishmentId: z.string().trim().min(1).max(64),
+        templateBody: z.string().trim().min(1).max(5000),
+        variableKeys: z.array(z.string().trim().max(40)).max(20),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { tenantId } = context as AdminHandlerContext;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { buildWhatsAppPreviewSampleContext, renderWhatsAppTemplatePreview } = await import(
+      "@/lib/whatsapp-chat/variables"
+    );
+    const { sanitizeWhatsAppTemplateVariableKeys } = await import("@/lib/whatsapp-chat/notify.server");
+
+    await assertEstablishmentInTenant(data.establishmentId, tenantId);
+
+    const { data: establishment } = await supabaseAdmin
+      .from("establishments")
+      .select("name")
+      .eq("establishment_id", data.establishmentId)
+      .eq("tenant_id", tenantId)
+      .maybeSingle();
+
+    const keys = sanitizeWhatsAppTemplateVariableKeys(data.variableKeys);
+    const contextPreview = buildWhatsAppPreviewSampleContext(
+      establishment?.name ?? data.establishmentId,
+    );
+
+    return {
+      preview: renderWhatsAppTemplatePreview(data.templateBody, keys, contextPreview),
+      parameters: keys.map((key) => contextPreview[key] ?? "—"),
+    };
   });
 
 export const adminListInboxManagedUnits = createServerFn({ method: "POST" })

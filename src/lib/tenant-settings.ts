@@ -19,6 +19,14 @@ export type TenantSettings = {
   inboxBaseUrl?: string | null;
   /** Módulos do painel Inbox habilitados pela empresa. */
   inboxModules?: InboxModules;
+  /** Token Bearer (ocu_…) da API WhatsApp Chat AgentsLabs. */
+  whatsappChatApiToken?: string | null;
+  /** UUID da organização na API WhatsApp Chat. */
+  whatsappOrganizationId?: string | null;
+  /** UUID da caixa WhatsApp (inboxId) para templates/envio. */
+  whatsappInboxId?: string | null;
+  /** Base URL opcional da API WhatsApp Chat. */
+  whatsappChatBaseUrl?: string | null;
 };
 
 export const DEFAULT_TENANT_SETTINGS: TenantSettings = {
@@ -27,6 +35,10 @@ export const DEFAULT_TENANT_SETTINGS: TenantSettings = {
   inboxClientSecret: null,
   inboxBaseUrl: null,
   inboxModules: { ...DEFAULT_INBOX_MODULES },
+  whatsappChatApiToken: null,
+  whatsappOrganizationId: null,
+  whatsappInboxId: null,
+  whatsappChatBaseUrl: null,
 };
 
 export const MAX_TENANT_LOGO_BYTES = 400_000;
@@ -66,6 +78,10 @@ export function parseTenantSettings(raw: unknown): TenantSettings {
     inboxClientSecret: parseOptionalString(settings.inboxClientSecret, 512),
     inboxBaseUrl: parseOptionalString(settings.inboxBaseUrl, 512),
     inboxModules: parseInboxModules(settings.inboxModules),
+    whatsappChatApiToken: parseOptionalString(settings.whatsappChatApiToken, 512),
+    whatsappOrganizationId: parseOptionalString(settings.whatsappOrganizationId, 64),
+    whatsappInboxId: parseOptionalString(settings.whatsappInboxId, 64),
+    whatsappChatBaseUrl: parseOptionalString(settings.whatsappChatBaseUrl, 512),
   };
 }
 
@@ -77,12 +93,19 @@ export function tenantSettingsForSave(input: Partial<TenantSettings>): TenantSet
     inboxClientSecret: parsed.inboxClientSecret,
     inboxBaseUrl: parsed.inboxBaseUrl,
     inboxModules: inboxModulesForSave(parsed.inboxModules),
+    whatsappChatApiToken: parsed.whatsappChatApiToken,
+    whatsappOrganizationId: parsed.whatsappOrganizationId,
+    whatsappInboxId: parsed.whatsappInboxId,
+    whatsappChatBaseUrl: parsed.whatsappChatBaseUrl,
   };
 }
 
 export function mergeTenantSettingsForSave(
   current: TenantSettings,
-  patch: Partial<TenantSettings> & { clearInboxClientSecret?: boolean },
+  patch: Partial<TenantSettings> & {
+    clearInboxClientSecret?: boolean;
+    clearWhatsAppChatApiToken?: boolean;
+  },
 ): TenantSettings {
   const next: TenantSettings = {
     ...current,
@@ -90,12 +113,25 @@ export function mergeTenantSettingsForSave(
     ...(patch.inboxClientId !== undefined ? { inboxClientId: patch.inboxClientId } : {}),
     ...(patch.inboxBaseUrl !== undefined ? { inboxBaseUrl: patch.inboxBaseUrl } : {}),
     ...(patch.inboxModules !== undefined ? { inboxModules: inboxModulesForSave(patch.inboxModules) } : {}),
+    ...(patch.whatsappOrganizationId !== undefined
+      ? { whatsappOrganizationId: patch.whatsappOrganizationId }
+      : {}),
+    ...(patch.whatsappInboxId !== undefined ? { whatsappInboxId: patch.whatsappInboxId } : {}),
+    ...(patch.whatsappChatBaseUrl !== undefined
+      ? { whatsappChatBaseUrl: patch.whatsappChatBaseUrl }
+      : {}),
   };
 
   if (patch.clearInboxClientSecret) {
     next.inboxClientSecret = null;
   } else if (patch.inboxClientSecret !== undefined) {
     next.inboxClientSecret = patch.inboxClientSecret;
+  }
+
+  if (patch.clearWhatsAppChatApiToken) {
+    next.whatsappChatApiToken = null;
+  } else if (patch.whatsappChatApiToken !== undefined) {
+    next.whatsappChatApiToken = patch.whatsappChatApiToken;
   }
 
   return tenantSettingsForSave(next);
