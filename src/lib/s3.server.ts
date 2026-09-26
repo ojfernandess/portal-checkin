@@ -27,26 +27,50 @@ function readEnv(name: string): string | undefined {
   return trimmed;
 }
 
-function readS3Config(): S3Config | null {
-  const accessKeyId = readEnv("MINIO_ACCESS_KEY") ?? readEnv("AWS_ACCESS_KEY_ID");
-  const secretAccessKey = readEnv("MINIO_SECRET_KEY") ?? readEnv("AWS_SECRET_ACCESS_KEY");
-  const bucket = readEnv("MINIO_BUCKET") ?? readEnv("AWS_S3_BUCKET");
+/** Credenciais AWS Vivakey (fotos do PMS TecHospitality) — nunca mistura com MinIO. */
+function readVivakeyS3Config(): S3Config | null {
+  const accessKeyId = readEnv("AWS_ACCESS_KEY_ID");
+  const secretAccessKey = readEnv("AWS_SECRET_ACCESS_KEY");
+  const bucket = readEnv("AWS_S3_BUCKET");
   if (!accessKeyId || !secretAccessKey || !bucket) return null;
 
   return {
     accessKeyId,
     secretAccessKey,
-    region: readEnv("MINIO_REGION") ?? readEnv("AWS_REGION") ?? "sa-east-1",
-    endpoint: readEnv("MINIO_ENDPOINT") ?? readEnv("AWS_S3_ENDPOINT"),
+    region: readEnv("AWS_REGION") ?? "sa-east-1",
+    endpoint: readEnv("AWS_S3_ENDPOINT"),
     bucket,
-    forcePathStyle:
-      readEnv("MINIO_FORCE_PATH_STYLE") !== "false" &&
-      readEnv("AWS_S3_FORCE_PATH_STYLE") !== "false",
+    forcePathStyle: readEnv("AWS_S3_FORCE_PATH_STYLE") !== "false",
   };
 }
 
+/** Storage do portal (uploads VB / MinIO). Prioriza MINIO_* sobre AWS_*. */
+function readPortalS3Config(): S3Config | null {
+  const minioAccessKey = readEnv("MINIO_ACCESS_KEY");
+  const minioSecretKey = readEnv("MINIO_SECRET_KEY");
+  const minioBucket = readEnv("MINIO_BUCKET");
+
+  if (minioAccessKey && minioSecretKey && minioBucket) {
+    return {
+      accessKeyId: minioAccessKey,
+      secretAccessKey: minioSecretKey,
+      region: readEnv("MINIO_REGION") ?? readEnv("AWS_REGION") ?? "sa-east-1",
+      endpoint: readEnv("MINIO_ENDPOINT"),
+      bucket: minioBucket,
+      forcePathStyle: readEnv("MINIO_FORCE_PATH_STYLE") !== "false",
+    };
+  }
+
+  return readVivakeyS3Config();
+}
+
+/** Alias usado por uploads do portal (MinIO/VB). */
+function readS3Config(): S3Config | null {
+  return readPortalS3Config();
+}
+
 function readS3Bucket(): string | undefined {
-  return readS3Config()?.bucket ?? readEnv("AWS_S3_BUCKET");
+  return readPortalS3Config()?.bucket ?? readEnv("AWS_S3_BUCKET");
 }
 
 function profilePhotoPrefix(): string {
@@ -80,6 +104,41 @@ function isStorageObjectKey(value?: string | null): boolean {
     trimmed.startsWith("document-photos/") ||
     trimmed.startsWith("minio:")
   );
+}
+
+function isExternalVivakeyMediaUrl(url?: string | null): boolean {
+  if (!url?.trim()) return false;
+  const trimmed = url.trim();
+  if (trimmed.startsWith("minio:") || isStorageObjectKey(trimmed)) return false;
+  return (
+    /amazonaws\.com\/vivakey\//i.test(trimmed) ||
+    /\/vivakey\/(?:profile-photos|document-photos)\//i.test(trimmed)
+  );
+}
+
+function isPortalStorageReference(
+  url?: string | null,
+  id?: string | number | null,
+): boolean {
+  const raw = url?.trim();
+  if (raw?.startsWith("minio:")) return true;
+  if (raw && isStorageObjectKey(raw)) return true;
+  if (raw?.includes("/vb/")) return true;
+
+  const idStr = id != null ? String(id).trim() : "";
+  if (idStr.includes("/vb/") || isStorageObjectKey(idStr)) return true;
+
+  const portalBucket = readPortalS3Config()?.bucket?.toLowerCase();
+  if (raw && portalBucket) {
+    try {
+      const urlBucket = new URL(raw).pathname.split("/").filter(Boolean)[0]?.toLowerCase();
+      if (urlBucket === portalBucket) return true;
+    } catch {
+      // ignore invalid URLs
+    }
+  }
+
+  return false;
 }
 
 function isUsableMediaUrl(url?: string | null): boolean {
@@ -144,11 +203,11 @@ function keySuffixLooksNumeric(key: string): boolean {
   return isNumericMediaId(suffix);
 }
 
-export function resolveObjectKey(
+function resolvePortalObjectKey(
   type: "profile" | "document",
   options: { url?: string | null; id?: string | number | null },
 ): string | undefined {
-  const bucket = readS3Bucket();
+  const bucket = readPortalS3Config()?.bucket;
   const rawUrl = options.url?.trim();
 
   if (rawUrl?.startsWith("minio:")) {
@@ -166,18 +225,39 @@ export function resolveObjectKey(
     }
   }
 
-  if (options.url && isUsableMediaUrl(options.url)) {
-    const fromPath = extractObjectKey(options.url, bucket ?? "vivakey");
-    if (fromPath && !keySuffixLooksNumeric(fromPath)) {
-      return fromPath;
+  if (options.id != null && !isNumericMediaId(options.id)) {
+    const idStr = String(options.id).trim();
+    if (idStr.includes("/") || isStorageObjectKey(idStr)) {
+      return normalizeKeyPrefix(type, idStr);
     }
   }
 
-  if (options.id != null && !isNumericMediaId(options.id)) {
-    return normalizeKeyPrefix(type, String(options.id));
+  return undefined;
+}
+
+function resolveVivakeyObjectKey(
+  type: "profile" | "document",
+  options: { url?: string | null; id?: string | number | null },
+): string | undefined {
+  const bucket = readEnv("AWS_S3_BUCKET") ?? "vivakey";
+  const rawUrl = options.url?.trim();
+  if (!rawUrl || !isExternalVivakeyMediaUrl(rawUrl)) return undefined;
+
+  const fromPath = extractObjectKey(rawUrl, bucket);
+  if (fromPath && !keySuffixLooksNumeric(fromPath)) {
+    return fromPath;
   }
 
   return undefined;
+}
+
+export function resolveObjectKey(
+  type: "profile" | "document",
+  options: { url?: string | null; id?: string | number | null },
+): string | undefined {
+  return (
+    resolvePortalObjectKey(type, options) ?? resolveVivakeyObjectKey(type, options) ?? undefined
+  );
 }
 
 function buildPublicObjectUrl(
@@ -208,9 +288,7 @@ async function getS3Client(config: S3Config) {
   });
 }
 
-async function objectExists(key: string): Promise<boolean> {
-  const config = readS3Config();
-  if (!config) return false;
+async function objectExistsWithConfig(config: S3Config, key: string): Promise<boolean> {
   try {
     const { HeadObjectCommand } = await import("@aws-sdk/client-s3");
     const client = await getS3Client(config);
@@ -219,6 +297,12 @@ async function objectExists(key: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+async function objectExists(key: string): Promise<boolean> {
+  const config = readPortalS3Config();
+  if (!config) return false;
+  return objectExistsWithConfig(config, key);
 }
 
 async function getSignedObjectUrl(config: S3Config, key: string): Promise<string> {
@@ -232,10 +316,10 @@ async function getSignedObjectUrl(config: S3Config, key: string): Promise<string
   );
 }
 
-export async function getObjectAsDataUrl(key: string): Promise<string | undefined> {
-  const config = readS3Config();
-  if (!config) return undefined;
-
+async function getObjectAsDataUrlWithConfig(
+  config: S3Config,
+  key: string,
+): Promise<string | undefined> {
   try {
     const { GetObjectCommand } = await import("@aws-sdk/client-s3");
     const client = await getS3Client(config);
@@ -252,6 +336,37 @@ export async function getObjectAsDataUrl(key: string): Promise<string | undefine
     console.error("[S3] Failed to load object:", key, error);
     return undefined;
   }
+}
+
+export async function getObjectAsDataUrl(key: string): Promise<string | undefined> {
+  const config = readPortalS3Config();
+  if (!config) return undefined;
+  return getObjectAsDataUrlWithConfig(config, key);
+}
+
+async function resolveConfigObjectToUrl(
+  config: S3Config,
+  key: string,
+): Promise<string | undefined> {
+  if (!(await objectExistsWithConfig(config, key))) return undefined;
+
+  try {
+    return await getSignedObjectUrl(config, key);
+  } catch (error) {
+    console.error("[S3] Failed to sign object URL:", error);
+  }
+
+  const dataUrl = await getObjectAsDataUrlWithConfig(config, key);
+  if (dataUrl) return dataUrl;
+
+  const region = config.region ?? readEnv("AWS_REGION") ?? "sa-east-1";
+  return buildPublicObjectUrl(
+    config.bucket,
+    key,
+    region,
+    config.endpoint,
+    config.forcePathStyle,
+  );
 }
 
 async function fetchHubMediaDataUrl(mediaId: string | number): Promise<string | undefined> {
@@ -292,36 +407,33 @@ export async function resolveMediaUrl(
   type: "profile" | "document",
   options: { url?: string | null; id?: string | number | null },
 ): Promise<string | undefined> {
-  const config = readS3Config();
-  const bucket = readS3Bucket();
-  const region = config?.region ?? readEnv("AWS_REGION") ?? "sa-east-1";
-  const endpoint = config?.endpoint ?? readEnv("AWS_S3_ENDPOINT");
-  const forcePathStyle = config?.forcePathStyle ?? readEnv("AWS_S3_FORCE_PATH_STYLE") !== "false";
-  const key = resolveObjectKey(type, options);
+  const rawUrl = options.url?.trim();
 
-  if (key && (await objectExists(key))) {
-    if (config) {
-      try {
-        return await getSignedObjectUrl(config, key);
-      } catch (error) {
-        console.error("[S3] Failed to sign object URL:", error);
-      }
-    }
-
-    const dataUrl = await getObjectAsDataUrl(key);
-    if (dataUrl) return dataUrl;
-
-    if (bucket) {
-      return buildPublicObjectUrl(bucket, key, region, endpoint, forcePathStyle);
+  // 1) Objetos do portal (MinIO / uploads VB deste app)
+  if (isPortalStorageReference(rawUrl, options.id)) {
+    const portalConfig = readPortalS3Config();
+    const portalKey = resolvePortalObjectKey(type, options);
+    if (portalConfig && portalKey) {
+      const portalUrl = await resolveConfigObjectToUrl(portalConfig, portalKey);
+      if (portalUrl) return portalUrl;
     }
   }
 
-  if (options.id != null && isNumericMediaId(options.id)) {
-    const hubDataUrl = await fetchHubMediaDataUrl(options.id);
+  // 2) API hub TecHospitality (IDs alfanuméricos Vivakey, ex.: zHryVbZ9Z0)
+  const hubMediaId = resolveHubMediaId(options);
+  if (hubMediaId) {
+    const hubDataUrl = await fetchHubMediaDataUrl(hubMediaId);
     if (hubDataUrl) return hubDataUrl;
   }
 
-  const rawUrl = options.url?.trim();
+  // 3) Bucket AWS Vivakey — caminho usado antes da integração VB/MinIO
+  const vivakeyConfig = readVivakeyS3Config();
+  const vivakeyKey = resolveVivakeyObjectKey(type, options);
+  if (vivakeyConfig && vivakeyKey) {
+    const vivakeyUrl = await resolveConfigObjectToUrl(vivakeyConfig, vivakeyKey);
+    if (vivakeyUrl) return vivakeyUrl;
+  }
+
   if (rawUrl && isUsableMediaUrl(rawUrl) && !isPlaceholderMediaUrl(rawUrl)) {
     return rawUrl;
   }
@@ -383,6 +495,21 @@ export async function enrichGuestLookupPhotos(guest: GuestLookup): Promise<Guest
   };
 }
 
+async function fetchS3UrlObjectAsDataUrl(url: string): Promise<string | undefined> {
+  const config = resolveS3ConfigForUrl(url);
+  if (!config) return undefined;
+
+  try {
+    const bucket = config.bucket;
+    const key = extractObjectKey(url, bucket);
+    if (!key) return undefined;
+    return getObjectAsDataUrlWithConfig(config, key);
+  } catch (error) {
+    console.warn("[S3] failed to load object from URL:", error);
+    return undefined;
+  }
+}
+
 export async function getCheckinPhotoDisplayUrl(
   type: "profile" | "document",
   options: { url?: string | null; id?: string | number | null },
@@ -391,10 +518,36 @@ export async function getCheckinPhotoDisplayUrl(
   if (!resolved) return undefined;
   if (resolved.startsWith("data:")) return resolved;
 
-  const key = resolveObjectKey(type, options);
-  if (key && (await objectExists(key))) {
-    const dataUrl = await getObjectAsDataUrl(key);
+  const displayOptions = { ...options, url: options.url ?? resolved };
+
+  const hubMediaId = resolveHubMediaId(displayOptions);
+  if (hubMediaId) {
+    const hubDataUrl = await fetchHubMediaDataUrl(hubMediaId);
+    if (hubDataUrl) return hubDataUrl;
+  }
+
+  const vivakeyConfig = readVivakeyS3Config();
+  const vivakeyKey = resolveVivakeyObjectKey(type, displayOptions);
+  if (vivakeyConfig && vivakeyKey) {
+    const dataUrl = await getObjectAsDataUrlWithConfig(vivakeyConfig, vivakeyKey);
     if (dataUrl) return dataUrl;
+  }
+
+  const portalConfig = readPortalS3Config();
+  const portalKey = resolvePortalObjectKey(type, displayOptions);
+  if (portalConfig && portalKey) {
+    const dataUrl = await getObjectAsDataUrlWithConfig(portalConfig, portalKey);
+    if (dataUrl) return dataUrl;
+  }
+
+  if (resolved.startsWith("http://") || resolved.startsWith("https://")) {
+    const fromS3Url = await fetchS3UrlObjectAsDataUrl(resolved);
+    if (fromS3Url) return fromS3Url;
+
+    const fetched = await fetchUrlAsBase64(resolved);
+    if (fetched) {
+      return `data:image/jpeg;base64,${fetched}`;
+    }
   }
 
   return resolved;
@@ -407,8 +560,30 @@ function stripDataUrlPrefix(value: string): string {
 
 function extractMediaIdFromUrl(url?: string | null): string | number | undefined {
   if (!url?.trim()) return undefined;
-  const match = /\/api\/media\/(\d+)/i.exec(url.trim());
+  const match = /\/api\/media\/([^/?#]+)/i.exec(url.trim());
   return match?.[1];
+}
+
+/** Chave alfanumérica em URLs Vivakey (ex.: profile-photos/zHryVbZ9Z0). */
+function extractVivakeyMediaKey(url?: string | null): string | undefined {
+  if (!url?.trim()) return undefined;
+  const match = /(?:profile-photos|document-photos)\/([^/?#]+)/i.exec(url.trim());
+  return match?.[1]?.trim() || undefined;
+}
+
+function resolveHubMediaId(options: {
+  url?: string | null;
+  id?: string | number | null;
+}): string | undefined {
+  const idStr = options.id != null ? String(options.id).trim() : "";
+  if (idStr) return idStr;
+  return extractVivakeyMediaKey(options.url) ?? undefined;
+}
+
+function resolveS3ConfigForUrl(url: string): S3Config | null {
+  if (isExternalVivakeyMediaUrl(url)) return readVivakeyS3Config();
+  if (isPortalStorageReference(url, null)) return readPortalS3Config();
+  return null;
 }
 
 function readTechospitalityToken(): string | undefined {
@@ -522,7 +697,7 @@ export async function resolvePhotoForUpload(
   type: "profile" | "document",
   options: { url?: string | null; id?: string | number | null },
 ): Promise<ResolvedPhotoUpload | undefined> {
-  const mediaId = options.id ?? extractMediaIdFromUrl(options.url);
+  const hubMediaId = resolveHubMediaId(options);
   const rawUrl = options.url?.trim();
 
   if (rawUrl && isStorageObjectKey(rawUrl)) {
@@ -540,8 +715,8 @@ export async function resolvePhotoForUpload(
     if (fromSignedUrl) return parseBase64ToUpload(fromSignedUrl);
   }
 
-  if (mediaId != null && isNumericMediaId(mediaId)) {
-    const hubDataUrl = await fetchHubMediaDataUrl(mediaId);
+  if (hubMediaId) {
+    const hubDataUrl = await fetchHubMediaDataUrl(hubMediaId);
     if (hubDataUrl?.startsWith("data:")) {
       return parseDataUrl(hubDataUrl);
     }
@@ -553,7 +728,7 @@ export async function resolvePhotoForUpload(
 
   const resolved = await getCheckinPhotoDisplayUrl(type, {
     url: options.url,
-    id: mediaId,
+    id: options.id ?? hubMediaId,
   });
   if (!resolved) return undefined;
 

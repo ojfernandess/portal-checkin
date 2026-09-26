@@ -73,7 +73,10 @@ import { useI18n } from "@/lib/i18n/context";
 import {
   companionsHaveInboxPhotoUpdates,
 } from "@/lib/companion-inbox-photos";
-import { normalizeImageDataUrlToJpeg } from "@/lib/checkin-photo-normalize";
+import {
+  isDistinctPhotoReference,
+  normalizeImageDataUrlToJpeg,
+} from "@/lib/checkin-photo-normalize";
 
 export type CheckinPortalProps = {
   initialLocalizer?: string;
@@ -188,7 +191,9 @@ function photoReplacementFlags(
   current: MainGuest,
   baseline: {
     profileUrl?: string | null;
+    profileId?: string | number;
     documentUrl?: string | null;
+    documentId?: string | number;
   },
   tracked: { profile: boolean; document: boolean },
   pending: { profile: string | null; document: string | null },
@@ -196,16 +201,22 @@ function photoReplacementFlags(
   return {
     profile:
       tracked.profile ||
-      !!pending.profile && isDataUrl(pending.profile) ||
-      (!!current.profilePhotoUrl &&
-        !!baseline.profileUrl &&
-        current.profilePhotoUrl !== baseline.profileUrl),
+      (!!pending.profile && isDataUrl(pending.profile)) ||
+      isDistinctPhotoReference(
+        pending.profile ?? current.profilePhotoUrl,
+        current.profilePhotoId,
+        baseline.profileUrl,
+        baseline.profileId,
+      ),
     document:
       tracked.document ||
-      !!pending.document && isDataUrl(pending.document) ||
-      (!!current.documentPhotoUrl &&
-        !!baseline.documentUrl &&
-        current.documentPhotoUrl !== baseline.documentUrl),
+      (!!pending.document && isDataUrl(pending.document)) ||
+      isDistinctPhotoReference(
+        pending.document ?? current.documentPhotoUrl,
+        current.documentPhotoId,
+        baseline.documentUrl,
+        baseline.documentId,
+      ),
   };
 }
 
@@ -958,11 +969,21 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
     }
     setLoading(true);
     try {
-      const uploaded = await ensureGuestPhotosUploaded({
+      const merged = buildGuestPhotos({
         ...guest,
-        profilePhotoUrl: selfie,
-        documentPhotoUrl: docPhoto,
+        profilePhotoUrl: selfie ?? undefined,
+        documentPhotoUrl: docPhoto ?? undefined,
       });
+      const replacementFlags = photoReplacementFlags(
+        merged,
+        registeredPhotoBaseline.current,
+        photosReplacedRef.current,
+        { profile: selfie, document: docPhoto },
+      );
+      const uploaded = photosNeedUpload(merged.profilePhotoUrl, merged.documentPhotoUrl)
+        ? await ensureGuestPhotosUploaded(merged)
+        : merged;
+      rememberUploadedReplacement(uploaded, replacementFlags);
       setGuest(uploaded);
       setSelfie(uploaded.profilePhotoUrl ?? null);
       setDocPhoto(uploaded.documentPhotoUrl ?? null);
@@ -1841,7 +1862,12 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
                   validationEnabled={faceValidationEnabled}
                   onValidate={validateSelfiePhoto}
                   {...exclusiveCameraProps}
-                  onCapture={(value) => setSelfie(value || null)}
+                  onCapture={(value) => {
+                    setSelfie(value || null);
+                    if (registeredPhotosActive.current && value && isDataUrl(value)) {
+                      photosReplacedRef.current.profile = true;
+                    }
+                  }}
                 />
                 <CameraCapture
                   compact
@@ -1851,7 +1877,12 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
                   captureId="document"
                   {...exclusiveCameraProps}
                   label={t("checkin.photos.documentHint")}
-                  onCapture={(value) => setDocPhoto(value || null)}
+                  onCapture={(value) => {
+                    setDocPhoto(value || null);
+                    if (registeredPhotosActive.current && value && isDataUrl(value)) {
+                      photosReplacedRef.current.document = true;
+                    }
+                  }}
                 />
               </div>
 

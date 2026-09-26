@@ -1,3 +1,42 @@
+/** Chave estável para comparar referências PMS (URL, path ou mediaId). */
+export function normalizePhotoReference(
+  url?: string | null,
+  id?: string | number | null,
+): string | null {
+  const idStr = id != null ? String(id).trim() : "";
+  const urlStr = url?.trim() ?? "";
+  if (!urlStr && !idStr) return null;
+
+  const keyMatch = urlStr.match(/(?:profile-photos|document-photos)\/([^/?#]+)/i);
+  if (keyMatch?.[1]) return keyMatch[1].toLowerCase();
+
+  if (/^\d+$/.test(idStr)) return `id:${idStr}`;
+  if (idStr) return idStr.toLowerCase();
+
+  if (urlStr.startsWith("data:")) return `data:${urlStr.length}`;
+
+  try {
+    const tail = new URL(urlStr).pathname.split("/").filter(Boolean).pop();
+    if (tail) return tail.toLowerCase();
+  } catch {
+    // ignore invalid URLs
+  }
+
+  return urlStr.toLowerCase();
+}
+
+export function isDistinctPhotoReference(
+  url?: string | null,
+  id?: string | number | null,
+  baselineUrl?: string | null,
+  baselineId?: string | number | null,
+): boolean {
+  const current = normalizePhotoReference(url, id);
+  const baseline = normalizePhotoReference(baselineUrl, baselineId);
+  if (!current || !baseline) return Boolean(current && !baseline);
+  return current !== baseline;
+}
+
 /** Converte data URLs (PNG/WebP/galeria) para JPEG — exigido pelo PMS VB. */
 export async function normalizeImageDataUrlToJpeg(
   dataUrl: string,

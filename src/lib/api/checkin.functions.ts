@@ -23,6 +23,7 @@ import {
   normalizeVbReservationDocumentTypes,
   portalDocumentTypeToVb,
 } from "@/lib/vb-document-type";
+import { isDistinctPhotoReference } from "@/lib/checkin-photo-normalize";
 
 function stripDataUrl(value: string): string {
   const match = /^data:[^;]+;base64,(.+)$/i.exec(value.trim());
@@ -128,7 +129,18 @@ type PhotoReplacementFlags = {
   document?: boolean;
 };
 
-/** Remove IDs obsoletos quando a URL mudou; preserva IDs do cadastro se a foto não foi alterada. */
+function isStaleRegisteredPhotoId(
+  currentId: string | number | undefined,
+  registeredId: string | number | undefined,
+): boolean {
+  return (
+    registeredId != null &&
+    currentId != null &&
+    String(currentId).trim() === String(registeredId).trim()
+  );
+}
+
+/** Preserva fotos do cadastro quando não alteradas; mantém mediaId novo após upload. */
 export function prepareMainGuestForCheckin(
   mainGuest: MainGuest,
   registered?: RegisteredPhotoSnapshot,
@@ -143,29 +155,41 @@ export function prepareMainGuestForCheckin(
   }
 
   const profileChanged =
-    replaced?.profile ||
-    (registered?.profileUrl &&
-      guest.profilePhotoUrl &&
-      guest.profilePhotoUrl !== registered.profileUrl);
+    replaced?.profile === true ||
+    isDistinctPhotoReference(
+      guest.profilePhotoUrl,
+      guest.profilePhotoId,
+      registered?.profileUrl,
+      registered?.profileId,
+    );
 
   const documentChanged =
-    replaced?.document ||
-    (registered?.documentUrl &&
-      guest.documentPhotoUrl &&
-      guest.documentPhotoUrl !== registered.documentUrl);
+    replaced?.document === true ||
+    isDistinctPhotoReference(
+      guest.documentPhotoUrl,
+      guest.documentPhotoId,
+      registered?.documentUrl,
+      registered?.documentId,
+    );
 
-  if (profileChanged) {
-    delete guest.profilePhotoId;
-  } else if (registered?.profileId != null && guest.profilePhotoUrl) {
+  if (!profileChanged && registered?.profileId != null && guest.profilePhotoUrl) {
     guest.profilePhotoId = registered.profileId;
     guest.profilePhotoUrl = registered.profileUrl ?? guest.profilePhotoUrl;
+  } else if (
+    profileChanged &&
+    isStaleRegisteredPhotoId(guest.profilePhotoId, registered?.profileId)
+  ) {
+    delete guest.profilePhotoId;
   }
 
-  if (documentChanged) {
-    delete guest.documentPhotoId;
-  } else if (registered?.documentId != null && guest.documentPhotoUrl) {
+  if (!documentChanged && registered?.documentId != null && guest.documentPhotoUrl) {
     guest.documentPhotoId = registered.documentId;
     guest.documentPhotoUrl = registered.documentUrl ?? guest.documentPhotoUrl;
+  } else if (
+    documentChanged &&
+    isStaleRegisteredPhotoId(guest.documentPhotoId, registered?.documentId)
+  ) {
+    delete guest.documentPhotoId;
   }
 
   delete guest.profilePhotoDisplayUrl;

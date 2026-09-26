@@ -71,6 +71,12 @@ export function RegisteredPhotoTile({
 
   useEffect(() => {
     if (editing) return;
+    if (registeredUrl?.startsWith("data:")) {
+      setDisplayUrl(registeredUrl);
+      setPhotoError(false);
+      setLoadingPhoto(false);
+      return;
+    }
     if (!registeredUrl && mediaId == null) {
       setDisplayUrl(null);
       setPhotoError(false);
@@ -90,8 +96,9 @@ export function RegisteredPhotoTile({
     })
       .then((result) => {
         if (!active) return;
-        setDisplayUrl(result.displayUrl ?? registeredUrl ?? null);
-        setPhotoError(!result.displayUrl && !registeredUrl);
+        const resolved = result.displayUrl ?? registeredUrl ?? null;
+        setDisplayUrl(resolved);
+        setPhotoError(!resolved);
       })
       .catch(() => {
         if (!active) return;
