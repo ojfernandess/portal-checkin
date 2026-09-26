@@ -100,6 +100,8 @@ function EstablishmentConfigPage() {
   const [whatsappTemplateName, setWhatsappTemplateName] = useState<string | null>(null);
   const [whatsappTemplateVariableCount, setWhatsappTemplateVariableCount] = useState(0);
   const [whatsappTemplateVariableKeys, setWhatsappTemplateVariableKeys] = useState<string[]>([]);
+  const [whatsappSendToWa, setWhatsappSendToWa] = useState(true);
+  const [whatsappInboxType, setWhatsappInboxType] = useState<"ai" | "human">("ai");
   const [savingSettings, setSavingSettings] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -137,6 +139,8 @@ function EstablishmentConfigPage() {
         setWhatsappTemplateName(settings.settings.whatsappTemplateName);
         setWhatsappTemplateVariableCount(settings.settings.whatsappTemplateVariableCount);
         setWhatsappTemplateVariableKeys(settings.settings.whatsappTemplateVariableKeys);
+        setWhatsappSendToWa(settings.settings.whatsappSendToWa);
+        setWhatsappInboxType(settings.settings.whatsappInboxType);
       })
       .finally(() => setLoading(false));
   }, [establishmentId, getEstablishment, getTerms, getContact, listFields, getSettings]);
@@ -234,6 +238,8 @@ function EstablishmentConfigPage() {
           whatsappTemplateName,
           whatsappTemplateVariableCount,
           whatsappTemplateVariableKeys,
+          whatsappSendToWa,
+          whatsappInboxType,
         },
       });
       toast.success(t("admin.establishmentConfig.settingsSaved"));
@@ -492,6 +498,10 @@ function EstablishmentConfigPage() {
               onVariableKeysChange={setWhatsappTemplateVariableKeys}
               variableCount={whatsappTemplateVariableCount}
               onVariableCountChange={setWhatsappTemplateVariableCount}
+              sendToWa={whatsappSendToWa}
+              onSendToWaChange={setWhatsappSendToWa}
+              inboxType={whatsappInboxType}
+              onInboxTypeChange={setWhatsappInboxType}
             />
             <Button disabled={savingSettings} onClick={() => void handleSaveSettings()}>
               {savingSettings ? t("common.loading") : t("admin.establishmentConfig.saveWhatsAppSettings")}

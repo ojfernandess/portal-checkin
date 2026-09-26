@@ -50,6 +50,10 @@ export type EstablishmentSettings = {
   whatsappTemplateVariableCount: number;
   /** Mapeamento ordenado {{1}}, {{2}}… → variáveis do check-in. */
   whatsappTemplateVariableKeys: string[];
+  /** Envia via WhatsApp (sendToWA); false registra só na plataforma. */
+  whatsappSendToWa: boolean;
+  /** Fila da caixa: ai (bot) ou human (atendimento humano). */
+  whatsappInboxType: "ai" | "human";
 };
 
 export const DEFAULT_ESTABLISHMENT_SETTINGS: EstablishmentSettings = {
@@ -67,6 +71,8 @@ export const DEFAULT_ESTABLISHMENT_SETTINGS: EstablishmentSettings = {
   whatsappTemplateName: null,
   whatsappTemplateVariableCount: 0,
   whatsappTemplateVariableKeys: [],
+  whatsappSendToWa: true,
+  whatsappInboxType: "ai",
 };
 
 export const MAX_USEFUL_INFO_ITEMS = 20;
@@ -243,6 +249,8 @@ export function parseEstablishmentSettings(raw: unknown): EstablishmentSettings 
           .filter(Boolean)
           .slice(0, 20)
       : [],
+    whatsappSendToWa: settings.whatsappSendToWa !== false,
+    whatsappInboxType: settings.whatsappInboxType === "human" ? "human" : "ai",
   };
 }
 

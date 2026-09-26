@@ -1,3 +1,5 @@
+export type WhatsAppInboxType = "ai" | "human";
+
 export type WhatsAppChatTemplate = {
   id: string;
   name: string;

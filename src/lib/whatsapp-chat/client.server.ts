@@ -1,4 +1,10 @@
-import type { WhatsAppChatConfig, WhatsAppChatTemplate, WhatsAppSendTemplateResult } from "./types";
+import type {
+  WhatsAppChatConfig,
+  WhatsAppChatTemplate,
+  WhatsAppInboxType,
+  WhatsAppSendTemplateResult,
+} from "./types";
+import { sanitizeWhatsAppTemplateParameterText } from "./variables";
 
 const DEFAULT_BASE_URL = "https://chat.agentslabs.cloud";
 
@@ -123,6 +129,8 @@ export async function sendWhatsAppTemplateMessage(input: {
   to: string;
   templateId: string;
   bodyParameters: string[];
+  sendToWA?: boolean;
+  inboxType?: WhatsAppInboxType;
 }): Promise<WhatsAppSendTemplateResult> {
   const urlPath = "/api/v1/sendTemplate";
   const baseUrl = (input.config.baseUrl || defaultWhatsAppChatBaseUrl()).replace(/\/$/, "");
@@ -134,12 +142,15 @@ export async function sendWhatsAppTemplateMessage(input: {
     to: input.to,
     data: {
       templateId: input.templateId,
-      sendToWA: true,
-      inboxType: "ai",
+      sendToWA: input.sendToWA !== false,
+      inboxType: input.inboxType === "human" ? "human" : "ai",
       components: [
         {
           type: "body",
-          parameters: input.bodyParameters.map((text) => ({ type: "text", text })),
+          parameters: input.bodyParameters.map((text) => ({
+            type: "text",
+            text: sanitizeWhatsAppTemplateParameterText(text),
+          })),
         },
       ],
     },

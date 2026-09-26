@@ -1281,6 +1281,8 @@ export const adminSaveSettings = createServerFn({ method: "POST" })
         whatsappTemplateName: z.string().trim().max(120).nullable().optional(),
         whatsappTemplateVariableCount: z.number().int().min(0).max(20).optional(),
         whatsappTemplateVariableKeys: z.array(z.string().trim().max(40)).max(20).optional(),
+        whatsappSendToWa: z.boolean().optional(),
+        whatsappInboxType: z.enum(["ai", "human"]).optional(),
       })
       .parse(input),
   )
@@ -1370,6 +1372,8 @@ export const adminSaveSettings = createServerFn({ method: "POST" })
             ),
           }
         : {}),
+      ...(data.whatsappSendToWa !== undefined ? { whatsappSendToWa: data.whatsappSendToWa } : {}),
+      ...(data.whatsappInboxType !== undefined ? { whatsappInboxType: data.whatsappInboxType } : {}),
     };
 
     const { error } = await supabaseAdmin.from("establishment_settings").upsert(
@@ -1441,9 +1445,11 @@ export const adminPreviewWhatsAppCheckinTemplate = createServerFn({ method: "POS
     await assertAdmin(context);
     const { tenantId } = context as AdminHandlerContext;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { buildWhatsAppPreviewSampleContext, renderWhatsAppTemplatePreview } = await import(
-      "@/lib/whatsapp-chat/variables"
-    );
+    const {
+      buildWhatsAppPreviewSampleContext,
+      renderWhatsAppTemplatePreview,
+      resolveWhatsAppTemplateParameter,
+    } = await import("@/lib/whatsapp-chat/variables");
     const { sanitizeWhatsAppTemplateVariableKeys } = await import("@/lib/whatsapp-chat/notify.server");
 
     await assertEstablishmentInTenant(data.establishmentId, tenantId);
@@ -1462,7 +1468,9 @@ export const adminPreviewWhatsAppCheckinTemplate = createServerFn({ method: "POS
 
     return {
       preview: renderWhatsAppTemplatePreview(data.templateBody, keys, contextPreview),
-      parameters: keys.map((key) => contextPreview[key] ?? "—"),
+      parameters: keys.map((key) =>
+        resolveWhatsAppTemplateParameter(key, contextPreview, { forMetaSend: false }),
+      ),
     };
   });
 

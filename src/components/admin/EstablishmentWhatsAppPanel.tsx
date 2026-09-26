@@ -17,7 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { suggestWhatsAppVariableKeys, WHATSAPP_TEMPLATE_VARIABLE_KEYS } from "@/lib/whatsapp-chat/variables";
-import type { WhatsAppChatTemplate } from "@/lib/whatsapp-chat/types";
+import type { WhatsAppChatTemplate, WhatsAppInboxType } from "@/lib/whatsapp-chat/types";
 import { useI18n } from "@/lib/i18n/context";
 
 type Props = {
@@ -31,6 +31,10 @@ type Props = {
   onVariableKeysChange: (keys: string[]) => void;
   variableCount: number;
   onVariableCountChange: (count: number) => void;
+  sendToWa: boolean;
+  onSendToWaChange: (value: boolean) => void;
+  inboxType: WhatsAppInboxType;
+  onInboxTypeChange: (value: WhatsAppInboxType) => void;
 };
 
 export function EstablishmentWhatsAppPanel({
@@ -44,6 +48,10 @@ export function EstablishmentWhatsAppPanel({
   onVariableKeysChange,
   variableCount,
   onVariableCountChange,
+  sendToWa,
+  onSendToWaChange,
+  inboxType,
+  onInboxTypeChange,
 }: Props) {
   const { t } = useI18n();
   const getStatus = useServerFn(adminGetWhatsAppChatStatus);
@@ -156,12 +164,54 @@ export function EstablishmentWhatsAppPanel({
 
   return (
     <div className="space-y-6">
-      <p className="text-sm text-muted-foreground">{t("admin.establishmentConfig.whatsappBody")}</p>
+      <div className="space-y-2 text-sm text-muted-foreground">
+        <p>{t("admin.establishmentConfig.whatsappBody")}</p>
+        <p>{t("admin.establishmentConfig.whatsappVariableHint")}</p>
+        <pre className="overflow-x-auto rounded-lg border border-border bg-muted/30 p-3 text-xs leading-relaxed whitespace-pre-wrap">
+          {t("admin.establishmentConfig.whatsappTemplateLayoutHint")}
+        </pre>
+      </div>
 
       <label className="flex items-start gap-3 rounded-lg border border-border bg-card p-4">
         <Checkbox checked={enabled} onCheckedChange={(checked) => onEnabledChange(checked === true)} />
         <span className="text-sm">{t("admin.establishmentConfig.whatsappEnable")}</span>
       </label>
+
+      <div className="flex flex-wrap items-end gap-4 rounded-lg border border-border bg-card p-4">
+        <div className="min-w-[12rem] flex-1 space-y-2">
+          <Label htmlFor="whatsapp-inbox-type">{t("admin.establishmentConfig.whatsappInboxType")}</Label>
+          <Select
+            value={inboxType}
+            onValueChange={(value) => onInboxTypeChange(value as WhatsAppInboxType)}
+          >
+            <SelectTrigger id="whatsapp-inbox-type">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ai">{t("admin.establishmentConfig.whatsappInboxTypeAi")}</SelectItem>
+              <SelectItem value="human">
+                {t("admin.establishmentConfig.whatsappInboxTypeHuman")}
+              </SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            {t("admin.establishmentConfig.whatsappInboxTypeHint")}
+          </p>
+        </div>
+
+        <label className="flex min-w-[14rem] items-start gap-3 pb-1">
+          <Checkbox
+            checked={sendToWa}
+            onCheckedChange={(checked) => onSendToWaChange(checked === true)}
+          />
+          <span className="space-y-1 text-sm">
+            <span className="block">{t("admin.establishmentConfig.whatsappSendToWa")}</span>
+            <span className="block text-xs text-muted-foreground">
+              {t("admin.establishmentConfig.whatsappSendToWaHint")}
+            </span>
+          </span>
+        </label>
+      </div>
 
       <div className="space-y-3">
         <div className="flex flex-wrap items-end gap-3">
@@ -218,7 +268,11 @@ export function EstablishmentWhatsAppPanel({
                   <SelectContent>
                     {WHATSAPP_TEMPLATE_VARIABLE_KEYS.map((key) => (
                       <SelectItem key={key} value={key}>
-                        {`{${key}}`}
+                        <span className="font-code">{`{${key}}`}</span>
+                        <span className="text-muted-foreground">
+                          {" — "}
+                          {t(`admin.establishmentConfig.whatsappVar.${key}` as never)}
+                        </span>
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -245,8 +299,9 @@ export function EstablishmentWhatsAppPanel({
               {previewParams.length > 0 ? (
                 <ul className="mt-3 space-y-1 border-t border-border/60 pt-3 text-xs text-muted-foreground">
                   {previewParams.map((value, index) => (
-                    <li key={index}>
-                      <span className="font-code">{`{{${index + 1}}}`}</span>: {value}
+                    <li key={index} className="whitespace-pre-wrap">
+                      <span className="font-code">{`{{${index + 1}}}`}</span>:
+                      <span className="mt-0.5 block pl-4 text-foreground">{value}</span>
                     </li>
                   ))}
                 </ul>

@@ -75,6 +75,8 @@ export async function sendCheckinWhatsAppNotification(
     to,
     templateId: settings.whatsappTemplateId.trim(),
     bodyParameters,
+    sendToWA: settings.whatsappSendToWa,
+    inboxType: settings.whatsappInboxType,
   });
 
   await writeAuditLog({
@@ -87,6 +89,8 @@ export async function sendCheckinWhatsAppNotification(
       localizer: input.localizer,
       to,
       templateId: settings.whatsappTemplateId,
+      sendToWA: settings.whatsappSendToWa,
+      inboxType: settings.whatsappInboxType,
       status: result.status,
       error: result.error ?? null,
     },
@@ -124,6 +128,18 @@ export function sanitizeWhatsAppTemplateVariableKeys(
     "checkout_horario",
     "noites",
     "hospedes",
+    "linha_quarto",
+    "linha_senha",
+    "linha_checkin",
+    "linha_checkout",
+    "linha_wifi_titulo",
+    "linha_wifi_rede",
+    "linha_wifi_senha",
+    "resumo_acesso",
+    "resumo_estadia",
+    "resumo_wifi",
+    "resumo_instrucoes",
+    "informacoes_checkin",
   ]);
 
   return value

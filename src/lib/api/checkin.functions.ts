@@ -1782,11 +1782,28 @@ export const submitCheckin = createServerFn({ method: "POST" })
         });
 
         try {
-          const { mergeCheckinResult } = await import("./reservation-normalizer");
+          const { mergeCheckinResult, mergeSuccessReservationFromLocalizer } = await import(
+            "./reservation-normalizer"
+          );
           const { sendCheckinWhatsAppNotification } = await import("@/lib/whatsapp-chat/notify.server");
           const snapshot = (data.reservationSnapshot as Reservation | undefined) ?? null;
-          const reservationForNotify =
-            snapshot && result ? mergeCheckinResult(snapshot, result) : snapshot;
+          let reservationForNotify = snapshot;
+          if (snapshot) {
+            try {
+              const refreshed = await fetchReservationByLocalizer(
+                localizerCode,
+                resolvedEstablishmentId ? String(resolvedEstablishmentId) : null,
+              );
+              reservationForNotify = refreshed
+                ? mergeSuccessReservationFromLocalizer(snapshot, refreshed, result)
+                : result
+                  ? mergeCheckinResult(snapshot, result)
+                  : snapshot;
+            } catch {
+              reservationForNotify =
+                result != null ? mergeCheckinResult(snapshot, result) : snapshot;
+            }
+          }
           await sendCheckinWhatsAppNotification({
             tenantId,
             establishmentId: String(resolvedEstablishmentId),
