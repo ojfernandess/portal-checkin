@@ -17,6 +17,24 @@ async function isTenantPmsEnabled(tenantId: string, provider: PmsProviderId): Pr
   return settings?.enabled !== false && settings != null;
 }
 
+/** Respeita o switch PMS VB do super admin (`tenant_pms_configs.enabled`). */
+export async function isTenantVbIntegrationEnabled(tenantId: string): Promise<boolean> {
+  const { loadTenantPmsSettings } = await import("@/lib/tenant-pms.server");
+  const settings = await loadTenantPmsSettings(tenantId, "vb");
+  if (settings != null) {
+    return settings.enabled;
+  }
+
+  // Sem linha no super admin: mantém compatibilidade com token só no estabelecimento.
+  return (await listVbEstablishmentCandidates(tenantId)).length > 0;
+}
+
+async function tenantHasVbFallbackToken(tenantId: string): Promise<boolean> {
+  const { loadTenantPmsSettings } = await import("@/lib/tenant-pms.server");
+  const settings = await loadTenantPmsSettings(tenantId, "vb");
+  return Boolean(settings?.enabled && settings.config.tokens?.api?.trim());
+}
+
 export async function listVbEstablishmentCandidates(
   tenantId?: string,
 ): Promise<Array<{ establishmentId: string; tenantId: string }>> {
@@ -49,14 +67,36 @@ export async function listVbEstablishmentCandidates(
     .filter((row): row is { establishmentId: string; tenantId: string } => row != null);
 }
 
-/** Há ao menos um estabelecimento deste tenant com token VB configurado. */
-export async function tenantHasVbEstablishments(tenantId: string): Promise<boolean> {
-  return (await listVbEstablishmentCandidates(tenantId)).length > 0;
+/** Estabelecimentos com token VB cujo tenant ainda tem integração VB habilitada no super admin. */
+export async function listEnabledVbEstablishmentCandidates(
+  tenantId?: string,
+): Promise<Array<{ establishmentId: string; tenantId: string }>> {
+  const candidates = await listVbEstablishmentCandidates(tenantId);
+  const enabledByTenant = new Map<string, boolean>();
+  const enabled: Array<{ establishmentId: string; tenantId: string }> = [];
+
+  for (const candidate of candidates) {
+    let tenantEnabled = enabledByTenant.get(candidate.tenantId);
+    if (tenantEnabled === undefined) {
+      tenantEnabled = await isTenantVbIntegrationEnabled(candidate.tenantId);
+      enabledByTenant.set(candidate.tenantId, tenantEnabled);
+    }
+    if (tenantEnabled) enabled.push(candidate);
+  }
+
+  return enabled;
 }
 
-/** Há estabelecimentos VB em qualquer tenant (check-in público sem contexto de empresa). */
+/** Há ao menos um estabelecimento deste tenant com VB ativo (token + integração habilitada). */
+export async function tenantHasVbEstablishments(tenantId: string): Promise<boolean> {
+  if (!(await isTenantVbIntegrationEnabled(tenantId))) return false;
+  if ((await listVbEstablishmentCandidates(tenantId)).length > 0) return true;
+  return tenantHasVbFallbackToken(tenantId);
+}
+
+/** Há estabelecimentos VB ativos em outro tenant (check-in público sem contexto de empresa). */
 export async function anyTenantHasVbEstablishments(): Promise<boolean> {
-  return (await listVbEstablishmentCandidates()).length > 0;
+  return (await listEnabledVbEstablishmentCandidates()).length > 0;
 }
 
 /** TecHospitality/Vivakey disponível (tenant config ou variáveis de ambiente). */
@@ -108,7 +148,12 @@ export async function resolvePmsProvider(
   if (establishmentId) {
     const { loadEstablishmentSettingsRow } = await import("@/lib/establishment-settings.server");
     const row = await loadEstablishmentSettingsRow(establishmentId);
-    if (row?.settings.vbApiToken?.trim()) return "vb";
+    if (
+      row?.settings.vbApiToken?.trim() &&
+      (await isTenantVbIntegrationEnabled(row.tenantId))
+    ) {
+      return "vb";
+    }
   }
 
   return "vivakey";
@@ -131,8 +176,16 @@ export async function resolvePmsProviderForLocalizer(
     return "vivakey";
   }
 
+  if (!(await isTenantVbIntegrationEnabled(tenantId))) {
+    return "vivakey";
+  }
+
   const vbFeature = await isTenantFeatureEnabled(tenantId, "pms_vb");
   if (vbFeature && (await isTenantPmsEnabled(tenantId, "vb"))) {
+    return "vb";
+  }
+
+  if (await tenantHasVbFallbackToken(tenantId)) {
     return "vb";
   }
 
@@ -147,5 +200,11 @@ export async function shouldTryVbLocalizer(
     return (await resolvePmsProvider(tenantId, establishmentId)) === "vb";
   }
   if (await tenantHasVbEstablishments(tenantId)) return true;
-  return anyTenantHasVbEstablishments();
+
+  const otherTenants = (await listEnabledVbEstablishmentCandidates()).some(
+    (candidate) => candidate.tenantId !== tenantId,
+  );
+  if (otherTenants) return true;
+
+  return tenantHasVbFallbackToken(tenantId);
 }

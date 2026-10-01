@@ -23,6 +23,10 @@ import {
   normalizeVbReservationDocumentTypes,
   portalDocumentTypeToVb,
 } from "@/lib/vb-document-type";
+import {
+  normalizeVbGuestDisplayName,
+  normalizeVbReservationDisplayNames,
+} from "@/lib/vb-display-names";
 import { isDistinctPhotoReference } from "@/lib/checkin-photo-normalize";
 
 function stripDataUrl(value: string): string {
@@ -101,7 +105,7 @@ async function parseLookupGuestWithPhotos(
   const guest = parseLookupGuest(payload);
   if (!guest) return null;
   if (provider === "vb") {
-    return stripLookupPhotos(guest);
+    return normalizeVbGuestDisplayName(stripLookupPhotos(guest)) ?? null;
   }
   const { enrichGuestLookupPhotos } = await import("@/lib/s3.server");
   const withMedia = await enrichGuestLookupPhotos(guest);
@@ -608,7 +612,7 @@ function applyPortalEstablishmentContext(
   }
 
   if (context.provider === "vb") {
-    next = normalizeVbReservationDocumentTypes(next);
+    next = normalizeVbReservationDisplayNames(normalizeVbReservationDocumentTypes(next));
   }
 
   return next;
@@ -1452,6 +1456,7 @@ export const getCompletedCheckinContext = createServerFn({ method: "POST" })
           const lookedUp = await parseLookupGuestWithPhotos(
             payload,
             establishmentId ? String(establishmentId) : null,
+            lookupResult.provider,
           );
           if (lookedUp) {
             mainGuest = applyMainGuestPhotoRefs(

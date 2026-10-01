@@ -157,7 +157,6 @@ export async function vbFetchLocalizerWithEstablishmentDiscovery(
   tenantId: string,
 ): Promise<{ payload: unknown; establishmentId: string }> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { listVbEstablishmentCandidates } = await import("@/lib/pms/resolve.server");
 
   const code = localizer.trim().toUpperCase();
 
@@ -173,18 +172,22 @@ export async function vbFetchLocalizerWithEstablishmentDiscovery(
   if (cached?.establishment_id) {
     const establishmentId = String(cached.establishment_id);
     const cachedTenantId = String(cached.tenant_id ?? tenantId);
-    try {
-      const payload = await vbApiFetch<unknown>(`/reservations/localizer/${encodeURIComponent(code)}`, {
-        tenantId: cachedTenantId,
-        establishmentId,
-      });
-      return { payload, establishmentId };
-    } catch {
-      // Cache desatualizado ou reserva em outro PMS — continua descoberta.
+    const { isTenantVbIntegrationEnabled } = await import("@/lib/pms/resolve.server");
+    if (await isTenantVbIntegrationEnabled(cachedTenantId)) {
+      try {
+        const payload = await vbApiFetch<unknown>(`/reservations/localizer/${encodeURIComponent(code)}`, {
+          tenantId: cachedTenantId,
+          establishmentId,
+        });
+        return { payload, establishmentId };
+      } catch {
+        // Cache desatualizado ou reserva em outro PMS — continua descoberta.
+      }
     }
   }
 
-  const tenantCandidates = await listVbEstablishmentCandidates(tenantId);
+  const { listEnabledVbEstablishmentCandidates } = await import("@/lib/pms/resolve.server");
+  const tenantCandidates = await listEnabledVbEstablishmentCandidates(tenantId);
   const tenantResult = await tryVbLocalizerAcrossCandidates(localizer, tenantCandidates).catch(
     (error) => {
       if (tenantCandidates.length === 0) return null;
@@ -193,7 +196,7 @@ export async function vbFetchLocalizerWithEstablishmentDiscovery(
   );
   if (tenantResult) return tenantResult;
 
-  const globalCandidates = (await listVbEstablishmentCandidates()).filter(
+  const globalCandidates = (await listEnabledVbEstablishmentCandidates()).filter(
     (candidate) => candidate.tenantId !== tenantId,
   );
   if (globalCandidates.length > 0) {
