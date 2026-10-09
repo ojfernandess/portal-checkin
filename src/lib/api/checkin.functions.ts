@@ -278,12 +278,23 @@ async function resolveSubmitPmsProvider(input: {
   return resolvePmsProvider(input.tenantId, input.establishmentId);
 }
 
+function stripMainGuestPhotoFieldsFromPmsRow(row: Record<string, unknown>): Record<string, unknown> {
+  const next = { ...row };
+  delete next.profilePhotoUrl;
+  delete next.documentPhotoUrl;
+  delete next.profilePhotoId;
+  delete next.documentPhotoId;
+  return next;
+}
+
 async function prepareMainGuestPayloadForPms(
   guest: MainGuest,
   input: {
     tenantId: string;
     establishmentId?: string | null;
     pmsProvider?: "vb" | "vivakey";
+    /** Pós-check-in: não reenviar mídia do titular — o PMS já possui selfie/documento. */
+    omitPhotos?: boolean;
   },
 ): Promise<Record<string, unknown>> {
   const provider = await resolveSubmitPmsProvider(input);
@@ -291,9 +302,12 @@ async function prepareMainGuestPayloadForPms(
   if (provider === "vb") {
     const vbDocumentType = portalDocumentTypeToVb(String(row["documentType"] ?? "CPF"));
     if (vbDocumentType != null) row["documentType"] = vbDocumentType;
-  } else {
+  } else if (!input.omitPhotos) {
     const { normalizePmsCheckinPhotoFields } = await import("@/lib/s3.server");
     row = normalizePmsCheckinPhotoFields(row);
+  }
+  if (input.omitPhotos) {
+    row = stripMainGuestPhotoFieldsFromPmsRow(row);
   }
   return row;
 }
@@ -1730,6 +1744,7 @@ export const submitCheckin = createServerFn({ method: "POST" })
           ? String(resolvedEstablishmentIdForTenant)
           : null,
         pmsProvider,
+        omitPhotos: purpose === "companions",
       }),
       embratur: data.embratur as unknown as EmbraturForm,
     };

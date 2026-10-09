@@ -278,22 +278,33 @@ export function normalizePmsCheckinPhotoFields(
     const urlRaw = typeof next[urlKey] === "string" ? next[urlKey].trim() : "";
     const idRaw = next[idKey];
 
-    if (idRaw != null && String(idRaw).trim() !== "" && /^\d+$/.test(String(idRaw))) {
-      delete next[urlKey];
-      next[idKey] = Number(String(idRaw));
-      continue;
-    }
-
     const objectKey = resolveObjectKey(kind, {
       url: urlRaw || undefined,
       id: idRaw as string | number | undefined,
     });
-    if (objectKey && objectKey.length <= PMS_MEDIA_KEY_NAME_MAX_LEN) {
-      const bucket = readEnv("AWS_S3_BUCKET") ?? "vivakey";
-      const region = readEnv("AWS_REGION") ?? "sa-east-1";
-      const endpoint = readEnv("AWS_S3_ENDPOINT");
-      const forcePathStyle = readEnv("AWS_S3_FORCE_PATH_STYLE") !== "false";
-      next[urlKey] = buildPublicObjectUrl(bucket, objectKey, region, endpoint, forcePathStyle);
+    const canonicalUrl =
+      objectKey && objectKey.length <= PMS_MEDIA_KEY_NAME_MAX_LEN
+        ? buildPublicObjectUrl(
+            readEnv("AWS_S3_BUCKET") ?? "vivakey",
+            objectKey,
+            readEnv("AWS_REGION") ?? "sa-east-1",
+            readEnv("AWS_S3_ENDPOINT"),
+            readEnv("AWS_S3_FORCE_PATH_STYLE") !== "false",
+          )
+        : undefined;
+
+    if (idRaw != null && String(idRaw).trim() !== "" && /^\d+$/.test(String(idRaw))) {
+      next[idKey] = Number(String(idRaw));
+      if (canonicalUrl && canonicalUrl.length <= PMS_MEDIA_KEY_NAME_MAX_LEN) {
+        next[urlKey] = canonicalUrl;
+      } else {
+        delete next[urlKey];
+      }
+      continue;
+    }
+
+    if (canonicalUrl && canonicalUrl.length <= PMS_MEDIA_KEY_NAME_MAX_LEN) {
+      next[urlKey] = canonicalUrl;
       if (idRaw != null && String(idRaw).trim() !== "") next[idKey] = idRaw;
       continue;
     }
