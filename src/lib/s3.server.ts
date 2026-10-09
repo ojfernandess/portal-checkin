@@ -260,6 +260,61 @@ export function resolveObjectKey(
   );
 }
 
+/** Limite típico da coluna `keyName` (vivakey_media_content) no PMS TecHospitality. */
+const PMS_MEDIA_KEY_NAME_MAX_LEN = 255;
+
+/**
+ * Evita enviar URLs pré-assinadas longas no POST /checkin — o backend persiste o valor em keyName.
+ * Prefere mediaId numérico; senão URL curta path-style (ex.: …/vivakey/profile-photos/…).
+ */
+export function normalizePmsCheckinPhotoFields(
+  row: Record<string, unknown>,
+): Record<string, unknown> {
+  const next = { ...row };
+
+  for (const kind of ["profile", "document"] as const) {
+    const urlKey = kind === "profile" ? "profilePhotoUrl" : "documentPhotoUrl";
+    const idKey = kind === "profile" ? "profilePhotoId" : "documentPhotoId";
+    const urlRaw = typeof next[urlKey] === "string" ? next[urlKey].trim() : "";
+    const idRaw = next[idKey];
+
+    if (idRaw != null && String(idRaw).trim() !== "" && /^\d+$/.test(String(idRaw))) {
+      delete next[urlKey];
+      next[idKey] = Number(String(idRaw));
+      continue;
+    }
+
+    const objectKey = resolveObjectKey(kind, {
+      url: urlRaw || undefined,
+      id: idRaw as string | number | undefined,
+    });
+    if (objectKey && objectKey.length <= PMS_MEDIA_KEY_NAME_MAX_LEN) {
+      const bucket = readEnv("AWS_S3_BUCKET") ?? "vivakey";
+      const region = readEnv("AWS_REGION") ?? "sa-east-1";
+      const endpoint = readEnv("AWS_S3_ENDPOINT");
+      const forcePathStyle = readEnv("AWS_S3_FORCE_PATH_STYLE") !== "false";
+      next[urlKey] = buildPublicObjectUrl(bucket, objectKey, region, endpoint, forcePathStyle);
+      if (idRaw != null && String(idRaw).trim() !== "") next[idKey] = idRaw;
+      continue;
+    }
+
+    if (urlRaw && !urlRaw.startsWith("data:")) {
+      const withoutQuery = (urlRaw.split("#")[0]?.split("?")[0] ?? urlRaw).trim();
+      if (withoutQuery.length > 0 && withoutQuery.length <= PMS_MEDIA_KEY_NAME_MAX_LEN) {
+        next[urlKey] = withoutQuery;
+      } else {
+        delete next[urlKey];
+        if (idRaw != null && String(idRaw).trim() !== "") next[idKey] = idRaw;
+      }
+      continue;
+    }
+
+    delete next[urlKey];
+  }
+
+  return next;
+}
+
 function buildPublicObjectUrl(
   bucket: string,
   key: string,

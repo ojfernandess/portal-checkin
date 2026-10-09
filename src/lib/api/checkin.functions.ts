@@ -208,6 +208,13 @@ function stripOptionalString(value: unknown): string | undefined {
   return trimmed || undefined;
 }
 
+/** Nomes usados pelo PMS (ex.: chaves Vivakey) costumam ter limite ~255 caracteres. */
+function trimPmsGuestName(value: string | undefined): string | undefined {
+  const trimmed = stripOptionalString(value);
+  if (!trimmed) return undefined;
+  return trimmed.length > 200 ? trimmed.slice(0, 200) : trimmed;
+}
+
 function normalizePhoneForApi(value: string | undefined): string {
   const raw = stripOptionalString(value);
   if (!raw) return "";
@@ -280,10 +287,13 @@ async function prepareMainGuestPayloadForPms(
   },
 ): Promise<Record<string, unknown>> {
   const provider = await resolveSubmitPmsProvider(input);
-  const row = pickMainGuestForApi(guest);
+  let row = pickMainGuestForApi(guest);
   if (provider === "vb") {
     const vbDocumentType = portalDocumentTypeToVb(String(row["documentType"] ?? "CPF"));
     if (vbDocumentType != null) row["documentType"] = vbDocumentType;
+  } else {
+    const { normalizePmsCheckinPhotoFields } = await import("@/lib/s3.server");
+    row = normalizePmsCheckinPhotoFields(row);
   }
   return row;
 }
@@ -336,7 +346,7 @@ function appendAddressFieldsToPayload(
 function pickMainGuestForApi(guest: MainGuest): Record<string, unknown> {
   const documentType = String(guest.documentType ?? "CPF");
   const row: Record<string, unknown> = {
-    name: guest.name,
+    name: trimPmsGuestName(guest.name) ?? guest.name,
     email: guest.email,
     documentNumber: normalizeGuestDocumentNumber(guest.documentNumber ?? "", documentType),
     documentType,
@@ -379,7 +389,7 @@ export function prepareDependentsForCheckin(
 
   return dependents
     .map((dependent) => {
-      const name = stripOptionalString(dependent.name);
+      const name = trimPmsGuestName(stripOptionalString(dependent.name));
       const email = stripOptionalString(dependent.email);
       const documentType = stripOptionalString(dependent.documentType) ?? "CPF";
       const documentNumber = normalizeGuestDocumentNumber(
