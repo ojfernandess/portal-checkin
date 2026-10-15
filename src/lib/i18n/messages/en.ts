@@ -446,6 +446,11 @@ export const en: MessageTree = {
       selfStayView: "View check-in information",
       selfStayVerifyBody:
         "Enter the birth date used in your companion registration to view the completed check-in details.",
+      selfRosterTitle: "Registered companions",
+      selfRosterEmpty: "No companion has registered yet.",
+      selfRosterRegisterTitle: "Register a companion",
+      selfAccessVerifyBody: "Enter {name}'s birth date to view the completed check-in details.",
+      selfAccessMissing: "Choose a companion from the list to continue.",
       selfPageWaitingMain:
         "The main guest still needs to finish check-in. Come back to this link after check-in is complete.",
     },

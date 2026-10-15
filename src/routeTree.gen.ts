@@ -17,6 +17,7 @@ import { Route as LocalizerGuestRouteImport } from './routes/$localizer_.guest'
 import { Route as AuthenticatedAdminRouteRouteImport } from './routes/_authenticated/admin/route'
 import { Route as AuthenticatedPlatformRouteRouteImport } from './routes/_authenticated/platform/route'
 import { Route as AuthSlugRouteImport } from './routes/auth.$slug'
+import { Route as LocalizerGuestAcessoRouteImport } from './routes/$localizer_.guest_.acesso'
 import { Route as AuthenticatedAdminAuditRouteImport } from './routes/_authenticated/admin/audit'
 import { Route as AuthenticatedAdminBrandingRouteImport } from './routes/_authenticated/admin/branding'
 import { Route as AuthenticatedAdminCheckinsRouteImport } from './routes/_authenticated/admin/checkins'
@@ -79,6 +80,11 @@ const AuthSlugRoute = AuthSlugRouteImport.update({
   id: '/$slug',
   path: '/$slug',
   getParentRoute: () => AuthRoute,
+} as any)
+const LocalizerGuestAcessoRoute = LocalizerGuestAcessoRouteImport.update({
+  id: '/$localizer_/guest_/acesso',
+  path: '/$localizer/guest/acesso',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedAdminAuditRoute = AuthenticatedAdminAuditRouteImport.update({
   id: '/audit',
@@ -220,6 +226,7 @@ export interface FileRoutesByFullPath {
   '/$localizer/guest': typeof LocalizerGuestRoute
   '/auth/$slug': typeof AuthSlugRoute
   '/admin/inbox': typeof AuthenticatedAdminInboxRouteRouteWithChildren
+  '/$localizer/guest/acesso': typeof LocalizerGuestAcessoRoute
   '/admin/audit': typeof AuthenticatedAdminAuditRoute
   '/admin/branding': typeof AuthenticatedAdminBrandingRoute
   '/admin/checkins': typeof AuthenticatedAdminCheckinsRoute
@@ -250,6 +257,7 @@ export interface FileRoutesByTo {
   '/platform': typeof AuthenticatedPlatformRouteRouteWithChildren
   '/$localizer/guest': typeof LocalizerGuestRoute
   '/auth/$slug': typeof AuthSlugRoute
+  '/$localizer/guest/acesso': typeof LocalizerGuestAcessoRoute
   '/admin/audit': typeof AuthenticatedAdminAuditRoute
   '/admin/branding': typeof AuthenticatedAdminBrandingRoute
   '/admin/checkins': typeof AuthenticatedAdminCheckinsRoute
@@ -283,6 +291,7 @@ export interface FileRoutesById {
   '/$localizer_/guest': typeof LocalizerGuestRoute
   '/auth/$slug': typeof AuthSlugRoute
   '/_authenticated/admin/inbox': typeof AuthenticatedAdminInboxRouteRouteWithChildren
+  '/$localizer_/guest_/acesso': typeof LocalizerGuestAcessoRoute
   '/_authenticated/admin/audit': typeof AuthenticatedAdminAuditRoute
   '/_authenticated/admin/branding': typeof AuthenticatedAdminBrandingRoute
   '/_authenticated/admin/checkins': typeof AuthenticatedAdminCheckinsRoute
@@ -316,6 +325,7 @@ export interface FileRouteTypes {
     | '/$localizer/guest'
     | '/auth/$slug'
     | '/admin/inbox'
+    | '/$localizer/guest/acesso'
     | '/admin/audit'
     | '/admin/branding'
     | '/admin/checkins'
@@ -346,6 +356,7 @@ export interface FileRouteTypes {
     | '/platform'
     | '/$localizer/guest'
     | '/auth/$slug'
+    | '/$localizer/guest/acesso'
     | '/admin/audit'
     | '/admin/branding'
     | '/admin/checkins'
@@ -378,6 +389,7 @@ export interface FileRouteTypes {
     | '/$localizer_/guest'
     | '/auth/$slug'
     | '/_authenticated/admin/inbox'
+    | '/$localizer_/guest_/acesso'
     | '/_authenticated/admin/audit'
     | '/_authenticated/admin/branding'
     | '/_authenticated/admin/checkins'
@@ -407,6 +419,7 @@ export interface RootRouteChildren {
   LocalizerRoute: typeof LocalizerRoute
   AuthRoute: typeof AuthRouteWithChildren
   LocalizerGuestRoute: typeof LocalizerGuestRoute
+  LocalizerGuestAcessoRoute: typeof LocalizerGuestAcessoRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -466,6 +479,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/auth/$slug'
       preLoaderRoute: typeof AuthSlugRouteImport
       parentRoute: typeof AuthRoute
+    }
+    '/$localizer_/guest_/acesso': {
+      id: '/$localizer_/guest_/acesso'
+      path: '/$localizer/guest/acesso'
+      fullPath: '/$localizer/guest/acesso'
+      preLoaderRoute: typeof LocalizerGuestAcessoRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_authenticated/admin/audit': {
       id: '/_authenticated/admin/audit'
@@ -745,6 +765,7 @@ const rootRouteChildren: RootRouteChildren = {
   LocalizerRoute: LocalizerRoute,
   AuthRoute: AuthRouteWithChildren,
   LocalizerGuestRoute: LocalizerGuestRoute,
+  LocalizerGuestAcessoRoute: LocalizerGuestAcessoRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

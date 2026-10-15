@@ -1530,6 +1530,11 @@ export const getCompletedCheckinContext = createServerFn({ method: "POST" })
     return loadCompletedCheckinContext(data.localizer);
   });
 
+export type CompanionRosterEntry = {
+  accessKey: string;
+  name: string;
+};
+
 export type CompanionGuestPageContext = {
   localizer: string;
   establishmentName: string;
@@ -1547,6 +1552,8 @@ export type CompanionGuestPageContext = {
   /** Selfie opcional enviada só à portaria (Inbox), não ao PMS. */
   inboxEnabled: boolean;
   faceValidationEnabled: boolean;
+  /** Nomes de quem já se cadastrou. A data de nascimento não sai desta resposta. */
+  registeredCompanions: CompanionRosterEntry[];
   /** Endereço do titular, usado só para a opção “mesmo endereço”. */
   mainGuestAddress: {
     zipCode: string;
@@ -1628,6 +1635,10 @@ export const getCompanionGuestPage = createServerFn({ method: "POST" })
       establishmentId,
       inboxEnabled,
       faceValidationEnabled,
+      registeredCompanions: (await toCompanionRoster(code, context.dependents)).map((item) => ({
+        accessKey: item.accessKey,
+        name: item.name,
+      })),
       mainGuestAddress: {
         zipCode: context.mainGuest.zipCode ?? "",
         street: context.mainGuest.street ?? "",
@@ -1640,37 +1651,36 @@ export const getCompanionGuestPage = createServerFn({ method: "POST" })
     };
   });
 
-async function listCompanionBirthDates(localizer: string): Promise<string[]> {
-  const code = localizer.trim().toUpperCase();
-  const dates = new Set<string>();
-  const push = (value: unknown) => {
-    const trimmed = typeof value === "string" ? value.trim() : "";
-    if (trimmed) dates.add(trimmed);
-  };
+async function companionAccessKey(localizer: string, dependent: Dependent): Promise<string | null> {
+  const name = dependent.name?.trim();
+  const documentKey = normalizeCompanionDocument(
+    dependent.documentNumber ?? "",
+    dependent.documentType ?? "CPF",
+  );
+  if (!name || !documentKey) return null;
+  const { createHash } = await import("node:crypto");
+  return createHash("sha256")
+    .update(`${localizer.trim().toUpperCase()}:${documentKey}`)
+    .digest("hex")
+    .slice(0, 20);
+}
 
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data: record } = await supabaseAdmin
-    .from("checkin_records")
-    .select("dependents")
-    .eq("localizer", code)
-    .order("checked_in_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  for (const dependent of asDependentList(record?.dependents)) {
-    push(dependent.birthDate);
+async function toCompanionRoster(
+  localizer: string,
+  dependents: Dependent[],
+): Promise<Array<CompanionRosterEntry & { birthDate: string }>> {
+  const roster: Array<CompanionRosterEntry & { birthDate: string }> = [];
+  for (const dependent of dependents) {
+    const name = dependent.name?.trim();
+    const accessKey = await companionAccessKey(localizer, dependent);
+    if (!name || !accessKey) continue;
+    roster.push({
+      accessKey,
+      name,
+      birthDate: dependent.birthDate?.trim() ?? "",
+    });
   }
-
-  try {
-    const reservation = await fetchReservationByLocalizer(code);
-    for (const dependent of asDependentList(reservation?.dependents)) {
-      push(dependent.birthDate);
-    }
-  } catch {
-    // A data gravada no check-in local ainda pode liberar o acesso.
-  }
-
-  return [...dates];
+  return roster;
 }
 
 /** Libera a página de check-in concluído para o acompanhante após confirmar a data de nascimento. */
@@ -1680,6 +1690,7 @@ export const getCompanionCompletedStay = createServerFn({ method: "POST" })
       .object({
         localizer: LOCALIZER_SCHEMA,
         birthDate: z.string().trim().max(32).optional(),
+        companionKey: z.string().trim().max(64).optional(),
       })
       .parse(input),
   )
@@ -1704,10 +1715,23 @@ export const getCompanionCompletedStay = createServerFn({ method: "POST" })
     const settings = settingsRow?.settings;
     const provided = data.birthDate?.trim();
     if (!provided) return { access: "verify" as const };
-    const expectedDates = await listCompanionBirthDates(code);
-    if (expectedDates.length === 0) return { access: "unavailable" as const };
-    if (!expectedDates.some((expected) => birthDatesMatch(expected, provided))) {
-      return { access: "denied" as const };
+
+    const stayContext = await loadCompletedCheckinContext(code);
+    const roster = await toCompanionRoster(code, stayContext.dependents);
+    const multiCompanion = stayContext.guestsQuantity >= 3;
+    if (multiCompanion) {
+      const companion = roster.find((item) => item.accessKey === data.companionKey?.trim());
+      if (!companion) return { access: "denied" as const };
+      if (!companion.birthDate || !birthDatesMatch(companion.birthDate, provided)) {
+        return companion.birthDate ? ({ access: "denied" as const }) : ({ access: "unavailable" as const });
+      }
+    } else if (
+      roster.length === 0 ||
+      !roster.some((item) => item.birthDate && birthDatesMatch(item.birthDate, provided))
+    ) {
+      return roster.some((item) => item.birthDate)
+        ? ({ access: "denied" as const })
+        : ({ access: "unavailable" as const });
     }
 
     return {

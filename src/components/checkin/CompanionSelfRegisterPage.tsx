@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { CalendarRange, CircleCheck, Loader2 } from "lucide-react";
+import { CalendarRange, ChevronRight, CircleCheck, Loader2 } from "lucide-react";
 import { BrandLogo } from "@/components/BrandLogo";
 import { CompanionsStep } from "@/components/checkin/CompanionsStep";
 import { ReaccessIdentityGate } from "@/components/checkin/ReaccessIdentityGate";
@@ -52,6 +53,8 @@ export function CompanionSelfRegisterPage({ localizer }: Props) {
   const [birthDateError, setBirthDateError] = useState("");
   const [verifying, setVerifying] = useState(false);
   const [stay, setStay] = useState<UnlockedStay | null>(null);
+  const [formKey, setFormKey] = useState(0);
+  const multiCompanion = (context?.guestsQuantity ?? 0) >= 3;
 
   useEffect(() => {
     let cancelled = false;
@@ -61,7 +64,7 @@ export function CompanionSelfRegisterPage({ localizer }: Props) {
       .then((page) => {
         if (cancelled) return;
         setContext(page);
-        if (!page.canRegister && page.blockedReason === "no_slots") {
+        if (page.guestsQuantity < 3 && !page.canRegister && page.blockedReason === "no_slots") {
           setPhase("verify");
         }
       })
@@ -111,9 +114,15 @@ export function CompanionSelfRegisterPage({ localizer }: Props) {
           dependents: next as unknown as Record<string, unknown>[],
         },
       });
+      toast.success(t("checkin.companions.selfPageSaved"));
+      if ((context?.guestsQuantity ?? 0) >= 3) {
+        const page = await loadPage({ data: { localizer: code } });
+        setContext(page);
+        setFormKey((current) => current + 1);
+        return;
+      }
       setDone(true);
       setPhase("verify");
-      toast.success(t("checkin.companions.selfPageSaved"));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t("checkin.companions.selfPageSaveFailed"));
     } finally {
@@ -239,6 +248,66 @@ export function CompanionSelfRegisterPage({ localizer }: Props) {
               <p className="rounded-2xl border border-destructive/30 bg-card p-5 text-sm text-destructive shadow-card">
                 {error}
               </p>
+            ) : multiCompanion ? (
+              <>
+                <section className="space-y-3 rounded-2xl border border-border bg-card p-5 shadow-card">
+                  <h2 className="font-display text-xl">{t("checkin.companions.selfRosterTitle")}</h2>
+                  {(context?.registeredCompanions.length ?? 0) === 0 ? (
+                    <p className="text-sm text-muted-foreground">{t("checkin.companions.selfRosterEmpty")}</p>
+                  ) : (
+                    <ul className="space-y-2">
+                      {context?.registeredCompanions.map((companion) => (
+                        <li key={companion.accessKey}>
+                          <Link
+                            to="/$localizer/guest/acesso"
+                            params={{ localizer: code }}
+                            search={{ c: companion.accessKey }}
+                            className="flex items-center justify-between gap-3 rounded-xl border border-border px-4 py-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+                          >
+                            <span>{companion.name}</span>
+                            <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </section>
+                {context?.canRegister ? (
+                  <>
+                    <h2 className="font-display text-xl">{t("checkin.companions.selfRosterRegisterTitle")}</h2>
+                    <CompanionsStep
+                      key={formKey}
+                      guestsQuantity={(context.remainingSlots ?? 0) + 1}
+                      mainGuest={{
+                        documentNumber: context.mainGuestDocumentNumber ?? "",
+                        documentType: context.mainGuestDocumentType ?? "CPF",
+                        zipCode: context.mainGuestAddress.zipCode ?? "",
+                        street: context.mainGuestAddress.street ?? "",
+                        number: context.mainGuestAddress.number ?? "",
+                        neighborhood: context.mainGuestAddress.neighborhood ?? "",
+                        city: context.mainGuestAddress.city ?? "",
+                        state: context.mainGuestAddress.state ?? "",
+                        country: context.mainGuestAddress.country ?? "",
+                      }}
+                      dependents={[]}
+                      mode="postCheckin"
+                      selfService
+                      lockedCount={0}
+                      saving={saving}
+                      inboxEnabled={context.inboxEnabled === true}
+                      faceValidationEnabled={context.faceValidationEnabled === true}
+                      onValidateSelfie={validateSelfiePhoto}
+                      onChange={() => undefined}
+                      onBack={() => undefined}
+                      onContinue={(next) => void handleSubmit(next)}
+                    />
+                  </>
+                ) : (context?.registeredCompanions.length ?? 0) === 0 ? (
+                  <p className="rounded-2xl border border-border bg-card p-5 text-sm text-muted-foreground shadow-card">
+                    {blockedMessage(context?.blockedReason, t)}
+                  </p>
+                ) : null}
+              </>
             ) : phase === "verify" && checkinComplete ? (
               <>
                 {done ? (

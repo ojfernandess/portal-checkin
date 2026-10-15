@@ -446,6 +446,12 @@ export const ptBR = {
       selfStayView: "Ver informações do check-in",
       selfStayVerifyBody:
         "Informe a data de nascimento usada no seu cadastro de acompanhante para visualizar os dados do check-in concluído.",
+      selfRosterTitle: "Acompanhantes cadastrados",
+      selfRosterEmpty: "Nenhum acompanhante se cadastrou ainda.",
+      selfRosterRegisterTitle: "Cadastrar acompanhante",
+      selfAccessVerifyBody:
+        "Informe a data de nascimento de {name} para ver as informações do check-in concluído.",
+      selfAccessMissing: "Escolha um acompanhante na lista para continuar.",
       selfPageWaitingMain:
         "O hóspede principal ainda precisa concluir o check-in. Volte a este link depois que o check-in for finalizado.",
     },

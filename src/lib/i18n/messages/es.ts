@@ -448,6 +448,12 @@ export const es: MessageTree = {
       selfStayView: "Ver información del check-in",
       selfStayVerifyBody:
         "Informe la fecha de nacimiento usada en su registro de acompañante para ver los datos del check-in concluido.",
+      selfRosterTitle: "Acompañantes registrados",
+      selfRosterEmpty: "Ningún acompañante se ha registrado todavía.",
+      selfRosterRegisterTitle: "Registrar acompañante",
+      selfAccessVerifyBody:
+        "Informe la fecha de nacimiento de {name} para ver la información del check-in concluido.",
+      selfAccessMissing: "Elija un acompañante de la lista para continuar.",
       selfPageWaitingMain:
         "El huésped principal aún debe concluir el check-in. Vuelva a este enlace después de finalizarlo.",
     },
