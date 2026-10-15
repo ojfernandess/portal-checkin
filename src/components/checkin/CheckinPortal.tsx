@@ -1799,6 +1799,7 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
           {step === 4 && subStep === "companions" && (
             <CompanionsStep
               guestsQuantity={guestsQuantity}
+              localizer={String(reservation?.localizer ?? localizer)}
               mainGuest={guest}
               dependents={dependents}
               inboxEnabled={establishmentSettings.inboxEnabled}
@@ -1988,6 +1989,7 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
                       <CompanionsStep
                         mode="postCheckin"
                         guestsQuantity={postCompanionsContext.guestsQuantity}
+                        localizer={String(reservation?.localizer ?? localizer)}
                         mainGuest={postCompanionsContext.mainGuest}
                         dependents={postCompanionsDraft}
                         lockedCount={postCompanionsLockedCount}

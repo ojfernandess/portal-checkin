@@ -422,6 +422,34 @@ export const es: MessageTree = {
       inboxPhotoSaved: "Foto del acompañante enviada a portinería.",
       inboxPhotoSaveFailed: "No se pudo enviar la foto del acompañante a portinería.",
       postNeedNewOrPhoto: "Agregue un nuevo acompañante o envíe la foto de acceso a portinería.",
+      selfLinkTitle: "Enviar enlace al acompañante",
+      selfLinkBody:
+        "El acompañante puede completar su propio registro en este enlace. La dirección termina en /guest.",
+      selfLinkBodyPending:
+        "Envíe este enlace ahora. El acompañante podrá concluir el registro después de que usted finalice el check-in.",
+      selfLinkCopy: "Copiar enlace",
+      selfLinkCopied: "Enlace copiado",
+      selfLinkCopyFailed: "No fue posible copiar el enlace.",
+      selfLinkShare: "Compartir",
+      selfLinkShareTitle: "Registro de acompañante",
+      selfLinkShareText: "Complete su registro de acompañante de la reserva {localizer}:",
+      selfPageEyebrow: "Registro de acompañante",
+      selfPageTitle: "Haga su registro",
+      selfPageBody: "Reserva en {establishment} · localizador {localizer}",
+      selfPageBodyGeneric: "Localizador {localizer}",
+      selfPageSubmit: "Enviar mi registro",
+      selfPageSubmitting: "Su registro se está concluyendo. Espere.",
+      selfPageSaved: "Registro enviado con éxito.",
+      selfPageSaveFailed: "No fue posible enviar el registro.",
+      selfPageLoadFailed: "No fue posible abrir el registro de esta reserva.",
+      selfPageDoneTitle: "Registro concluido",
+      selfPageDoneBody:
+        "Sus datos fueron enviados. Confirme la fecha de nacimiento de su registro para ver la información del check-in.",
+      selfStayView: "Ver información del check-in",
+      selfStayVerifyBody:
+        "Informe la fecha de nacimiento usada en su registro de acompañante para ver los datos del check-in concluido.",
+      selfPageWaitingMain:
+        "El huésped principal aún debe concluir el check-in. Vuelva a este enlace después de finalizarlo.",
     },
     errors: {
       intro: "Corrija lo siguiente antes de continuar:",

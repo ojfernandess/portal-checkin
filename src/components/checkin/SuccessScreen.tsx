@@ -43,6 +43,7 @@ import { cn } from "@/lib/utils";
 import { mergeGuests, resolveReservationUnitDisplay } from "@/lib/api/reservation-normalizer";
 import type { Dependent, GuestLookup, Reservation } from "@/lib/api/types";
 import { companionNeedsInboxPhoto } from "@/lib/companion-inbox-photos";
+import { CompanionInviteLink } from "@/components/checkin/CompanionInviteLink";
 import type { ExclusiveCameraProps } from "@/lib/camera-utils";
 import type { SelfieValidationOutcome } from "@/components/checkin/SelfieCapture";
 import type { UsefulInfoItem, UsefulInfoItemKind } from "@/lib/establishment-settings";
@@ -1041,6 +1042,11 @@ export function SuccessScreen({
               </Button>
             ) : null}
           </div>
+          {showAddCompanionsOption && !addingCompanions && !hideGuestDetails && reservation.localizer ? (
+            <div className="mb-4">
+              <CompanionInviteLink localizer={String(reservation.localizer)} />
+            </div>
+          ) : null}
 
           {addingCompanions && companionsEditor ? (
             <div>{companionsEditor}</div>

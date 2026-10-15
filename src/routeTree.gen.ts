@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as LocalizerRouteImport } from './routes/$localizer'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as LocalizerGuestRouteImport } from './routes/$localizer_.guest'
 import { Route as AuthenticatedAdminRouteRouteImport } from './routes/_authenticated/admin/route'
 import { Route as AuthenticatedPlatformRouteRouteImport } from './routes/_authenticated/platform/route'
 import { Route as AuthSlugRouteImport } from './routes/auth.$slug'
@@ -56,6 +57,11 @@ const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LocalizerGuestRoute = LocalizerGuestRouteImport.update({
+  id: '/$localizer_/guest',
+  path: '/$localizer/guest',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedAdminRouteRoute = AuthenticatedAdminRouteRouteImport.update({
@@ -211,6 +217,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRouteWithChildren
   '/admin': typeof AuthenticatedAdminRouteRouteWithChildren
   '/platform': typeof AuthenticatedPlatformRouteRouteWithChildren
+  '/$localizer/guest': typeof LocalizerGuestRoute
   '/auth/$slug': typeof AuthSlugRoute
   '/admin/inbox': typeof AuthenticatedAdminInboxRouteRouteWithChildren
   '/admin/audit': typeof AuthenticatedAdminAuditRoute
@@ -241,6 +248,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRouteWithChildren
   '/admin': typeof AuthenticatedAdminRouteRouteWithChildren
   '/platform': typeof AuthenticatedPlatformRouteRouteWithChildren
+  '/$localizer/guest': typeof LocalizerGuestRoute
   '/auth/$slug': typeof AuthSlugRoute
   '/admin/audit': typeof AuthenticatedAdminAuditRoute
   '/admin/branding': typeof AuthenticatedAdminBrandingRoute
@@ -272,6 +280,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRouteWithChildren
   '/_authenticated/admin': typeof AuthenticatedAdminRouteRouteWithChildren
   '/_authenticated/platform': typeof AuthenticatedPlatformRouteRouteWithChildren
+  '/$localizer_/guest': typeof LocalizerGuestRoute
   '/auth/$slug': typeof AuthSlugRoute
   '/_authenticated/admin/inbox': typeof AuthenticatedAdminInboxRouteRouteWithChildren
   '/_authenticated/admin/audit': typeof AuthenticatedAdminAuditRoute
@@ -304,6 +313,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/admin'
     | '/platform'
+    | '/$localizer/guest'
     | '/auth/$slug'
     | '/admin/inbox'
     | '/admin/audit'
@@ -334,6 +344,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/admin'
     | '/platform'
+    | '/$localizer/guest'
     | '/auth/$slug'
     | '/admin/audit'
     | '/admin/branding'
@@ -364,6 +375,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/_authenticated/admin'
     | '/_authenticated/platform'
+    | '/$localizer_/guest'
     | '/auth/$slug'
     | '/_authenticated/admin/inbox'
     | '/_authenticated/admin/audit'
@@ -394,6 +406,7 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   LocalizerRoute: typeof LocalizerRoute
   AuthRoute: typeof AuthRouteWithChildren
+  LocalizerGuestRoute: typeof LocalizerGuestRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -424,6 +437,13 @@ declare module '@tanstack/react-router' {
       path: '/auth'
       fullPath: '/auth'
       preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/$localizer_/guest': {
+      id: '/$localizer_/guest'
+      path: '/$localizer/guest'
+      fullPath: '/$localizer/guest'
+      preLoaderRoute: typeof LocalizerGuestRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/admin': {
@@ -724,6 +744,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   LocalizerRoute: LocalizerRoute,
   AuthRoute: AuthRouteWithChildren,
+  LocalizerGuestRoute: LocalizerGuestRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

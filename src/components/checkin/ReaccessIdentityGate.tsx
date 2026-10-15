@@ -10,8 +10,10 @@ type Props = {
   birthDateError: string;
   verifying: boolean;
   onBirthDateChange: (value: string) => void;
-  onBack: () => void;
+  onBack?: () => void;
   onContinue: () => void;
+  title?: string;
+  body?: string;
 };
 
 export function ReaccessIdentityGate({
@@ -21,6 +23,8 @@ export function ReaccessIdentityGate({
   onBirthDateChange,
   onBack,
   onContinue,
+  title,
+  body,
 }: Props) {
   const { t } = useI18n();
 
@@ -36,10 +40,10 @@ export function ReaccessIdentityGate({
             <ShieldCheck className="relative size-9 text-primary" strokeWidth={1.75} />
           </div>
           <h2 className="font-display text-2xl leading-tight text-foreground">
-            {t("checkin.reaccess.birthDateVerifyTitle")}
+            {title ?? t("checkin.reaccess.birthDateVerifyTitle")}
           </h2>
           <p className="mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
-            {t("checkin.reaccess.birthDateVerifyBody")}
+            {body ?? t("checkin.reaccess.birthDateVerifyBody")}
           </p>
         </div>
 
@@ -85,9 +89,11 @@ export function ReaccessIdentityGate({
       </div>
 
       <div className="flex gap-3">
-        <Button variant="outline" className="tap-safe" disabled={verifying} onClick={onBack}>
-          {t("common.back")}
-        </Button>
+        {onBack ? (
+          <Button variant="outline" className="tap-safe" disabled={verifying} onClick={onBack}>
+            {t("common.back")}
+          </Button>
+        ) : null}
         <Button
           className="tap-safe flex-1"
           disabled={!birthDateInput.trim() || verifying}

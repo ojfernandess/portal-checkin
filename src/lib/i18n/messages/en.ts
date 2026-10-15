@@ -421,6 +421,33 @@ export const en: MessageTree = {
       inboxPhotoSaved: "Companion photo sent to front desk.",
       inboxPhotoSaveFailed: "Could not send the companion photo to front desk.",
       postNeedNewOrPhoto: "Add a new companion or send the front desk access photo.",
+      selfLinkTitle: "Send a link to the companion",
+      selfLinkBody: "The companion can complete their own registration on this link. The address ends with /guest.",
+      selfLinkBodyPending:
+        "Share this link now. The companion can finish registration after you complete check-in.",
+      selfLinkCopy: "Copy link",
+      selfLinkCopied: "Link copied",
+      selfLinkCopyFailed: "Could not copy the link.",
+      selfLinkShare: "Share",
+      selfLinkShareTitle: "Companion registration",
+      selfLinkShareText: "Complete your companion registration for reservation {localizer}:",
+      selfPageEyebrow: "Companion registration",
+      selfPageTitle: "Complete your registration",
+      selfPageBody: "Stay at {establishment} · locator {localizer}",
+      selfPageBodyGeneric: "Locator {localizer}",
+      selfPageSubmit: "Submit my registration",
+      selfPageSubmitting: "Your registration is being completed. Please wait.",
+      selfPageSaved: "Registration sent successfully.",
+      selfPageSaveFailed: "Could not send the registration.",
+      selfPageLoadFailed: "Could not open registration for this reservation.",
+      selfPageDoneTitle: "Registration complete",
+      selfPageDoneBody:
+        "Your details were sent. Confirm the birth date from your registration to see the completed check-in information.",
+      selfStayView: "View check-in information",
+      selfStayVerifyBody:
+        "Enter the birth date used in your companion registration to view the completed check-in details.",
+      selfPageWaitingMain:
+        "The main guest still needs to finish check-in. Come back to this link after check-in is complete.",
     },
     errors: {
       intro: "Please fix the following before continuing:",

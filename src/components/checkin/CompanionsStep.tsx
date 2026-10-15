@@ -20,6 +20,7 @@ import { getEmbraturReference } from "@/lib/api/checkin.functions";
 import type { Dependent, MainGuest } from "@/lib/api/types";
 import { CompanionInboxPhotoTile } from "@/components/checkin/CompanionInboxPhotoTile";
 import { companionNeedsInboxPhoto, companionsHaveInboxPhotoUpdates } from "@/lib/companion-inbox-photos";
+import { CompanionInviteLink } from "@/components/checkin/CompanionInviteLink";
 import { normalizeEmbratur } from "@/lib/embratur";
 import type { ExclusiveCameraProps } from "@/lib/camera-utils";
 import {
@@ -34,6 +35,7 @@ import { buildGenderSelectOptions } from "@/lib/guest-gender";
 import { defaultCallingCodeForGuest } from "@/lib/phone-display";
 import { fetchViaCep, maskCep, maskCpf, onlyDigits } from "@/lib/validators";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 type Props = {
   guestsQuantity: number;
@@ -42,6 +44,12 @@ type Props = {
   onChange: (dependents: Dependent[]) => void;
   onContinue: (dependents?: Dependent[]) => void;
   onBack: () => void;
+  /** Localizador para o link /{localizador}/guest. */
+  localizer?: string;
+  /** Cadastro aberto pelo próprio acompanhante. */
+  selfService?: boolean;
+  /** Mantém o formulário visível, sem edição (após o envio). */
+  readOnly?: boolean;
   /** Pós-check-in: lista existente somente leitura; botão salva em vez de continuar. */
   mode?: "flow" | "postCheckin";
   /** Quantidade de acompanhantes já gravados (somente leitura no modo postCheckin). */
@@ -128,6 +136,9 @@ export function CompanionsStep({
   onChange,
   onContinue,
   onBack,
+  localizer,
+  selfService = false,
+  readOnly = false,
   mode = "flow",
   lockedCount = 0,
   saving = false,
@@ -145,6 +156,7 @@ export function CompanionsStep({
   const loadReference = useServerFn(getEmbraturReference);
   const max = Math.max(0, guestsQuantity - 1);
   const isPostCheckin = mode === "postCheckin";
+  const formLocked = saving || readOnly;
   const readOnlyCount = isPostCheckin ? Math.min(lockedCount, dependents.length) : 0;
   const [adding, setAdding] = useState(isPostCheckin || dependents.length > 0);
   const [draft, setDraft] = useState<Dependent>(EMPTY);
@@ -364,7 +376,7 @@ export function CompanionsStep({
       if (!companion) return;
       nextDependents = [...dependents, companion];
       onChange(nextDependents);
-      resetDraftForm();
+      if (!selfService) resetDraftForm();
     }
     onContinue(nextDependents);
   }
@@ -408,19 +420,36 @@ export function CompanionsStep({
 
   return (
     <div className="space-y-5">
-      <header className="space-y-1">
-        <h2 className="font-display text-2xl">
-          {isPostCheckin ? t("checkin.companions.postTitle") : t("checkin.companions.title")}
-        </h2>
-        <p className="text-sm text-muted-foreground">
-          {isPostCheckin
-            ? t("checkin.companions.postBody", {
-                count: guestsQuantity,
-                remaining: Math.max(0, max - dependents.length),
-              })
-            : t("checkin.companions.body", { count: guestsQuantity })}
-        </p>
-      </header>
+      {selfService ? null : (
+        <header className="space-y-1">
+          <h2 className="font-display text-2xl">
+            {isPostCheckin ? t("checkin.companions.postTitle") : t("checkin.companions.title")}
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            {isPostCheckin
+              ? t("checkin.companions.postBody", {
+                  count: guestsQuantity,
+                  remaining: Math.max(0, max - dependents.length),
+                })
+              : t("checkin.companions.body", { count: guestsQuantity })}
+          </p>
+        </header>
+      )}
+
+      {localizer && !selfService && max > dependents.length ? (
+        <CompanionInviteLink localizer={localizer} pendingMainCheckin={!isPostCheckin} />
+      ) : null}
+
+      {selfService && saving ? (
+        <div
+          className="flex items-center gap-3 rounded-2xl border border-border bg-card p-5 text-sm text-foreground shadow-card"
+          role="status"
+          aria-live="polite"
+        >
+          <Loader2 className="size-5 shrink-0 animate-spin text-primary" aria-hidden />
+          <p>{t("checkin.companions.selfPageSubmitting")}</p>
+        </div>
+      ) : null}
 
       {dependents.length > 0 && (
         <ul className="space-y-2">
@@ -561,8 +590,15 @@ export function CompanionsStep({
       ) : null}
 
       {adding && dependents.length < max && (
-        <div className="space-y-5 rounded-2xl border border-border bg-card p-5 shadow-card">
-          <section className="space-y-4">
+        <div
+          className={cn(
+            "space-y-5",
+            !selfService && "rounded-2xl border border-border bg-card p-5 shadow-card",
+            selfService && formLocked && "pointer-events-none",
+          )}
+          aria-busy={selfService && saving ? true : undefined}
+        >
+          <section className={cn("space-y-4", selfService && "rounded-2xl border border-border bg-card p-5 shadow-card")}>
             <h3 className="font-display text-lg">{t("guest.personalData")}</h3>
             {field("name", `${t("guest.fullName")} *`, { autoComplete: "name" })}
             {field("email", `${t("guest.email")} *`, {
@@ -675,7 +711,7 @@ export function CompanionsStep({
           </section>
 
           {showInboxPhotos ? (
-            <section className="space-y-3">
+            <section className={cn("space-y-3", selfService && "rounded-2xl border border-border bg-card p-5 shadow-card")}>
               <header className="space-y-1">
                 <h3 className="font-display text-lg">{t("checkin.companions.inboxPhotoTitle")}</h3>
                 <p className="text-sm text-muted-foreground">{t("checkin.companions.inboxPhotoHint")}</p>
@@ -702,7 +738,7 @@ export function CompanionsStep({
             </section>
           ) : null}
 
-          <section className="space-y-4">
+          <section className={cn("space-y-4", selfService && "rounded-2xl border border-border bg-card p-5 shadow-card")}>
             <h3 className="font-display text-lg">{t("guest.addressSection")}</h3>
             <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/30 p-3">
               <Checkbox
@@ -758,6 +794,7 @@ export function CompanionsStep({
             </div>
           </section>
 
+          {selfService ? null : (
           <Button
             type="button"
             className="tap-safe w-full border-transparent bg-accent font-semibold text-accent-foreground shadow-md shadow-accent/30 hover:bg-accent/90"
@@ -766,6 +803,7 @@ export function CompanionsStep({
           >
             <Plus className="size-4" aria-hidden /> {t("checkin.companions.add")}
           </Button>
+          )}
         </div>
       )}
 
@@ -779,24 +817,37 @@ export function CompanionsStep({
         </Button>
       )}
 
+      {selfService && readOnly ? null : (
       <div className="flex gap-3">
-        <Button type="button" variant="outline" className="tap-safe" disabled={saving} onClick={onBack}>
-          {t("common.back")}
-        </Button>
+        {selfService ? null : (
+          <Button type="button" variant="outline" className="tap-safe" disabled={saving} onClick={onBack}>
+            {t("common.back")}
+          </Button>
+        )}
         <Button
           type="button"
           className="tap-safe flex-1"
-          disabled={saving || (isPostCheckin && dependents.length <= readOnlyCount && !canSavePhotoOnly)}
+          disabled={
+            formLocked ||
+            (selfService
+              ? dependents.length === 0 && !draftHasMinimumData()
+              : isPostCheckin && dependents.length <= readOnlyCount && !canSavePhotoOnly)
+          }
           onClick={handleContinue}
         >
           {saving ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
-          {isPostCheckin
-            ? t("checkin.companions.postSave")
-            : dependents.length > 0
-              ? t("common.continue")
-              : t("checkin.companions.noContinue")}
+          {selfService
+            ? saving
+              ? t("checkin.companions.selfPageSubmitting")
+              : t("checkin.companions.selfPageSubmit")
+            : isPostCheckin
+              ? t("checkin.companions.postSave")
+              : dependents.length > 0
+                ? t("common.continue")
+                : t("checkin.companions.noContinue")}
         </Button>
       </div>
+      )}
     </div>
   );
 }

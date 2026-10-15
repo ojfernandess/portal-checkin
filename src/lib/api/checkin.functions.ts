@@ -1362,15 +1362,9 @@ export type CompletedCheckinContext = {
   source: "checkin_record" | "reservation";
 };
 
-/** Recupera mainGuest/embratur/dependents para adicionar acompanhantes após check-in. */
-export const getCompletedCheckinContext = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) =>
-    z.object({ localizer: LOCALIZER_SCHEMA }).parse(input),
-  )
-  .handler(async ({ data }): Promise<CompletedCheckinContext> => {
-    await enforceRateLimit(clientIpBucket("completed-checkin-context"), { maxRequests: 20 });
-    const code = data.localizer.trim().toUpperCase();
-    const reservation = await fetchReservationByLocalizer(code);
+async function loadCompletedCheckinContext(localizer: string): Promise<CompletedCheckinContext> {
+  const code = localizer.trim().toUpperCase();
+  const reservation = await fetchReservationByLocalizer(code);
     const { assertRegisteredEstablishmentAccess, resolveReservationEstablishmentId } = await import(
       "@/lib/establishment-registry.server"
     );
@@ -1524,6 +1518,264 @@ export const getCompletedCheckinContext = createServerFn({ method: "POST" })
       blockedReason,
       source,
     };
+}
+
+/** Recupera mainGuest/embratur/dependents para adicionar acompanhantes após check-in. */
+export const getCompletedCheckinContext = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    z.object({ localizer: LOCALIZER_SCHEMA }).parse(input),
+  )
+  .handler(async ({ data }): Promise<CompletedCheckinContext> => {
+    await enforceRateLimit(clientIpBucket("completed-checkin-context"), { maxRequests: 20 });
+    return loadCompletedCheckinContext(data.localizer);
+  });
+
+export type CompanionGuestPageContext = {
+  localizer: string;
+  establishmentName: string;
+  checkinDate?: string;
+  checkoutDate?: string;
+  guestsQuantity: number;
+  remainingSlots: number;
+  registeredCount: number;
+  canRegister: boolean;
+  blockedReason: CompletedCheckinContext["blockedReason"];
+  /** Usado só para impedir documento igual ao titular; não é exibido na tela. */
+  mainGuestDocumentNumber: string;
+  mainGuestDocumentType: string;
+  establishmentId: string;
+  /** Selfie opcional enviada só à portaria (Inbox), não ao PMS. */
+  inboxEnabled: boolean;
+  faceValidationEnabled: boolean;
+  /** Endereço do titular, usado só para a opção “mesmo endereço”. */
+  mainGuestAddress: {
+    zipCode: string;
+    street: string;
+    number: string;
+    neighborhood: string;
+    city: string;
+    state: string;
+    country: string;
+  };
+};
+
+function normalizeCompanionDocument(documentNumber: string, documentType: string): string {
+  const trimmed = documentNumber.trim();
+  if (documentType === "CPF" || documentType === "RG") return onlyDigits(trimmed);
+  return trimmed.replace(/\s+/g, "").toUpperCase();
+}
+
+function mergeCompanionDependents(existing: Dependent[], incoming: Dependent[]): Dependent[] {
+  const seen = new Set(
+    existing
+      .map((item) => normalizeCompanionDocument(item.documentNumber ?? "", item.documentType ?? "CPF"))
+      .filter(Boolean),
+  );
+  const next = [...existing];
+  for (const item of incoming) {
+    const key = normalizeCompanionDocument(item.documentNumber ?? "", item.documentType ?? "CPF");
+    if (!item.name?.trim() || !key || seen.has(key)) continue;
+    seen.add(key);
+    next.push(item);
+  }
+  return next;
+}
+
+/** Dados públicos da página /{localizador}/guest — sem cadastro completo do titular. */
+export const getCompanionGuestPage = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    z.object({ localizer: LOCALIZER_SCHEMA }).parse(input),
+  )
+  .handler(async ({ data }): Promise<CompanionGuestPageContext> => {
+    await enforceRateLimit(clientIpBucket("companion-guest-page"), { maxRequests: 30 });
+    const code = data.localizer.trim().toUpperCase();
+    const reservation = await fetchReservationByLocalizer(code);
+    const context = await loadCompletedCheckinContext(code);
+    const registeredCount = context.dependents.filter((item) => item.name?.trim()).length;
+    const canRegister =
+      context.canAdd &&
+      context.contextComplete &&
+      context.blockedReason == null &&
+      context.remainingSlots > 0;
+
+    const { resolveReservationEstablishmentId } = await import("@/lib/establishment-registry.server");
+    const establishmentId = String(resolveReservationEstablishmentId(reservation) ?? "").trim();
+    let inboxEnabled = false;
+    let faceValidationEnabled = false;
+    if (establishmentId) {
+      const { loadEstablishmentSettingsRow } = await import("@/lib/establishment-settings.server");
+      const settingsRow = await loadEstablishmentSettingsRow(establishmentId);
+      inboxEnabled = settingsRow?.settings.inboxEnabled === true;
+      const tenantId = await resolveCheckinTenantId(establishmentId);
+      const { loadTenantZepirisContext } = await import("@/lib/face-validation/service.server");
+      const faceValidation = await loadTenantZepirisContext(tenantId);
+      faceValidationEnabled = faceValidation.active === true;
+    }
+
+    return {
+      localizer: code,
+      establishmentName:
+        reservation?.establishmentName ?? reservation?.establishment?.establishmentName ?? "",
+      checkinDate: reservation?.stay?.checkinDate ?? reservation?.checkinDate,
+      checkoutDate: reservation?.stay?.checkoutDate ?? reservation?.checkoutDate,
+      guestsQuantity: context.guestsQuantity,
+      remainingSlots: context.remainingSlots,
+      registeredCount,
+      canRegister,
+      blockedReason: canRegister ? null : context.blockedReason ?? "incomplete_context",
+      mainGuestDocumentNumber: context.mainGuest.documentNumber ?? "",
+      mainGuestDocumentType: context.mainGuest.documentType ?? "CPF",
+      establishmentId,
+      inboxEnabled,
+      faceValidationEnabled,
+      mainGuestAddress: {
+        zipCode: context.mainGuest.zipCode ?? "",
+        street: context.mainGuest.street ?? "",
+        number: context.mainGuest.number ?? "",
+        neighborhood: context.mainGuest.neighborhood ?? "",
+        city: context.mainGuest.city ?? "",
+        state: context.mainGuest.state ?? "",
+        country: context.mainGuest.country ?? context.mainGuest.citizenship ?? "",
+      },
+    };
+  });
+
+async function listCompanionBirthDates(localizer: string): Promise<string[]> {
+  const code = localizer.trim().toUpperCase();
+  const dates = new Set<string>();
+  const push = (value: unknown) => {
+    const trimmed = typeof value === "string" ? value.trim() : "";
+    if (trimmed) dates.add(trimmed);
+  };
+
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data: record } = await supabaseAdmin
+    .from("checkin_records")
+    .select("dependents")
+    .eq("localizer", code)
+    .order("checked_in_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  for (const dependent of asDependentList(record?.dependents)) {
+    push(dependent.birthDate);
+  }
+
+  try {
+    const reservation = await fetchReservationByLocalizer(code);
+    for (const dependent of asDependentList(reservation?.dependents)) {
+      push(dependent.birthDate);
+    }
+  } catch {
+    // A data gravada no check-in local ainda pode liberar o acesso.
+  }
+
+  return [...dates];
+}
+
+/** Libera a página de check-in concluído para o acompanhante após confirmar a data de nascimento. */
+export const getCompanionCompletedStay = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        localizer: LOCALIZER_SCHEMA,
+        birthDate: z.string().trim().max(32).optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    await enforceRateLimit(clientIpBucket("companion-stay-access"), { maxRequests: 15 });
+    const code = data.localizer.trim().toUpperCase();
+    const reservation = await fetchReservationByLocalizer(code);
+    const { assertRegisteredEstablishmentAccess, resolveReservationEstablishmentId } = await import(
+      "@/lib/establishment-registry.server"
+    );
+    const establishmentId = String(resolveReservationEstablishmentId(reservation) ?? "").trim();
+    await assertRegisteredEstablishmentAccess(establishmentId || null);
+
+    const { isAlreadyCheckedIn } = await import("./types");
+    if (!reservation || !isAlreadyCheckedIn(reservation)) {
+      return { access: "unavailable" as const };
+    }
+
+    const { loadEstablishmentSettingsRow } = await import("@/lib/establishment-settings.server");
+    const { birthDatesMatch } = await import("@/lib/establishment-settings");
+    const settingsRow = establishmentId ? await loadEstablishmentSettingsRow(establishmentId) : null;
+    const settings = settingsRow?.settings;
+    const provided = data.birthDate?.trim();
+    if (!provided) return { access: "verify" as const };
+    const expectedDates = await listCompanionBirthDates(code);
+    if (expectedDates.length === 0) return { access: "unavailable" as const };
+    if (!expectedDates.some((expected) => birthDatesMatch(expected, provided))) {
+      return { access: "denied" as const };
+    }
+
+    return {
+      access: "granted" as const,
+      reservation,
+      usefulInfoItems: settings?.usefulInfoItems ?? [],
+      successPagePhotoUrl: settings?.successPagePhotoUrl ?? null,
+      inboxEnabled: settings?.inboxEnabled === true,
+    };
+  });
+
+/** Acompanhante envia o próprio cadastro pelo link /{localizador}/guest. */
+export const submitCompanionSelfRegistration = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        localizer: LOCALIZER_SCHEMA,
+        dependents: z.array(z.record(z.any())).min(1).max(10),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    await enforceRateLimit(clientIpBucket("companion-self-register"), { maxRequests: 10 });
+    const code = data.localizer.trim().toUpperCase();
+    const reservation = await fetchReservationByLocalizer(code);
+    const context = await loadCompletedCheckinContext(code);
+
+    if (!context.embratur || !context.contextComplete || context.blockedReason) {
+      if (context.blockedReason === "not_checked_in") {
+        throw new Error(
+          "O hóspede principal ainda precisa concluir o check-in antes do cadastro do acompanhante.",
+        );
+      }
+      if (context.blockedReason === "no_slots") {
+        throw new Error("Todos os acompanhantes desta reserva já foram cadastrados.");
+      }
+      if (context.blockedReason === "cancelled" || context.blockedReason === "pending_cancellation") {
+        throw new Error("Esta reserva não permite cadastrar acompanhantes no momento.");
+      }
+      throw new Error(
+        "Não encontramos os dados completos do check-in. Peça ao hóspede principal para concluir o check-in.",
+      );
+    }
+
+    const incoming = data.dependents as Dependent[];
+    const merged = mergeCompanionDependents(context.dependents, incoming);
+    const added = merged.length - context.dependents.filter((item) => item.name?.trim()).length;
+    if (added <= 0) {
+      throw new Error("Informe um acompanhante com documento diferente dos já cadastrados.");
+    }
+    if (merged.filter((item) => item.name?.trim()).length > context.guestsQuantity - 1) {
+      throw new Error("Não há vagas suficientes para estes acompanhantes.");
+    }
+
+    const { resolveReservationEstablishmentId } = await import("@/lib/establishment-registry.server");
+    const establishmentId = resolveReservationEstablishmentId(reservation);
+
+    return executeSubmitCheckin({
+      reservationId: String(reservation?.reservationId ?? code),
+      localizer: code,
+      ...(establishmentId ? { establishmentId: String(establishmentId) } : {}),
+      ...(reservation?.establishmentName ? { establishmentName: reservation.establishmentName } : {}),
+      ...(reservation ? { reservationSnapshot: reservation as unknown as Record<string, unknown> } : {}),
+      mainGuest: context.mainGuest as unknown as Record<string, unknown>,
+      embratur: context.embratur as unknown as Record<string, unknown>,
+      dependents: merged as unknown as Record<string, unknown>[],
+      purpose: "companions",
+    });
   });
 
 export const updateCompanionInboxPhotos = createServerFn({ method: "POST" })
@@ -1608,7 +1860,35 @@ export const submitCheckin = createServerFn({ method: "POST" })
       })
       .parse(input),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data }) => executeSubmitCheckin(data));
+
+type SubmitCheckinInput = {
+  reservationId: string;
+  localizer?: string;
+  establishmentId?: string;
+  establishmentName?: string;
+  reservationSnapshot?: Record<string, unknown>;
+  mainGuest: Record<string, unknown>;
+  embratur: Record<string, unknown>;
+  dependents: Record<string, unknown>[];
+  purpose?: "checkin" | "companions";
+  termsAcceptedAt?: string;
+  termsVersion?: number;
+  checkinSessionId?: string;
+  extraFields?: Record<string, unknown>;
+  registeredPhotos?: {
+    profileUrl?: string;
+    profileId?: string | number;
+    documentUrl?: string;
+    documentId?: string | number;
+  };
+  photosReplaced?: {
+    profile?: boolean;
+    document?: boolean;
+  };
+};
+
+async function executeSubmitCheckin(data: SubmitCheckinInput) {
     await enforceRateLimit(clientIpBucket("submit-checkin"), { maxRequests: 10 });
     const purpose = data.purpose ?? "checkin";
     const { assertRegisteredEstablishmentAccess, resolveReservationEstablishmentId } = await import(
@@ -1903,4 +2183,4 @@ export const submitCheckin = createServerFn({ method: "POST" })
     }
 
     return result;
-  });
+}
