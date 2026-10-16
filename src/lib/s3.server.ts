@@ -220,7 +220,7 @@ function resolvePortalObjectKey(
 
   if (options.url && isUsableMediaUrl(options.url) && bucket) {
     const fromUrl = extractObjectKey(options.url, bucket);
-    if (fromUrl && !keySuffixLooksNumeric(fromUrl)) {
+    if (fromUrl && (fromUrl.includes("/") || !keySuffixLooksNumeric(fromUrl))) {
       return fromUrl;
     }
   }
@@ -244,7 +244,7 @@ function resolveVivakeyObjectKey(
   if (!rawUrl || !isExternalVivakeyMediaUrl(rawUrl)) return undefined;
 
   const fromPath = extractObjectKey(rawUrl, bucket);
-  if (fromPath && !keySuffixLooksNumeric(fromPath)) {
+  if (fromPath && (fromPath.includes("/") || !keySuffixLooksNumeric(fromPath))) {
     return fromPath;
   }
 
@@ -263,9 +263,17 @@ export function resolveObjectKey(
 /** Limite típico da coluna `keyName` (vivakey_media_content) no PMS TecHospitality. */
 const PMS_MEDIA_KEY_NAME_MAX_LEN = 255;
 
+function shortPmsMediaUrl(urlRaw: string): string | undefined {
+  if (!urlRaw || urlRaw.startsWith("data:")) return undefined;
+  const withoutQuery = (urlRaw.split("#")[0]?.split("?")[0] ?? urlRaw).trim();
+  if (!withoutQuery || withoutQuery.length > PMS_MEDIA_KEY_NAME_MAX_LEN) return undefined;
+  if (/^\d+$/.test(withoutQuery)) return undefined;
+  return withoutQuery;
+}
+
 /**
  * Evita enviar URLs pré-assinadas longas no POST /checkin — o backend persiste o valor em keyName.
- * Prefere mediaId numérico; senão URL curta path-style (ex.: …/vivakey/profile-photos/…).
+ * Mantém a URL curta devolvida pelo upload e o mediaId numérico juntos.
  */
 export function normalizePmsCheckinPhotoFields(
   row: Record<string, unknown>,
@@ -275,11 +283,18 @@ export function normalizePmsCheckinPhotoFields(
   for (const kind of ["profile", "document"] as const) {
     const urlKey = kind === "profile" ? "profilePhotoUrl" : "documentPhotoUrl";
     const idKey = kind === "profile" ? "profilePhotoId" : "documentPhotoId";
-    const urlRaw = typeof next[urlKey] === "string" ? next[urlKey].trim() : "";
-    const idRaw = next[idKey];
+    let urlRaw = typeof next[urlKey] === "string" ? next[urlKey].trim() : "";
+    let idRaw = next[idKey];
 
+    if ((idRaw == null || String(idRaw).trim() === "") && /^\d+$/.test(urlRaw)) {
+      idRaw = Number(urlRaw);
+      next[idKey] = idRaw;
+      urlRaw = "";
+    }
+
+    const preservedUrl = shortPmsMediaUrl(urlRaw);
     const objectKey = resolveObjectKey(kind, {
-      url: urlRaw || undefined,
+      url: preservedUrl || urlRaw || undefined,
       id: idRaw as string | number | undefined,
     });
     const canonicalUrl =
@@ -292,35 +307,24 @@ export function normalizePmsCheckinPhotoFields(
             readEnv("AWS_S3_FORCE_PATH_STYLE") !== "false",
           )
         : undefined;
+    const photoUrl =
+      (preservedUrl &&
+      (isExternalVivakeyMediaUrl(preservedUrl) ||
+        preservedUrl.includes("profile-photos/") ||
+        preservedUrl.includes("document-photos/"))
+        ? preservedUrl
+        : undefined) ||
+      (canonicalUrl && canonicalUrl.length <= PMS_MEDIA_KEY_NAME_MAX_LEN ? canonicalUrl : undefined) ||
+      preservedUrl;
 
     if (idRaw != null && String(idRaw).trim() !== "" && /^\d+$/.test(String(idRaw))) {
       next[idKey] = Number(String(idRaw));
-      if (canonicalUrl && canonicalUrl.length <= PMS_MEDIA_KEY_NAME_MAX_LEN) {
-        next[urlKey] = canonicalUrl;
-      } else {
-        delete next[urlKey];
-      }
-      continue;
+    } else if (idRaw != null && String(idRaw).trim() !== "") {
+      next[idKey] = idRaw;
     }
 
-    if (canonicalUrl && canonicalUrl.length <= PMS_MEDIA_KEY_NAME_MAX_LEN) {
-      next[urlKey] = canonicalUrl;
-      if (idRaw != null && String(idRaw).trim() !== "") next[idKey] = idRaw;
-      continue;
-    }
-
-    if (urlRaw && !urlRaw.startsWith("data:")) {
-      const withoutQuery = (urlRaw.split("#")[0]?.split("?")[0] ?? urlRaw).trim();
-      if (withoutQuery.length > 0 && withoutQuery.length <= PMS_MEDIA_KEY_NAME_MAX_LEN) {
-        next[urlKey] = withoutQuery;
-      } else {
-        delete next[urlKey];
-        if (idRaw != null && String(idRaw).trim() !== "") next[idKey] = idRaw;
-      }
-      continue;
-    }
-
-    delete next[urlKey];
+    if (photoUrl) next[urlKey] = photoUrl;
+    else delete next[urlKey];
   }
 
   return next;

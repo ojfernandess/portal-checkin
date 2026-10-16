@@ -571,7 +571,11 @@ function resolveUploadedMediaReference(
   const candidates = [
     source["url"],
     source["fileUrl"],
+    source["keyName"],
+    source["fileKey"],
+    source["path"],
     type === "profile" ? source["profilePhotoUrl"] : source["documentPhotoUrl"],
+    type === "profile" ? source["profilePhotoKey"] : source["documentPhotoKey"],
   ];
 
   for (const raw of candidates) {

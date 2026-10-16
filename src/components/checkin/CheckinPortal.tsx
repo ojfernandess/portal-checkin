@@ -323,10 +323,12 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
       if (pending.profile) {
         next.profilePhotoUrl = pending.profile;
         if (isDataUrl(pending.profile)) delete next.profilePhotoId;
+        else if (current.profilePhotoId != null) next.profilePhotoId = current.profilePhotoId;
       }
       if (pending.document) {
         next.documentPhotoUrl = pending.document;
         if (isDataUrl(pending.document)) delete next.documentPhotoId;
+        else if (current.documentPhotoId != null) next.documentPhotoId = current.documentPhotoId;
       }
       return next;
     }
