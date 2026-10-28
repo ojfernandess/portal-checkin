@@ -1084,7 +1084,10 @@ export const ptBR = {
       checkinBody: "Comportamento do fluxo de check-in web durante o preenchimento dos dados.",
       vbPmsTitle: "PMS VB (Vinibarr)",
       vbPmsHint:
-        "Token X-Auth-IApi-Token exclusivo deste estabelecimento. Quando preenchido, o check-in usa o PMS VB em vez do Vivakey.",
+        "Disponível quando o PMS VB estiver ativo no tenant. Só com VB ativo neste estabelecimento o localizador usa o Vinibarr; caso contrário segue TecHospitality/Vivakey.",
+      vbEnabled: "Ativar PMS VB neste estabelecimento",
+      vbEnabledHint:
+        "Quando ativo, localizadores deste estabelecimento são consultados e finalizados no VB. Estabelecimentos TecHospitality devem manter esta opção desligada.",
       vbApiToken: "Token X-Auth-IApi-Token",
       vbApiTokenPlaceholder: "Token da API VB deste estabelecimento",
       vbPhotoLinkEnabled: "Vincular fotos de check-in anteriores ao hóspede",

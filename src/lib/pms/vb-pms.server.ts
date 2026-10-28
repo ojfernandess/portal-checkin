@@ -172,8 +172,8 @@ export async function vbFetchLocalizerWithEstablishmentDiscovery(
   if (cached?.establishment_id) {
     const establishmentId = String(cached.establishment_id);
     const cachedTenantId = String(cached.tenant_id ?? tenantId);
-    const { isTenantVbIntegrationEnabled } = await import("@/lib/pms/resolve.server");
-    if (await isTenantVbIntegrationEnabled(cachedTenantId)) {
+    const { resolvePmsProvider } = await import("@/lib/pms/resolve.server");
+    if ((await resolvePmsProvider(cachedTenantId, establishmentId)) === "vb") {
       try {
         const payload = await vbApiFetch<unknown>(`/reservations/localizer/${encodeURIComponent(code)}`, {
           tenantId: cachedTenantId,

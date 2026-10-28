@@ -28,6 +28,11 @@ export type EstablishmentSettings = {
   requireBirthDateConfirmationOnReaccess: boolean;
   /** Foto exibida no banner e card da página de check-in concluído (URL ou data URL). */
   successPagePhotoUrl: string | null;
+  /**
+   * Ativa o PMS VB neste estabelecimento (além do switch do tenant no super admin).
+   * Sem isto, o localizador não entra na descoberta/roteamento VB.
+   */
+  vbEnabled: boolean;
   /** Token X-Auth-IApi-Token do PMS VB para este estabelecimento. */
   vbApiToken: string | null;
   /** Vincula fotos de check-in anteriores ao hóspede (lookup) via MinIO. */
@@ -60,6 +65,7 @@ export const DEFAULT_ESTABLISHMENT_SETTINGS: EstablishmentSettings = {
   requireBirthDateConfirmation: false,
   requireBirthDateConfirmationOnReaccess: false,
   successPagePhotoUrl: null,
+  vbEnabled: false,
   vbApiToken: null,
   vbPhotoLinkEnabled: false,
   inboxEnabled: false,
@@ -212,6 +218,16 @@ export function sanitizeUsefulInfoItems(items: UsefulInfoItem[]): UsefulInfoItem
     .slice(0, MAX_USEFUL_INFO_ITEMS);
 }
 
+/** Só conta como ativo com o switch explícito (token sozinho não ativa o VB). */
+function parseVbEnabled(settings: Record<string, unknown>): boolean {
+  return settings.vbEnabled === true;
+}
+
+/** Estabelecimento usa VB: switch ligado e token preenchido. */
+export function isEstablishmentVbActive(settings: EstablishmentSettings): boolean {
+  return settings.vbEnabled === true && Boolean(settings.vbApiToken?.trim());
+}
+
 export function parseEstablishmentSettings(raw: unknown): EstablishmentSettings {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
     return DEFAULT_ESTABLISHMENT_SETTINGS;
@@ -226,6 +242,7 @@ export function parseEstablishmentSettings(raw: unknown): EstablishmentSettings 
       typeof settings.vbApiToken === "string" && settings.vbApiToken.trim()
         ? settings.vbApiToken.trim()
         : null,
+    vbEnabled: parseVbEnabled(settings),
     vbPhotoLinkEnabled: settings.vbPhotoLinkEnabled === true,
     inboxEnabled: settings.inboxEnabled === true,
     inboxManagedUnitId: parseInboxManagedUnitId(settings.inboxManagedUnitId),

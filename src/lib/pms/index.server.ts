@@ -8,6 +8,7 @@ import {
 import {
   isRecoverablePmsMissError,
   isVivakeyAvailable,
+  resolveLocalizerEstablishmentHint,
   resolvePmsProvider,
   resolvePmsProviderForLocalizer,
   shouldTryVbLocalizer,
@@ -48,42 +49,90 @@ async function fetchLocalizerViaVivakey(
   return { payload, provider: "vivakey" };
 }
 
+async function establishmentIdFromVivakeyPayload(payload: unknown): Promise<string | null> {
+  const { unwrap } = await import("@/lib/api/techospitality.server");
+  const { normalizeReservationPayload } = await import("@/lib/api/reservation-normalizer");
+  const { resolveReservationEstablishmentId } = await import("@/lib/establishment-registry.server");
+  const raw = unwrap<unknown>(payload);
+  const reservation = Array.isArray(raw)
+    ? normalizeReservationPayload(raw[0])
+    : normalizeReservationPayload(raw);
+  return resolveReservationEstablishmentId(reservation);
+}
+
+/**
+ * Busca reserva pelo localizador escolhendo o PMS pelo estabelecimento:
+ * 1) identifica o estabelecimento (hint / check-in anterior / resposta TecHospitality);
+ * 2) se VB estiver ativo nesse estabelecimento → Vinibarr;
+ * 3) caso contrário → TecHospitality/Vivakey.
+ */
 export async function pmsFetchLocalizer(
   localizer: string,
   input: { tenantId: string; establishmentId?: string | null },
 ): Promise<{ payload: unknown; provider: PmsProviderId; establishmentId?: string }> {
-  const tryVb = await shouldTryVbLocalizer(input.tenantId, input.establishmentId);
   const vivakeyAvailable = await isVivakeyAvailable(input.tenantId);
+  const known = await resolveLocalizerEstablishmentHint(localizer, input.establishmentId);
 
-  let vbMissError: Error | null = null;
+  if (known?.establishmentId) {
+    const tenantId = known.tenantId?.trim() || input.tenantId;
+    const provider = await resolvePmsProvider(tenantId, known.establishmentId);
 
-  if (tryVb) {
-    try {
-      return await fetchLocalizerViaVb(localizer, input);
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      if (vivakeyAvailable && isRecoverablePmsMissError(err)) {
-        vbMissError = err;
-        console.info("[pms] VB localizer miss, trying Vivakey/TecHospitality:", err.message);
-      } else {
-        throw err;
-      }
+    if (provider === "vb") {
+      return fetchLocalizerViaVb(localizer, {
+        tenantId,
+        establishmentId: known.establishmentId,
+      });
     }
+
+    if (!vivakeyAvailable) {
+      throw new Error("Nenhum PMS configurado para consultar este localizador.");
+    }
+    const result = await fetchLocalizerViaVivakey(localizer, tenantId);
+    return { ...result, establishmentId: known.establishmentId };
   }
+
+  // Estabelecimento desconhecido: TecHospitality identifica o hotel.
+  // VB só entra se esse estabelecimento tiver VB ativo, ou se TecHospitality não achar a reserva.
+  const tryVb = await shouldTryVbLocalizer(input.tenantId, null);
+  let vivakeyMiss: Error | null = null;
 
   if (vivakeyAvailable) {
     try {
-      return await fetchLocalizerViaVivakey(localizer, input.tenantId);
+      const result = await fetchLocalizerViaVivakey(localizer, input.tenantId);
+      const establishmentId = await establishmentIdFromVivakeyPayload(result.payload);
+      if (establishmentId) {
+        const provider = await resolvePmsProvider(input.tenantId, establishmentId);
+        if (provider === "vb") {
+          return fetchLocalizerViaVb(localizer, {
+            tenantId: input.tenantId,
+            establishmentId,
+          });
+        }
+        // Hotel sem VB ativo: permanece no TecHospitality (não chama Vinibarr).
+        return { ...result, establishmentId };
+      }
+      return result;
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
-      if (tryVb && vbMissError && isRecoverablePmsMissError(err)) {
+      if (!tryVb || !isRecoverablePmsMissError(err)) throw err;
+      vivakeyMiss = err;
+      console.info("[pms] TecHospitality localizer miss, trying VB if enabled:", err.message);
+    }
+  }
+
+  if (tryVb) {
+    try {
+      return await fetchLocalizerViaVb(localizer, { tenantId: input.tenantId });
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      if (vivakeyMiss && isRecoverablePmsMissError(err)) {
         throw new Error("Reserva não encontrada para este localizador.");
       }
       throw err;
     }
   }
 
-  if (vbMissError) throw vbMissError;
+  if (vivakeyMiss) throw vivakeyMiss;
   throw new Error("Nenhum PMS configurado para consultar este localizador.");
 }
 

@@ -1237,9 +1237,11 @@ export const adminGetSettings = createServerFn({ method: "POST" })
       .eq("establishment_id", data.establishmentId)
       .eq("tenant_id", tenantId)
       .maybeSingle();
+    const { isTenantVbIntegrationEnabled } = await import("@/lib/pms/resolve.server");
     return {
       settings: parseEstablishmentSettings(row?.settings ?? null),
       updatedAt: row?.updated_at ?? null,
+      tenantVbEnabled: await isTenantVbIntegrationEnabled(tenantId),
     };
   });
 
@@ -1274,6 +1276,7 @@ export const adminSaveSettings = createServerFn({ method: "POST" })
             }),
           )
           .optional(),
+        vbEnabled: z.boolean().optional(),
         vbApiToken: z.string().trim().max(500).nullable().optional(),
         vbPhotoLinkEnabled: z.boolean().optional(),
         whatsappNotifyEnabled: z.boolean().optional(),
@@ -1334,6 +1337,7 @@ export const adminSaveSettings = createServerFn({ method: "POST" })
       ...(data.usefulInfoItems !== undefined
         ? { usefulInfoItems: sanitizeUsefulInfoItems(data.usefulInfoItems) }
         : {}),
+      ...(data.vbEnabled !== undefined ? { vbEnabled: data.vbEnabled } : {}),
       ...(data.vbApiToken !== undefined
         ? {
             vbApiToken:

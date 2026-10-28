@@ -39,7 +39,9 @@ export async function listVbEstablishmentCandidates(
   tenantId?: string,
 ): Promise<Array<{ establishmentId: string; tenantId: string }>> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { parseEstablishmentSettings } = await import("@/lib/establishment-settings");
+  const { isEstablishmentVbActive, parseEstablishmentSettings } = await import(
+    "@/lib/establishment-settings"
+  );
 
   let query = supabaseAdmin
     .from("establishment_settings")
@@ -58,7 +60,7 @@ export async function listVbEstablishmentCandidates(
   return (data ?? [])
     .map((row) => {
       const settings = parseEstablishmentSettings(row.settings);
-      if (!settings.vbApiToken?.trim()) return null;
+      if (!isEstablishmentVbActive(settings)) return null;
       return {
         establishmentId: String(row.establishment_id),
         tenantId: String(row.tenant_id),
@@ -67,7 +69,7 @@ export async function listVbEstablishmentCandidates(
     .filter((row): row is { establishmentId: string; tenantId: string } => row != null);
 }
 
-/** Estabelecimentos com token VB cujo tenant ainda tem integração VB habilitada no super admin. */
+/** Estabelecimentos com VB ativo (switch + token) cujo tenant ainda tem integração VB no super admin. */
 export async function listEnabledVbEstablishmentCandidates(
   tenantId?: string,
 ): Promise<Array<{ establishmentId: string; tenantId: string }>> {
@@ -147,9 +149,11 @@ export async function resolvePmsProvider(
 ): Promise<PmsProviderId> {
   if (establishmentId) {
     const { loadEstablishmentSettingsRow } = await import("@/lib/establishment-settings.server");
+    const { isEstablishmentVbActive } = await import("@/lib/establishment-settings");
     const row = await loadEstablishmentSettingsRow(establishmentId);
     if (
-      row?.settings.vbApiToken?.trim() &&
+      row &&
+      isEstablishmentVbActive(row.settings) &&
       (await isTenantVbIntegrationEnabled(row.tenantId))
     ) {
       return "vb";
@@ -159,7 +163,12 @@ export async function resolvePmsProvider(
   return "vivakey";
 }
 
-/** Na busca por localizador (sem estabelecimento conhecido), prioriza VB se houver tokens configurados. */
+/**
+ * Provedor sugerido para um localizador.
+ * Com estabelecimento conhecido, usa a config dele.
+ * Sem hint: TecHospitality/Vivakey quando disponível; VB só se não houver Vivakey
+ * e existir estabelecimento VB ativo (a ordem real da busca está em pmsFetchLocalizer).
+ */
 export async function resolvePmsProviderForLocalizer(
   tenantId: string,
   establishmentIdHint?: string | null,
@@ -168,12 +177,12 @@ export async function resolvePmsProviderForLocalizer(
     return resolvePmsProvider(tenantId, establishmentIdHint);
   }
 
-  if (await tenantHasVbEstablishments(tenantId)) {
-    return "vb";
-  }
-
   if (await isVivakeyAvailableForTenant(tenantId)) {
     return "vivakey";
+  }
+
+  if (await tenantHasVbEstablishments(tenantId)) {
+    return "vb";
   }
 
   if (!(await isTenantVbIntegrationEnabled(tenantId))) {
@@ -207,4 +216,35 @@ export async function shouldTryVbLocalizer(
   if (otherTenants) return true;
 
   return tenantHasVbFallbackToken(tenantId);
+}
+
+/**
+ * Identifica o estabelecimento do localizador antes de escolher o PMS:
+ * hint explícito ou último check-in gravado para esse localizador.
+ */
+export async function resolveLocalizerEstablishmentHint(
+  localizer: string,
+  establishmentIdHint?: string | null,
+): Promise<{ establishmentId: string; tenantId?: string } | null> {
+  const hint = establishmentIdHint?.trim();
+  if (hint) return { establishmentId: hint };
+
+  const code = localizer.trim().toUpperCase();
+  if (!code) return null;
+
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data } = await supabaseAdmin
+    .from("checkin_records")
+    .select("establishment_id, tenant_id")
+    .eq("localizer", code)
+    .not("establishment_id", "is", null)
+    .order("checked_in_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!data?.establishment_id) return null;
+  return {
+    establishmentId: String(data.establishment_id),
+    ...(data.tenant_id ? { tenantId: String(data.tenant_id) } : {}),
+  };
 }

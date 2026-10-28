@@ -1085,7 +1085,10 @@ export const es: MessageTree = {
       checkinBody: "Comportamiento del flujo de check-in web mientras el huésped completa los datos.",
       vbPmsTitle: "PMS VB (Vinibarr)",
       vbPmsHint:
-        "Token X-Auth-IApi-Token exclusivo de este establecimiento. Cuando se completa, el check-in usa PMS VB en lugar de Vivakey.",
+        "Disponible cuando el PMS VB esté activo en el tenant. Solo con VB activo en este establecimiento el localizador usa Vinibarr; de lo contrario sigue TecHospitality/Vivakey.",
+      vbEnabled: "Activar PMS VB en este establecimiento",
+      vbEnabledHint:
+        "Cuando está activo, los localizadores de este establecimiento se consultan y finalizan en VB. Los establecimientos TecHospitality deben mantener esta opción desactivada.",
       vbApiToken: "Token X-Auth-IApi-Token",
       vbApiTokenPlaceholder: "Token API VB de este establecimiento",
       vbPhotoLinkEnabled: "Vincular fotos de check-in anteriores al huésped",

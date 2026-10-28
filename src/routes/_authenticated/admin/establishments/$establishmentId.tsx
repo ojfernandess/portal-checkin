@@ -90,6 +90,8 @@ function EstablishmentConfigPage() {
   const [inboxManagedUnitId, setInboxManagedUnitId] = useState<number | null>(null);
   const [inboxUnitMappings, setInboxUnitMappings] = useState<InboxUnitMapping[]>([]);
   const [usefulInfoItems, setUsefulInfoItems] = useState<UsefulInfoItem[]>([]);
+  const [tenantVbEnabled, setTenantVbEnabled] = useState(false);
+  const [vbEnabled, setVbEnabled] = useState(false);
   const [vbApiToken, setVbApiToken] = useState("");
   const [vbPhotoLinkEnabled, setVbPhotoLinkEnabled] = useState(false);
   const [inboxUnits, setInboxUnits] = useState<InboxManagedUnitOption[]>([]);
@@ -132,6 +134,8 @@ function EstablishmentConfigPage() {
         setInboxManagedUnitId(settings.settings.inboxManagedUnitId);
         setInboxUnitMappings(settings.settings.inboxUnitMappings);
         setUsefulInfoItems(settings.settings.usefulInfoItems);
+        setTenantVbEnabled(settings.tenantVbEnabled === true);
+        setVbEnabled(settings.settings.vbEnabled === true);
         setVbApiToken(settings.settings.vbApiToken ?? "");
         setVbPhotoLinkEnabled(settings.settings.vbPhotoLinkEnabled);
         setWhatsappNotifyEnabled(settings.settings.whatsappNotifyEnabled);
@@ -231,6 +235,7 @@ function EstablishmentConfigPage() {
           inboxManagedUnitId,
           inboxUnitMappings,
           usefulInfoItems,
+          vbEnabled,
           vbApiToken: vbApiToken.trim() || null,
           vbPhotoLinkEnabled,
           whatsappNotifyEnabled,
@@ -393,40 +398,61 @@ function EstablishmentConfigPage() {
               </div>
             </div>
 
-            <div className="space-y-3 rounded-xl border border-border p-4">
-              <div className="space-y-1">
-                <p className="text-sm font-medium">{t("admin.establishmentConfig.vbPmsTitle")}</p>
-                <p className="text-xs text-muted-foreground">
-                  {t("admin.establishmentConfig.vbPmsHint")}
-                </p>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="vbApiToken">{t("admin.establishmentConfig.vbApiToken")}</Label>
-                <Input
-                  id="vbApiToken"
-                  type="password"
-                  value={vbApiToken}
-                  onChange={(e) => setVbApiToken(e.target.value)}
-                  placeholder={t("admin.establishmentConfig.vbApiTokenPlaceholder")}
-                  autoComplete="off"
-                />
-              </div>
-              <label className="flex items-start gap-3">
-                <Checkbox
-                  checked={vbPhotoLinkEnabled}
-                  onCheckedChange={(checked) => setVbPhotoLinkEnabled(checked === true)}
-                  className="mt-0.5"
-                />
-                <span className="space-y-1">
-                  <span className="block text-sm font-medium">
-                    {t("admin.establishmentConfig.vbPhotoLinkEnabled")}
+            {tenantVbEnabled ? (
+              <div className="space-y-3 rounded-xl border border-border p-4">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">{t("admin.establishmentConfig.vbPmsTitle")}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {t("admin.establishmentConfig.vbPmsHint")}
+                  </p>
+                </div>
+                <label className="flex items-start gap-3">
+                  <Checkbox
+                    checked={vbEnabled}
+                    onCheckedChange={(checked) => setVbEnabled(checked === true)}
+                    className="mt-0.5"
+                  />
+                  <span className="space-y-1">
+                    <span className="block text-sm font-medium">
+                      {t("admin.establishmentConfig.vbEnabled")}
+                    </span>
+                    <span className="block text-xs text-muted-foreground">
+                      {t("admin.establishmentConfig.vbEnabledHint")}
+                    </span>
                   </span>
-                  <span className="block text-xs text-muted-foreground">
-                    {t("admin.establishmentConfig.vbPhotoLinkEnabledHint")}
-                  </span>
-                </span>
-              </label>
-            </div>
+                </label>
+                {vbEnabled ? (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="vbApiToken">{t("admin.establishmentConfig.vbApiToken")}</Label>
+                      <Input
+                        id="vbApiToken"
+                        type="password"
+                        value={vbApiToken}
+                        onChange={(e) => setVbApiToken(e.target.value)}
+                        placeholder={t("admin.establishmentConfig.vbApiTokenPlaceholder")}
+                        autoComplete="off"
+                      />
+                    </div>
+                    <label className="flex items-start gap-3">
+                      <Checkbox
+                        checked={vbPhotoLinkEnabled}
+                        onCheckedChange={(checked) => setVbPhotoLinkEnabled(checked === true)}
+                        className="mt-0.5"
+                      />
+                      <span className="space-y-1">
+                        <span className="block text-sm font-medium">
+                          {t("admin.establishmentConfig.vbPhotoLinkEnabled")}
+                        </span>
+                        <span className="block text-xs text-muted-foreground">
+                          {t("admin.establishmentConfig.vbPhotoLinkEnabledHint")}
+                        </span>
+                      </span>
+                    </label>
+                  </>
+                ) : null}
+              </div>
+            ) : null}
 
             <label className="flex items-start gap-3 rounded-xl border border-border p-4">
               <Checkbox
@@ -454,7 +480,7 @@ function EstablishmentConfigPage() {
               saving={savingSettings}
               onChange={setUsefulInfoItems}
               onSave={() => void handleSaveSettings()}
-              vbEnabled={Boolean(vbApiToken.trim())}
+              vbEnabled={vbEnabled && Boolean(vbApiToken.trim())}
             />
           </TabsContent>
 
