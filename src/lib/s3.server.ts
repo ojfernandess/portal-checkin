@@ -344,8 +344,25 @@ function buildPublicObjectUrl(
   return `https://${bucket}.s3.${region}.amazonaws.com/${key}`;
 }
 
+/** URL pública path-style do objeto no storage do portal (MinIO / AWS_*). */
+export function buildPortalPublicObjectUrl(objectKey: string): string | undefined {
+  const config = readPortalS3Config();
+  const key = objectKey.trim().replace(/^minio:/, "");
+  if (!config || !key) return undefined;
+  return buildPublicObjectUrl(
+    config.bucket,
+    key,
+    config.region,
+    config.endpoint,
+    config.forcePathStyle,
+  );
+}
+
 async function getS3Client(config: S3Config) {
   const { S3Client } = await import("@aws-sdk/client-s3");
+  // Endpoints S3-compatíveis (MinIO / gateway) costumam rejeitar checksums
+  // obrigatórios do AWS SDK v3 com "UnknownError" / XAmzContentSHA256Mismatch.
+  const compatibleEndpoint = Boolean(config.endpoint);
   return new S3Client({
     region: config.region,
     credentials: {
@@ -355,6 +372,12 @@ async function getS3Client(config: S3Config) {
     ...(config.endpoint
       ? { endpoint: config.endpoint, forcePathStyle: config.forcePathStyle }
       : { forcePathStyle: config.forcePathStyle }),
+    ...(compatibleEndpoint
+      ? {
+          requestChecksumCalculation: "WHEN_REQUIRED" as const,
+          responseChecksumValidation: "WHEN_REQUIRED" as const,
+        }
+      : {}),
   });
 }
 

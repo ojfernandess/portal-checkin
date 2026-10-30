@@ -38,14 +38,16 @@ Accept: application/json
 
 **Query params** (conforme o fluxo):
 
-- `documentNumber` — CPF ou outro documento
+- `documentNumber` — CPF (somente dígitos) ou outro documento
 - `email` — e-mail do hóspede
-- `documentType` — enviado quando o documento é passaporte (`PASSPORT`)
+- `documentType` — código numérico VB (`2` CPF, `5` RG, `7` PASSPORT)
+
+Quando o hóspede **não** existe, o VB responde **HTTP 404** com `{ "found": false, "mainGuest": { …vazio } }`. O portal trata isso como “não encontrado”, não como erro.
 
 **Exemplo**
 
 ```http
-GET /v1/reservations/hub/main-guest/lookup?documentNumber=12345678900
+GET /v1/reservations/hub/main-guest/lookup?documentNumber=12345678900&documentType=2
 X-Auth-IApi-Token: {token}
 Accept: application/json
 ```

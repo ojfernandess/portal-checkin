@@ -143,8 +143,21 @@ export async function pmsLookupGuest(
   const provider = await resolvePmsProvider(input.tenantId, input.establishmentId);
 
   if (provider === "vb") {
+    const { portalDocumentTypeToVb } = await import("@/lib/vb-document-type");
+    const vbQuery: Record<string, string> = { ...query };
+    if (vbQuery.documentNumber) {
+      const digits = vbQuery.documentNumber.replace(/\D/g, "");
+      if (digits.length === 11) vbQuery.documentNumber = digits;
+      const documentType =
+        vbQuery.documentType?.trim() ||
+        (digits.length === 11 ? "CPF" : digits.length === 9 || digits.length === 10 ? "RG" : "");
+      if (documentType) {
+        const vbType = portalDocumentTypeToVb(documentType);
+        if (vbType != null) vbQuery.documentType = String(vbType);
+      }
+    }
     const payload = await vbApiFetch<unknown>("/reservations/hub/main-guest/lookup", {
-      query,
+      query: vbQuery,
       tenantId: input.tenantId,
       establishmentId: input.establishmentId ?? undefined,
     });
@@ -152,8 +165,13 @@ export async function pmsLookupGuest(
   }
 
   const { apiFetch } = await import("@/lib/api/techospitality.server");
+  // TecHospitality: documentType só é enviado para passaporte.
+  const techQuery: Record<string, string> = { ...query };
+  if (techQuery.documentType && techQuery.documentType.toUpperCase() !== "PASSPORT") {
+    delete techQuery.documentType;
+  }
   const payload = await apiFetch<unknown>("/api/reservations/hub/main-guest/lookup", {
-    query,
+    query: techQuery,
     tenantId: input.tenantId,
   });
   return { payload, provider };
@@ -247,6 +265,9 @@ export async function pmsUploadCheckinMedia(
     if (!input.establishmentId) {
       throw new Error("Estabelecimento não identificado para upload de foto no PMS VB.");
     }
+    if (!base64.trim() || base64.trim().length < 50) {
+      throw new Error("Foto inválida para upload no PMS VB (conteúdo vazio).");
+    }
 
     const payload = await vbApiFetch<unknown>(
       `/reservations/hub/${encodeURIComponent(localizer)}/checkin/media`,
@@ -258,26 +279,58 @@ export async function pmsUploadCheckinMedia(
       },
     );
 
-    const unwrapped = unwrapVbPayload<Record<string, unknown>>(payload);
+    const unwrapped = unwrapVbPayload<unknown>(payload);
+    const fromVb =
+      unwrapped && typeof unwrapped === "object" && !Array.isArray(unwrapped)
+        ? { ...(unwrapped as Record<string, unknown>) }
+        : typeof unwrapped === "string" && unwrapped.trim()
+          ? { url: unwrapped.trim() }
+          : {};
 
     try {
-      const { uploadCheckinPhotoObject } = await import("@/lib/s3.server");
+      const { uploadCheckinPhotoObject, buildPortalPublicObjectUrl } = await import(
+        "@/lib/s3.server"
+      );
       const objectKey = await uploadCheckinPhotoObject(input.type, {
         establishmentId: input.establishmentId,
         localizer,
         base64Data: base64,
       });
+      const publicUrl = buildPortalPublicObjectUrl(objectKey);
+      const photoUrl =
+        String(fromVb.url ?? fromVb.fileUrl ?? fromVb.keyName ?? "").trim() ||
+        publicUrl ||
+        objectKey;
+      const urlKey = input.type === "profile" ? "profilePhotoUrl" : "documentPhotoUrl";
+      const idKey = input.type === "profile" ? "profilePhotoId" : "documentPhotoId";
+
       return {
-        ...unwrapped,
+        ...fromVb,
+        url: photoUrl,
+        [urlKey]: fromVb[urlKey] ?? photoUrl,
+        ...(fromVb[idKey] != null ? { [idKey]: fromVb[idKey] } : {}),
         minioObjectKey: objectKey,
         storageProvider: "minio",
       };
     } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      const details =
+        error && typeof error === "object"
+          ? [
+              "name" in error ? String((error as { name?: unknown }).name ?? "") : "",
+              "Code" in error ? String((error as { Code?: unknown }).Code ?? "") : "",
+              "code" in error ? String((error as { code?: unknown }).code ?? "") : "",
+            ]
+              .filter(Boolean)
+              .join("/")
+          : "";
       console.warn(
         "[vb-pms] MinIO mirror after media upload failed:",
-        error instanceof Error ? error.message : error,
+        details ? `${err.message} (${details})` : err.message,
       );
-      return unwrapped;
+      // Sem MinIO: devolve o que o VB retornou. O portal pode manter a data URL
+      // e o POST /checkin envia a foto em base64.
+      return fromVb;
     }
   }
 

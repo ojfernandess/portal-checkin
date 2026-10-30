@@ -120,6 +120,8 @@ async function getMinioClient(config: MinioOnlyConfig) {
     },
     endpoint: config.endpoint!,
     forcePathStyle: config.forcePathStyle,
+    requestChecksumCalculation: "WHEN_REQUIRED",
+    responseChecksumValidation: "WHEN_REQUIRED",
   });
 }
 

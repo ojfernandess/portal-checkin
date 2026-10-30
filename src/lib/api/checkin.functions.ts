@@ -149,10 +149,16 @@ export function prepareMainGuestForCheckin(
   mainGuest: MainGuest,
   registered?: RegisteredPhotoSnapshot,
   replaced?: PhotoReplacementFlags,
+  options?: { allowDataUrlPhotos?: boolean },
 ): MainGuest {
   const guest = { ...mainGuest };
 
-  if (guest.profilePhotoUrl?.startsWith("data:") || guest.documentPhotoUrl?.startsWith("data:")) {
+  // Vivakey exige upload prévio em /checkin/media. No VB, data URL pode seguir
+  // para o POST /checkin como base64 quando o espelho MinIO estiver indisponível.
+  if (
+    !options?.allowDataUrlPhotos &&
+    (guest.profilePhotoUrl?.startsWith("data:") || guest.documentPhotoUrl?.startsWith("data:"))
+  ) {
     throw new Error(
       "Corrija os seguintes pontos antes de continuar:\n• Fotos: Selfie, Foto do documento",
     );
@@ -287,6 +293,60 @@ function stripMainGuestPhotoFieldsFromPmsRow(row: Record<string, unknown>): Reco
   return next;
 }
 
+async function normalizeVbMainGuestPhotoFields(
+  row: Record<string, unknown>,
+  guest: MainGuest,
+): Promise<Record<string, unknown>> {
+  const next = { ...row };
+  const { buildPortalPublicObjectUrl, resolvePhotoBase64 } = await import("@/lib/s3.server");
+
+  for (const kind of ["profile", "document"] as const) {
+    const urlKey = kind === "profile" ? "profilePhotoUrl" : "documentPhotoUrl";
+    const idKey = kind === "profile" ? "profilePhotoId" : "documentPhotoId";
+    let urlRaw = typeof next[urlKey] === "string" ? String(next[urlKey]).trim() : "";
+    let idRaw = next[idKey];
+
+    if ((idRaw == null || String(idRaw).trim() === "") && /^\d+$/.test(urlRaw)) {
+      idRaw = Number(urlRaw);
+      next[idKey] = idRaw;
+      urlRaw = "";
+    }
+
+    if (urlRaw.startsWith("data:")) {
+      next[urlKey] = urlRaw.replace(/^data:[^;]+;base64,/i, "");
+      continue;
+    }
+
+    if (urlRaw.startsWith("minio:") || urlRaw.startsWith("profile-photos/") || urlRaw.startsWith("document-photos/")) {
+      const publicUrl = buildPortalPublicObjectUrl(urlRaw);
+      if (publicUrl) urlRaw = publicUrl;
+    }
+
+    if (!urlRaw || (!urlRaw.startsWith("http") && !/^\d+$/.test(urlRaw))) {
+      const base64 = await resolvePhotoBase64(kind, {
+        url: guest[urlKey],
+        id: guest[idKey] ?? (typeof idRaw === "string" || typeof idRaw === "number" ? idRaw : null),
+      });
+      if (base64) {
+        next[urlKey] = base64;
+        continue;
+      }
+    }
+
+    if (urlRaw.startsWith("http")) {
+      next[urlKey] = urlRaw;
+    } else {
+      delete next[urlKey];
+    }
+
+    if (idRaw != null && String(idRaw).trim() !== "") {
+      next[idKey] = /^\d+$/.test(String(idRaw)) ? Number(String(idRaw)) : idRaw;
+    }
+  }
+
+  return next;
+}
+
 async function prepareMainGuestPayloadForPms(
   guest: MainGuest,
   input: {
@@ -302,6 +362,9 @@ async function prepareMainGuestPayloadForPms(
   if (provider === "vb") {
     const vbDocumentType = portalDocumentTypeToVb(String(row["documentType"] ?? "CPF"));
     if (vbDocumentType != null) row["documentType"] = vbDocumentType;
+    if (!input.omitPhotos) {
+      row = await normalizeVbMainGuestPhotoFields(row, guest);
+    }
   } else if (!input.omitPhotos) {
     const { normalizePmsCheckinPhotoFields } = await import("@/lib/s3.server");
     row = normalizePmsCheckinPhotoFields(row);
@@ -574,6 +637,7 @@ function resolveUploadedMediaReference(
     source["keyName"],
     source["fileKey"],
     source["path"],
+    source["minioObjectKey"],
     type === "profile" ? source["profilePhotoUrl"] : source["documentPhotoUrl"],
     type === "profile" ? source["profilePhotoKey"] : source["documentPhotoKey"],
   ];
@@ -1084,11 +1148,14 @@ export const lookupGuest = createServerFn({ method: "POST" })
     const query: Record<string, string> =
       "email" in data
         ? { email: data.email.trim().toLowerCase() }
-        : { documentNumber: data.documentNumber };
-
-    if ("documentNumber" in data && data.documentType === "PASSPORT") {
-      query.documentType = data.documentType;
-    }
+        : (() => {
+            const documentType = data.documentType ?? "CPF";
+            const documentNumber =
+              documentType === "CPF" || documentType === "RG"
+                ? data.documentNumber.replace(/\D/g, "") || data.documentNumber.trim()
+                : data.documentNumber.trim();
+            return { documentNumber, documentType };
+          })();
 
     try {
       const result = await pmsLookupGuest(query, {
@@ -1160,6 +1227,20 @@ export const uploadCheckinMedia = createServerFn({ method: "POST" })
         : (parsed.documentPhotoId ?? parsed.mediaId);
 
     if (!resolvedUrl?.trim() && resolvedId == null) {
+      // VB: mídia já foi aceita no /checkin/media; sem MinIO/URL o cliente mantém a data URL
+      // e o POST /checkin envia a foto em base64.
+      if (data.pmsProvider === "vb") {
+        console.warn(
+          "[checkin] VB media upload sem referência de URL/id; data URL será mantida no portal:",
+          payload,
+        );
+        return {
+          url: "",
+          mediaId: undefined,
+          profilePhotoUrl: data.type === "profile" ? "" : undefined,
+          documentPhotoUrl: data.type === "document" ? "" : undefined,
+        };
+      }
       console.error("[checkin] Upload de mídia sem referência retornada pelo PMS:", payload);
       throw new Error(
         "O servidor não retornou a referência da foto enviada. Tente capturar novamente.",
@@ -2007,6 +2088,7 @@ async function executeSubmitCheckin(data: SubmitCheckinInput) {
             mainGuestInput,
             data.registeredPhotos,
             data.photosReplaced,
+            { allowDataUrlPhotos: pmsProvider === "vb" },
           );
     const preparedDependents = prepareDependentsForCheckin(dependentsInput, mainGuest, {
       pmsProvider,

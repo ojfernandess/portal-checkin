@@ -271,6 +271,7 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
     documentId?: string | number;
   }>({});
   const photosReplacedRef = useRef({ profile: false, document: false });
+  const vbMediaUploadedRef = useRef({ profile: false, document: false });
   const registeredPhotosActive = useRef(false);
   const uploadedReplacementRef = useRef<{
     profileUrl?: string;
@@ -288,6 +289,7 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
     };
     registeredPhotosActive.current = true;
     photosReplacedRef.current = { profile: false, document: false };
+    vbMediaUploadedRef.current = { profile: false, document: false };
     uploadedReplacementRef.current = {};
   }
 
@@ -295,6 +297,7 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
     registeredPhotoBaseline.current = {};
     registeredPhotosActive.current = false;
     photosReplacedRef.current = { profile: false, document: false };
+    vbMediaUploadedRef.current = { profile: false, document: false };
     uploadedReplacementRef.current = {};
     setEditRegisteredSelfie(false);
     setEditRegisteredDocPhoto(false);
@@ -360,10 +363,12 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
     if (type === "profile") {
       setSelfie(value || null);
       photosReplacedRef.current.profile = !!value && isDataUrl(value);
+      if (value && isDataUrl(value)) vbMediaUploadedRef.current.profile = false;
       return;
     }
     setDocPhoto(value || null);
     photosReplacedRef.current.document = !!value && isDataUrl(value);
+    if (value && isDataUrl(value)) vbMediaUploadedRef.current.document = false;
   }
   const [reservation, setReservation] = useState<Reservation | null>(null);
   const [termsAcceptedAt, setTermsAcceptedAt] = useState<string | null>(null);
@@ -431,9 +436,18 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
   async function uploadPhotoIfNeeded(
     value: string | null | undefined,
     type: "profile" | "document",
+    existingId?: string | number,
   ): Promise<{ url: string; id?: string | number } | null> {
     if (!value) return null;
-    if (!isDataUrl(value)) return { url: value };
+    if (!isDataUrl(value)) return { url: value, id: existingId };
+
+    // VB: data URL já enviada ao /checkin/media nesta sessão — não reenviar.
+    if (
+      reservation?.pmsProvider === "vb" &&
+      (existingId != null || vbMediaUploadedRef.current[type])
+    ) {
+      return { url: value, id: existingId };
+    }
 
     let uploadPayload = value;
     if (reservation?.pmsProvider === "vb") {
@@ -451,20 +465,28 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
         pmsProvider: reservation?.pmsProvider,
       },
     });
+    const uploadedUrl =
+      (type === "profile" ? result.profilePhotoUrl : result.documentPhotoUrl) ?? result.url;
+    const uploadedId =
+      (type === "profile" ? result.profilePhotoId : result.documentPhotoId) ?? result.mediaId;
+    // VB: se o espelho MinIO falhar e o PMS não devolver URL http, mantém a data URL
+    // para o POST /checkin enviar a foto em base64.
+    const keepDataUrl =
+      reservation?.pmsProvider === "vb" &&
+      (!uploadedUrl?.trim() || !/^https?:\/\//i.test(uploadedUrl));
+    if (reservation?.pmsProvider === "vb") {
+      vbMediaUploadedRef.current[type] = true;
+    }
     return {
-      url:
-        (type === "profile" ? result.profilePhotoUrl : result.documentPhotoUrl) ??
-        result.url,
-      id:
-        (type === "profile" ? result.profilePhotoId : result.documentPhotoId) ??
-        result.mediaId,
+      url: keepDataUrl ? value : uploadedUrl,
+      id: uploadedId ?? existingId,
     };
   }
 
   async function ensureGuestPhotosUploaded(current: MainGuest): Promise<MainGuest> {
     const [profile, document] = await Promise.all([
-      uploadPhotoIfNeeded(current.profilePhotoUrl ?? null, "profile"),
-      uploadPhotoIfNeeded(current.documentPhotoUrl ?? null, "document"),
+      uploadPhotoIfNeeded(current.profilePhotoUrl ?? null, "profile", current.profilePhotoId),
+      uploadPhotoIfNeeded(current.documentPhotoUrl ?? null, "document", current.documentPhotoId),
     ]);
 
     const next: MainGuest = { ...current };
@@ -865,7 +887,11 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
     setLoading(true);
     try {
       const found = await lookup({
-        data: { documentNumber: value.replace(/\D/g, ""), establishmentId },
+        data: {
+          documentNumber: value.replace(/\D/g, ""),
+          documentType: "CPF",
+          establishmentId,
+        },
       });
       const fallbackGuest = {
         documentNumber: value.replace(/\D/g, ""),
@@ -1867,6 +1893,7 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
                   {...exclusiveCameraProps}
                   onCapture={(value) => {
                     setSelfie(value || null);
+                    if (value && isDataUrl(value)) vbMediaUploadedRef.current.profile = false;
                     if (registeredPhotosActive.current && value && isDataUrl(value)) {
                       photosReplacedRef.current.profile = true;
                     }
@@ -1882,6 +1909,7 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
                   label={t("checkin.photos.documentHint")}
                   onCapture={(value) => {
                     setDocPhoto(value || null);
+                    if (value && isDataUrl(value)) vbMediaUploadedRef.current.document = false;
                     if (registeredPhotosActive.current && value && isDataUrl(value)) {
                       photosReplacedRef.current.document = true;
                     }

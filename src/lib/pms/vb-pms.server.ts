@@ -107,6 +107,16 @@ export async function vbApiFetch<T>(path: string, options: VbApiOptions = {}): P
   if (!response.ok) {
     const row =
       parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : null;
+    // Lookup de hóspede: VB devolve 404 + { found: false } quando não há cadastro.
+    if (
+      response.status === 404 &&
+      row &&
+      row["found"] === false &&
+      url.pathname.includes("/main-guest/lookup")
+    ) {
+      console.info(`[vb-pms] ${method} ${url.pathname} -> 404 (hóspede não encontrado)`);
+      return parsed as T;
+    }
     const code = row ? String(row["code"] ?? "").trim() : "";
     const message =
       (row ? String(row["message"] ?? row["error"] ?? "") : null) ||
