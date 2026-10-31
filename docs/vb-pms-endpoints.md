@@ -18,6 +18,8 @@ O portal utiliza **4 endpoints** HTTP no VB. A referência Embratur/FNRH é loca
 | **Path** | `/reservations/localizer/{localizer}` |
 | **Uso** | Consultar a reserva pelo código localizador |
 
+No bloco `checkin`, o VB pode retornar `preCheckin` (boolean). Quando `true`, o hóspede concluiu o **pré check-in** digital (status ainda “Reserva Confirmada”); no dia/hora de entrada o VB promove para “Hospedada” com `validatedCheckin: true`. O portal mostra textos de pré check-in e sincroniza a Inbox também nesse caso. Com `preCheckin: false` (ex.: já “Hospedada”), o fluxo permanece o de check-in completo.
+
 **Exemplo**
 
 ```http

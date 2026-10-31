@@ -519,16 +519,32 @@ export function mergeCheckinResult(
     ...(normalizeCheckinFlags(checkin) ?? (checkin as Reservation["checkin"])),
   };
 
+  const preCheckinActive =
+    mergedCheckin.preCheckin === true ||
+    mergedCheckin.preCheckin === 1 ||
+    String(mergedCheckin.preCheckin ?? "") === "1";
+
   if (reservation.pmsProvider === "vb") {
-    mergedCheckin =
-      applyVbCheckedInStatus(VB_RESERVATION_STATUS.CHECKED_IN, mergedCheckin) ?? mergedCheckin;
+    // Marca o fluxo digital como concluído no portal; em pré check-in mantém o status
+    // real da reserva (ex.: Confirmada) até o VB promover para Hospedada.
+    mergedCheckin = {
+      ...(applyVbCheckedInStatus(
+        preCheckinActive ? reservation.reservationStatus : VB_RESERVATION_STATUS.CHECKED_IN,
+        mergedCheckin,
+      ) ?? mergedCheckin),
+      checkin: 1,
+      checkinApi: 1,
+      ...(preCheckinActive ? { preCheckin: 1 } : {}),
+    };
   }
 
   return {
     ...withDetails,
     ...(reservation.pmsProvider === "vb"
       ? {
-          reservationStatus: VB_RESERVATION_STATUS.CHECKED_IN,
+          ...(preCheckinActive
+            ? {}
+            : { reservationStatus: VB_RESERVATION_STATUS.CHECKED_IN }),
           pmsProvider: "vb" as const,
         }
       : {}),

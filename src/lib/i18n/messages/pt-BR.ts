@@ -549,10 +549,16 @@ export const ptBR = {
       body1:
         "Obrigado pela paciência. Estamos confirmando sua hospedagem e preparando os detalhes da sua estadia — endereço, acomodação e informações de acesso.",
       body2: "Isso leva apenas alguns segundos.",
+      waitNotice: "Por favor, aguarde nesta página e não feche ou atualize a tela.",
+      stageConfirm: "Confirmando seus dados no hotel",
+      stagePrepare: "Preparando acomodação e acesso",
+      stageAccess: "Gerando informações da sua estadia",
     },
     success: {
       titleDone: "Check-in concluído",
       titleSuccess: "Check-in realizado com sucesso!",
+      titlePreCheckinDone: "Pré check-in concluído",
+      titlePreCheckinSuccess: "Pré check-in realizado com sucesso!",
       titleCancelled: "Reserva cancelada",
       subtitleSuccess:
         "Sua chegada já está autorizada. Siga as informações abaixo para acessar sua acomodação e aproveitar sua estadia.",
@@ -611,6 +617,8 @@ export const ptBR = {
       shareText: "Check-in confirmado em {establishment} — {date}",
       submitFailed: "Não foi possível concluir o check-in.",
       readySubtitle: "Sua acomodação está pronta.",
+      preCheckinSubtitle:
+        "Seu pré check-in foi realizado. No dia e horário de entrada ({date} às {time}), a acomodação estará pronta para uso.",
       accessHubTitle: "Acesso à sua acomodação",
       yourRoom: "Seu quarto",
       quickRoom: "Quarto",

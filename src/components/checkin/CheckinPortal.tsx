@@ -1086,6 +1086,9 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
     }
 
     setLoading(true);
+    // Mostra a tela de finalização imediatamente — o submit VB/Inbox/WhatsApp
+    // pode levar vários segundos e antes a UI ficava parada na Ficha Embratur.
+    setStep(7);
     let checkinResult: Record<string, unknown> | null = null;
     let mainGuest = guest;
     const submittedDependents = dependentsRef.current;
@@ -1135,6 +1138,7 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
         },
       });
     } catch (error) {
+      setStep(6);
       if (isEstablishmentNotRegisteredError(error)) {
         showCheckinError(t("checkin.search.establishmentNotRegistered"));
         setLoading(false);
@@ -1149,9 +1153,6 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
       setLoading(false);
       return;
     }
-
-    setLoading(false);
-    setStep(7);
 
     const code = String(reservation?.localizer ?? localizer).trim().toUpperCase();
     const prior = reservation;
@@ -1186,6 +1187,7 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
     setCheckinAlreadyDone(false);
     setReaccessSecurityRequired(false);
     setReaccessVerifiedFor(String(reservation?.localizer ?? localizer).trim().toUpperCase());
+    setLoading(false);
     setStep(8);
     void refreshPostCompanionsAvailability(String(reservation?.localizer ?? localizer).trim().toUpperCase());
   }

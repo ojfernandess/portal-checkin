@@ -41,7 +41,7 @@ import { localeToDateLocale, type Locale } from "@/lib/i18n/types";
 import { buildWhatsAppUrl } from "@/lib/phone-display";
 import { cn } from "@/lib/utils";
 import { mergeGuests, resolveReservationUnitDisplay } from "@/lib/api/reservation-normalizer";
-import type { Dependent, GuestLookup, Reservation } from "@/lib/api/types";
+import { isReservationPreCheckin, type Dependent, type GuestLookup, type Reservation } from "@/lib/api/types";
 import { companionNeedsInboxPhoto } from "@/lib/companion-inbox-photos";
 import { CompanionInviteLink } from "@/components/checkin/CompanionInviteLink";
 import type { ExclusiveCameraProps } from "@/lib/camera-utils";
@@ -654,13 +654,26 @@ export function SuccessScreen({
   const heroImageUrl = establishmentPhotoUrl?.trim() || "/bg_portal.png";
   const checkoutWhenLabel = formatTimelineDate(checkoutDate, checkoutTime, locale);
 
+  const isPreCheckin = isReservationPreCheckin(reservation);
+
   const confirmationTitle = showCheckoutFarewell
     ? t("checkin.success.checkoutCompleteTitle")
     : alreadyCompleted && !isCancelled
-      ? t("checkin.success.titleDone")
+      ? isPreCheckin
+        ? t("checkin.success.titlePreCheckinDone")
+        : t("checkin.success.titleDone")
       : isCancelled
         ? t("checkin.success.titleCancelled")
-        : t("checkin.success.titleSuccess");
+        : isPreCheckin
+          ? t("checkin.success.titlePreCheckinSuccess")
+          : t("checkin.success.titleSuccess");
+
+  const readySubtitle = isPreCheckin
+    ? t("checkin.success.preCheckinSubtitle", {
+        date: formatDate(checkinDate, locale),
+        time: checkinTimeLabel,
+      })
+    : t("checkin.success.readySubtitle");
 
   const showMobileBar =
     !isCancelled && !checkoutPast && (showRoomNumber || showRoomPassword || whatsappUrl || mapsUrl || phone);
@@ -712,12 +725,12 @@ export function SuccessScreen({
           <h1 className="text-base font-semibold leading-snug text-foreground sm:text-lg">{confirmationTitle}</h1>
           {showCheckoutFarewell ? (
             <p className="text-sm text-muted-foreground">{t("checkin.success.checkoutCompleteFarewell")}</p>
-          ) : alreadyCompleted && checkinWhen && !isCancelled ? (
+          ) : alreadyCompleted && checkinWhen && !isCancelled && !isPreCheckin ? (
             <p className="text-sm text-muted-foreground">
               {t("checkin.success.doneAt")} {checkinWhen}
             </p>
           ) : !isCancelled ? (
-            <p className="text-sm text-muted-foreground">{t("checkin.success.readySubtitle")}</p>
+            <p className="text-sm text-muted-foreground">{readySubtitle}</p>
           ) : (
             <p className="text-sm text-destructive">{t("checkin.success.cancelledAccessNotice")}</p>
           )}
@@ -745,7 +758,7 @@ export function SuccessScreen({
                 </span>
                 <div className="min-w-0">
                   <SectionTitle>{t("checkin.success.accessHubTitle")}</SectionTitle>
-                  <p className="mt-0.5 text-sm text-muted-foreground">{t("checkin.success.readySubtitle")}</p>
+                  <p className="mt-0.5 text-sm text-muted-foreground">{readySubtitle}</p>
                 </div>
               </div>
             </div>

@@ -179,6 +179,41 @@
   animation: step-in 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+@keyframes checkin-finalizing-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes checkin-finalizing-bar {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(220%);
+  }
+}
+
+@utility checkin-finalizing-ring {
+  animation: checkin-finalizing-spin 3.2s linear infinite;
+}
+
+@utility checkin-finalizing-ring-reverse {
+  animation: checkin-finalizing-spin 4.8s linear infinite reverse;
+}
+
+@utility checkin-finalizing-bar {
+  animation: checkin-finalizing-bar 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .checkin-finalizing-ring,
+  .checkin-finalizing-ring-reverse,
+  .checkin-finalizing-bar {
+    animation: none !important;
+  }
+}
+
 @keyframes seal-pop {
   0% {
     opacity: 0;

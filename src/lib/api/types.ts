@@ -182,8 +182,16 @@ export type EmbraturForm = {
   snidcidadeibgedest: string;
 };
 
+/** Pré check-in digital no PMS VB (`checkin.preCheckin`), antes do status Hospedada. */
+export function isReservationPreCheckin(r: Reservation | null): boolean {
+  if (!r?.checkin) return false;
+  const value = r.checkin.preCheckin;
+  return value === true || value === 1 || value === "1";
+}
+
 export function isAlreadyCheckedIn(r: Reservation | null): boolean {
   if (!r) return false;
+  if (isReservationPreCheckin(r)) return true;
   if (Number(r.reservationStatus) === 6) return true;
 
   const c = r.checkin;
@@ -202,10 +210,11 @@ export function isCheckinApproved(r: Reservation | null): boolean {
   return Number(r?.checkin?.hasCheckinApproved) === 1;
 }
 
-/** Pronto para sincronizar com a Inbox: aprovado ou check-in digital concluído + validado. */
+/** Pronto para sincronizar com a Inbox: aprovado, pré check-in VB ou check-in digital + validado. */
 export function isCheckinConfirmedForInbox(r: Reservation | null): boolean {
   if (!r) return false;
   if (isCheckinApproved(r)) return true;
+  if (isReservationPreCheckin(r)) return true;
   const c = r.checkin;
   if (!c) return false;
   return Number(c.validatedCheckin) === 1 && isAlreadyCheckedIn(r);

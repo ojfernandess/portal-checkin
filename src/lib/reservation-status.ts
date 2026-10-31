@@ -28,6 +28,7 @@ export function normalizeCheckinFlags(
     checkinManual: normalizeCheckinFlag(checkin.checkinManual),
     validatedCheckin: normalizeCheckinFlag(checkin.validatedCheckin),
     hasCheckinApproved: normalizeCheckinFlag(checkin.hasCheckinApproved),
+    preCheckin: normalizeCheckinFlag(checkin.preCheckin),
   };
 }
 

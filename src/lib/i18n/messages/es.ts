@@ -551,10 +551,16 @@ export const es: MessageTree = {
       body1:
         "Gracias por su paciencia. Estamos confirmando su hospedaje y preparando los detalles — dirección, alojamiento e información de acceso.",
       body2: "Esto toma solo unos segundos.",
+      waitNotice: "Por favor, permanezca en esta página y no cierre ni actualice la pantalla.",
+      stageConfirm: "Confirmando sus datos en el hotel",
+      stagePrepare: "Preparando alojamiento y acceso",
+      stageAccess: "Generando la información de su estadía",
     },
     success: {
       titleDone: "Check-in completado",
       titleSuccess: "¡Check-in realizado con éxito!",
+      titlePreCheckinDone: "Pre check-in completado",
+      titlePreCheckinSuccess: "¡Pre check-in realizado con éxito!",
       titleCancelled: "Reserva cancelada",
       subtitleSuccess:
         "Su llegada ya está autorizada. Siga la información a continuación para acceder a su alojamiento y disfrutar su estadía.",
@@ -613,6 +619,8 @@ export const es: MessageTree = {
       shareText: "Check-in confirmado en {establishment} — {date}",
       submitFailed: "No fue posible completar el check-in.",
       readySubtitle: "Su alojamiento está listo.",
+      preCheckinSubtitle:
+        "Su pre check-in fue realizado. En el día y horario de entrada ({date} a las {time}), el alojamiento estará listo para uso.",
       accessHubTitle: "Acceso a su alojamiento",
       yourRoom: "Su habitación",
       quickRoom: "Habitación",
