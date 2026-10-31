@@ -33,6 +33,11 @@ export type EstablishmentSettings = {
    * Sem isto, o localizador não entra na descoberta/roteamento VB.
    */
   vbEnabled: boolean;
+  /**
+   * ID do estabelecimento no PMS VB (`data.establishment.establishmentId`).
+   * Independente do ID do portal — ex.: portal 33 (Rock Blue Ocean) → VB `1`.
+   */
+  vbEstablishmentId: string | null;
   /** Token X-Auth-IApi-Token do PMS VB para este estabelecimento. */
   vbApiToken: string | null;
   /** Vincula fotos de check-in anteriores ao hóspede (lookup) via MinIO. */
@@ -66,6 +71,7 @@ export const DEFAULT_ESTABLISHMENT_SETTINGS: EstablishmentSettings = {
   requireBirthDateConfirmationOnReaccess: false,
   successPagePhotoUrl: null,
   vbEnabled: false,
+  vbEstablishmentId: null,
   vbApiToken: null,
   vbPhotoLinkEnabled: false,
   inboxEnabled: false,
@@ -223,9 +229,37 @@ function parseVbEnabled(settings: Record<string, unknown>): boolean {
   return settings.vbEnabled === true;
 }
 
+function parseVbEstablishmentId(value: unknown): string | null {
+  if (value == null || value === "") return null;
+  const text = String(value).trim();
+  if (!text || !/^\d+$/.test(text)) return null;
+  return text;
+}
+
 /** Estabelecimento usa VB: switch ligado e token preenchido. */
 export function isEstablishmentVbActive(settings: EstablishmentSettings): boolean {
   return settings.vbEnabled === true && Boolean(settings.vbApiToken?.trim());
+}
+
+/**
+ * ID VB usado para casar a reserva ao portal.
+ * Preferência: `vbEstablishmentId` cadastrado; legado: o próprio ID do portal.
+ */
+export function resolveConfiguredVbEstablishmentId(
+  portalEstablishmentId: string,
+  settings: Pick<EstablishmentSettings, "vbEstablishmentId">,
+): string {
+  return settings.vbEstablishmentId?.trim() || String(portalEstablishmentId).trim();
+}
+
+/** Indica se este estabelecimento portal é o dono do `establishmentId` retornado pelo VB. */
+export function portalEstablishmentOwnsVbPmsId(
+  portalEstablishmentId: string,
+  settings: Pick<EstablishmentSettings, "vbEstablishmentId">,
+  vbPmsEstablishmentId: string,
+): boolean {
+  const configured = resolveConfiguredVbEstablishmentId(portalEstablishmentId, settings);
+  return configured === String(vbPmsEstablishmentId).trim();
 }
 
 export function parseEstablishmentSettings(raw: unknown): EstablishmentSettings {
@@ -242,6 +276,7 @@ export function parseEstablishmentSettings(raw: unknown): EstablishmentSettings 
       typeof settings.vbApiToken === "string" && settings.vbApiToken.trim()
         ? settings.vbApiToken.trim()
         : null,
+    vbEstablishmentId: parseVbEstablishmentId(settings.vbEstablishmentId),
     vbEnabled: parseVbEnabled(settings),
     vbPhotoLinkEnabled: settings.vbPhotoLinkEnabled === true,
     inboxEnabled: settings.inboxEnabled === true,

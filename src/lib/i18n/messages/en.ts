@@ -323,7 +323,6 @@ export const en: MessageTree = {
       document: "Document",
       documentHint: "Front of document",
       submit: "Submit and continue",
-      confirmSelfieRequired: 'Tap "Use this photo" to confirm your selfie before continuing.',
       required: "Please upload selfie and document photo.",
       uploadFailed: "Failed to upload photos.",
       invalidFormat:
@@ -1088,6 +1087,10 @@ export const en: MessageTree = {
       vbEnabled: "Enable VB PMS for this establishment",
       vbEnabledHint:
         "When enabled, this establishment's locators are looked up and completed on VB. TecHospitality establishments should keep this off.",
+      vbEstablishmentId: "VB establishment ID",
+      vbEstablishmentIdPlaceholder: "e.g. 1",
+      vbEstablishmentIdHint:
+        "The establishmentId returned by the VB API (e.g. data.establishment.establishmentId). This is not the portal hotel ID — use the Vinibarr value.",
       vbApiToken: "X-Auth-IApi-Token",
       vbApiTokenPlaceholder: "VB API token for this establishment",
       vbPhotoLinkEnabled: "Link previous check-in photos to guest",

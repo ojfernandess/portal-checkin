@@ -6,6 +6,8 @@ Base URL padrão: `http://api.vinibarr.com.br/v1`
 Autenticação: header `X-Auth-IApi-Token`  
 (Token do estabelecimento `vbApiToken`, token do tenant ou `VB_PMS_API_TOKEN`.)
 
+**ID VB ≠ ID do portal:** o `data.establishment.establishmentId` do Vinibarr é o ID interno do VB (ex.: `1` = Vivapp Rock Blue Ocean). No portal, o mesmo hotel pode ter outro ID (ex.: `33`). Em Admin → Estabelecimento, cadastre o campo **ID do estabelecimento no VB** (`vbEstablishmentId`) para o portal vincular a reserva ao hotel e ao token corretos.
+
 O portal utiliza **4 endpoints** HTTP no VB. A referência Embratur/FNRH é local e não chama a API Vinibarr.
 
 ---
@@ -106,6 +108,12 @@ Accept: application/json
 ```
 
 O body segue o payload de check-in digital do portal (`mode`, `mainGuest`, `dependents`, `embratur`, flags de validação, etc.).
+
+**Importante — token do hotel dono:** o `GET /localizer` e o `POST /checkin/media` podem responder OK com o token de **outro** hotel do mesmo ecossistema VB. O `POST /checkin` exige o `X-Auth-IApi-Token` do estabelecimento dono (`data.establishment.establishmentId`). Se o token for de outro hotel, o VB responde **404** `{ sucesso: false, mensagem: "Reserva não encontrada." }`.
+
+O portal só vincula a reserva a um estabelecimento quando o `establishmentId` do PMS coincide com o **ID VB cadastrado** (`vbEstablishmentId`) de um hotel **com PMS VB ativo e token**. Caso contrário, a busca falha com mensagem de configuração (ID VB não mapeado, VB inativo, etc.), em vez de seguir até o check-in com token errado.
+
+Se o VB responder **500 Slim Application Error** com `$cnpj ... null given` em `checkinReserva`, o token/hotel estão corretos no portal, mas o **cadastro do estabelecimento no Vinibarr está sem CNPJ**. Isso precisa ser corrigido no VB (não no payload do portal).
 
 ---
 

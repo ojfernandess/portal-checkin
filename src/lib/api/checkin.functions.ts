@@ -696,10 +696,7 @@ function applyPortalEstablishmentContext(
     next.establishmentId = context.portalEstablishmentId;
   }
 
-  if (
-    pmsEstablishmentId != null &&
-    String(pmsEstablishmentId) !== String(next.establishmentId ?? "")
-  ) {
+  if (pmsEstablishmentId != null) {
     next.pmsEstablishmentId = pmsEstablishmentId;
   }
 
@@ -1206,13 +1203,22 @@ export const uploadCheckinMedia = createServerFn({ method: "POST" })
     const { assertRegisteredEstablishmentAccess } = await import("@/lib/establishment-registry.server");
     await assertRegisteredEstablishmentAccess(data.establishmentId);
     const tenantId = await resolveCheckinTenantId(data.establishmentId);
+    let mediaEstablishmentId = data.establishmentId;
+    if (data.pmsProvider === "vb" && mediaEstablishmentId) {
+      const { resolveVbOwnerEstablishmentIdForMutation } = await import("@/lib/pms/vb-pms.server");
+      mediaEstablishmentId = await resolveVbOwnerEstablishmentIdForMutation({
+        localizer: data.localizer ?? data.reservationId,
+        tenantId,
+        portalEstablishmentId: mediaEstablishmentId,
+      });
+    }
     const { pmsUploadCheckinMedia } = await import("@/lib/pms/index.server");
     const payload = await pmsUploadCheckinMedia({
       reservationId: data.reservationId,
       data: stripDataUrl(data.data),
       type: data.type,
       tenantId,
-      establishmentId: data.establishmentId,
+      establishmentId: mediaEstablishmentId,
       localizer: data.localizer ?? data.reservationId,
       pmsProvider: data.pmsProvider,
     });
@@ -2122,6 +2128,26 @@ async function executeSubmitCheckin(data: SubmitCheckinInput) {
       );
     }
 
+    let submitEstablishmentId = resolvedEstablishmentIdForTenant
+      ? String(resolvedEstablishmentIdForTenant)
+      : null;
+    if ((pmsProvider ?? snapshot?.pmsProvider) === "vb") {
+      const { resolveVbOwnerEstablishmentIdForMutation } = await import("@/lib/pms/vb-pms.server");
+      const snapshotPmsEstablishmentId =
+        snapshot?.pmsEstablishmentId ??
+        snapshot?.establishment?.establishmentId ??
+        null;
+      submitEstablishmentId = await resolveVbOwnerEstablishmentIdForMutation({
+        localizer: localizerCode,
+        tenantId,
+        portalEstablishmentId: submitEstablishmentId,
+        pmsEstablishmentId: snapshotPmsEstablishmentId,
+      });
+      console.info(
+        `[checkin] VB submit localizer=${localizerCode} establishmentId=${submitEstablishmentId}`,
+      );
+    }
+
     const body: Record<string, unknown> = {
       mode: "digital",
       fnrhId: null,
@@ -2130,9 +2156,7 @@ async function executeSubmitCheckin(data: SubmitCheckinInput) {
       sentToReception: true,
       mainGuest: await prepareMainGuestPayloadForPms(mainGuest, {
         tenantId,
-        establishmentId: resolvedEstablishmentIdForTenant
-          ? String(resolvedEstablishmentIdForTenant)
-          : null,
+        establishmentId: submitEstablishmentId,
         pmsProvider,
         omitPhotos: purpose === "companions",
       }),
@@ -2141,11 +2165,10 @@ async function executeSubmitCheckin(data: SubmitCheckinInput) {
     if (preparedDependents.length > 0) {
       body["dependents"] = preparedDependents;
     }
+
     const submitResult = await pmsSubmitCheckin(localizerCode, body, {
       tenantId,
-      establishmentId: resolvedEstablishmentIdForTenant
-        ? String(resolvedEstablishmentIdForTenant)
-        : null,
+      establishmentId: submitEstablishmentId,
       pmsProvider,
     });
     const result = await unwrapPmsPayload<Record<string, unknown>>(

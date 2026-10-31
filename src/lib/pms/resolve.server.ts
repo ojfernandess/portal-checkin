@@ -35,13 +35,22 @@ async function tenantHasVbFallbackToken(tenantId: string): Promise<boolean> {
   return Boolean(settings?.enabled && settings.config.tokens?.api?.trim());
 }
 
+export type VbEstablishmentCandidate = {
+  establishmentId: string;
+  tenantId: string;
+  /** ID do hotel no PMS VB (`vbEstablishmentId`), ou o ID do portal se não cadastrado. */
+  vbEstablishmentId: string;
+};
+
 export async function listVbEstablishmentCandidates(
   tenantId?: string,
-): Promise<Array<{ establishmentId: string; tenantId: string }>> {
+): Promise<VbEstablishmentCandidate[]> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { isEstablishmentVbActive, parseEstablishmentSettings } = await import(
-    "@/lib/establishment-settings"
-  );
+  const {
+    isEstablishmentVbActive,
+    parseEstablishmentSettings,
+    resolveConfiguredVbEstablishmentId,
+  } = await import("@/lib/establishment-settings");
 
   let query = supabaseAdmin
     .from("establishment_settings")
@@ -61,21 +70,23 @@ export async function listVbEstablishmentCandidates(
     .map((row) => {
       const settings = parseEstablishmentSettings(row.settings);
       if (!isEstablishmentVbActive(settings)) return null;
+      const establishmentId = String(row.establishment_id);
       return {
-        establishmentId: String(row.establishment_id),
+        establishmentId,
         tenantId: String(row.tenant_id),
+        vbEstablishmentId: resolveConfiguredVbEstablishmentId(establishmentId, settings),
       };
     })
-    .filter((row): row is { establishmentId: string; tenantId: string } => row != null);
+    .filter((row): row is VbEstablishmentCandidate => row != null);
 }
 
 /** Estabelecimentos com VB ativo (switch + token) cujo tenant ainda tem integração VB no super admin. */
 export async function listEnabledVbEstablishmentCandidates(
   tenantId?: string,
-): Promise<Array<{ establishmentId: string; tenantId: string }>> {
+): Promise<VbEstablishmentCandidate[]> {
   const candidates = await listVbEstablishmentCandidates(tenantId);
   const enabledByTenant = new Map<string, boolean>();
-  const enabled: Array<{ establishmentId: string; tenantId: string }> = [];
+  const enabled: VbEstablishmentCandidate[] = [];
 
   for (const candidate of candidates) {
     let tenantEnabled = enabledByTenant.get(candidate.tenantId);
@@ -87,6 +98,17 @@ export async function listEnabledVbEstablishmentCandidates(
   }
 
   return enabled;
+}
+
+/** Localiza o estabelecimento do portal cujo ID VB cadastrado corresponde ao do PMS. */
+export async function findPortalEstablishmentByVbPmsId(
+  vbPmsEstablishmentId: string,
+  tenantId?: string,
+): Promise<VbEstablishmentCandidate | null> {
+  const pmsId = String(vbPmsEstablishmentId ?? "").trim();
+  if (!pmsId) return null;
+  const candidates = await listEnabledVbEstablishmentCandidates(tenantId);
+  return candidates.find((candidate) => candidate.vbEstablishmentId === pmsId) ?? null;
 }
 
 /** Há ao menos um estabelecimento deste tenant com VB ativo (token + integração habilitada). */

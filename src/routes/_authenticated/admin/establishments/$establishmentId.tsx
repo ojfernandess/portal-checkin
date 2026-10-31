@@ -92,6 +92,7 @@ function EstablishmentConfigPage() {
   const [usefulInfoItems, setUsefulInfoItems] = useState<UsefulInfoItem[]>([]);
   const [tenantVbEnabled, setTenantVbEnabled] = useState(false);
   const [vbEnabled, setVbEnabled] = useState(false);
+  const [vbEstablishmentId, setVbEstablishmentId] = useState("");
   const [vbApiToken, setVbApiToken] = useState("");
   const [vbPhotoLinkEnabled, setVbPhotoLinkEnabled] = useState(false);
   const [inboxUnits, setInboxUnits] = useState<InboxManagedUnitOption[]>([]);
@@ -136,6 +137,7 @@ function EstablishmentConfigPage() {
         setUsefulInfoItems(settings.settings.usefulInfoItems);
         setTenantVbEnabled(settings.tenantVbEnabled === true);
         setVbEnabled(settings.settings.vbEnabled === true);
+        setVbEstablishmentId(settings.settings.vbEstablishmentId ?? "");
         setVbApiToken(settings.settings.vbApiToken ?? "");
         setVbPhotoLinkEnabled(settings.settings.vbPhotoLinkEnabled);
         setWhatsappNotifyEnabled(settings.settings.whatsappNotifyEnabled);
@@ -236,6 +238,7 @@ function EstablishmentConfigPage() {
           inboxUnitMappings,
           usefulInfoItems,
           vbEnabled,
+          vbEstablishmentId: vbEstablishmentId.trim() || null,
           vbApiToken: vbApiToken.trim() || null,
           vbPhotoLinkEnabled,
           whatsappNotifyEnabled,
@@ -423,6 +426,24 @@ function EstablishmentConfigPage() {
                 </label>
                 {vbEnabled ? (
                   <>
+                    <div className="space-y-2">
+                      <Label htmlFor="vbEstablishmentId">
+                        {t("admin.establishmentConfig.vbEstablishmentId")}
+                      </Label>
+                      <Input
+                        id="vbEstablishmentId"
+                        inputMode="numeric"
+                        value={vbEstablishmentId}
+                        onChange={(e) =>
+                          setVbEstablishmentId(e.target.value.replace(/\D/g, "").slice(0, 32))
+                        }
+                        placeholder={t("admin.establishmentConfig.vbEstablishmentIdPlaceholder")}
+                        autoComplete="off"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        {t("admin.establishmentConfig.vbEstablishmentIdHint")}
+                      </p>
+                    </div>
                     <div className="space-y-2">
                       <Label htmlFor="vbApiToken">{t("admin.establishmentConfig.vbApiToken")}</Label>
                       <Input

@@ -322,8 +322,6 @@ export const ptBR = {
       document: "Documento",
       documentHint: "Frente do documento",
       submit: "Enviar e continuar",
-      confirmSelfieRequired:
-        'Toque em "Usar esta foto" para confirmar a selfie antes de continuar.',
       required: "Envie a selfie e a foto do documento.",
       uploadFailed: "Falha ao enviar as fotos.",
       invalidFormat:
@@ -1098,6 +1096,10 @@ export const ptBR = {
       vbEnabled: "Ativar PMS VB neste estabelecimento",
       vbEnabledHint:
         "Quando ativo, localizadores deste estabelecimento são consultados e finalizados no VB. Estabelecimentos TecHospitality devem manter esta opção desligada.",
+      vbEstablishmentId: "ID do estabelecimento no VB",
+      vbEstablishmentIdPlaceholder: "Ex.: 1",
+      vbEstablishmentIdHint:
+        "É o establishmentId retornado pela API VB (ex.: data.establishment.establishmentId). Não é o ID deste hotel no portal — use o valor do Vinibarr.",
       vbApiToken: "Token X-Auth-IApi-Token",
       vbApiTokenPlaceholder: "Token da API VB deste estabelecimento",
       vbPhotoLinkEnabled: "Vincular fotos de check-in anteriores ao hóspede",

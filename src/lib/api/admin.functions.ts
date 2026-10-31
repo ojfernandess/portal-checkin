@@ -1277,6 +1277,16 @@ export const adminSaveSettings = createServerFn({ method: "POST" })
           )
           .optional(),
         vbEnabled: z.boolean().optional(),
+        vbEstablishmentId: z
+          .union([
+            z
+              .string()
+              .trim()
+              .regex(/^\d*$/, "ID VB deve ser numérico")
+              .max(32),
+            z.null(),
+          ])
+          .optional(),
         vbApiToken: z.string().trim().max(500).nullable().optional(),
         vbPhotoLinkEnabled: z.boolean().optional(),
         whatsappNotifyEnabled: z.boolean().optional(),
@@ -1338,6 +1348,14 @@ export const adminSaveSettings = createServerFn({ method: "POST" })
         ? { usefulInfoItems: sanitizeUsefulInfoItems(data.usefulInfoItems) }
         : {}),
       ...(data.vbEnabled !== undefined ? { vbEnabled: data.vbEnabled } : {}),
+      ...(data.vbEstablishmentId !== undefined
+        ? {
+            vbEstablishmentId:
+              data.vbEstablishmentId && String(data.vbEstablishmentId).trim()
+                ? String(data.vbEstablishmentId).trim()
+                : null,
+          }
+        : {}),
       ...(data.vbApiToken !== undefined
         ? {
             vbApiToken:
