@@ -324,6 +324,8 @@ export const es: MessageTree = {
       document: "Documento",
       documentHint: "Frente del documento",
       submit: "Enviar y continuar",
+      confirmSelfieRequired:
+        'Toque en "Usar esta foto" para confirmar la selfie antes de continuar.',
       required: "Envíe la selfie y la foto del documento.",
       uploadFailed: "Error al enviar las fotos.",
       invalidFormat:

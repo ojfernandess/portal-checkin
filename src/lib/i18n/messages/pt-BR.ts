@@ -322,6 +322,8 @@ export const ptBR = {
       document: "Documento",
       documentHint: "Frente do documento",
       submit: "Enviar e continuar",
+      confirmSelfieRequired:
+        'Toque em "Usar esta foto" para confirmar a selfie antes de continuar.',
       required: "Envie a selfie e a foto do documento.",
       uploadFailed: "Falha ao enviar as fotos.",
       invalidFormat:

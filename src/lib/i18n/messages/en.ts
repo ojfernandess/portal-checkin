@@ -323,6 +323,7 @@ export const en: MessageTree = {
       document: "Document",
       documentHint: "Front of document",
       submit: "Submit and continue",
+      confirmSelfieRequired: 'Tap "Use this photo" to confirm your selfie before continuing.',
       required: "Please upload selfie and document photo.",
       uploadFailed: "Failed to upload photos.",
       invalidFormat:

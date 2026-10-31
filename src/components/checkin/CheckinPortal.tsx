@@ -383,6 +383,7 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
   const [dependents, setDependents] = useState<Dependent[]>([]);
   const [selfie, setSelfie] = useState<string | null>(null);
   const [docPhoto, setDocPhoto] = useState<string | null>(null);
+  const [selfiePreviewPending, setSelfiePreviewPending] = useState(false);
   const [editRegisteredSelfie, setEditRegisteredSelfie] = useState(false);
   const [editRegisteredDocPhoto, setEditRegisteredDocPhoto] = useState(false);
   const [activeCameraId, setActiveCameraId] = useState<string | null>(null);
@@ -1892,6 +1893,7 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
                   captureId="selfie"
                   validationEnabled={faceValidationEnabled}
                   onValidate={validateSelfiePhoto}
+                  onPreviewPendingChange={setSelfiePreviewPending}
                   {...exclusiveCameraProps}
                   onCapture={(value) => {
                     setSelfie(value || null);
@@ -1932,8 +1934,18 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
                 </Button>
                 <Button
                   className="tap-safe flex-1"
-                  disabled={loading || !selfie || !docPhoto}
-                  onClick={() => void handlePhotos()}
+                  disabled={loading}
+                  onClick={() => {
+                    if (selfiePreviewPending || !selfie) {
+                      toast.error(t("checkin.photos.confirmSelfieRequired"));
+                      return;
+                    }
+                    if (!docPhoto) {
+                      toast.error(t("checkin.photos.required"));
+                      return;
+                    }
+                    void handlePhotos();
+                  }}
                 >
                   {loading && <Loader2 className="size-4 animate-spin" aria-hidden />}{" "}
                   {t("checkin.photos.submit")}

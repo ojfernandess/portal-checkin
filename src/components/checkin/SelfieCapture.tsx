@@ -48,6 +48,8 @@ type Props = {
   /** Exibe aviso minimalista (hóspede já cadastrado) ou dialog antes de capturar (hóspede novo). */
   photoGuidance?: "registered" | "new";
   onValidate?: (photoBase64: string) => Promise<SelfieValidationOutcome>;
+  /** true enquanto a selfie está na prévia aguardando "Usar esta foto". */
+  onPreviewPendingChange?: (pending: boolean) => void;
 } & Partial<ExclusiveCameraProps>;
 
 const JPEG_QUALITY = 0.85;
@@ -61,6 +63,7 @@ export function SelfieCapture({
   photoGuidance,
   validationEnabled = false,
   onValidate,
+  onPreviewPendingChange,
   captureId,
   activeCaptureId,
   onRequestCapture,
@@ -125,6 +128,14 @@ export function SelfieCapture({
   }, []);
 
   useEffect(() => () => stopCamera(), [stopCamera]);
+
+  useEffect(() => {
+    onPreviewPendingChange?.(phase === "preview" && Boolean(previewUrl));
+  }, [onPreviewPendingChange, phase, previewUrl]);
+
+  useEffect(() => {
+    return () => onPreviewPendingChange?.(false);
+  }, [onPreviewPendingChange]);
 
   useEffect(() => {
     if (phase !== "live" && !openingCamera) return;
