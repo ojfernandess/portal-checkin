@@ -13,6 +13,12 @@ export type TenantPmsTokenConfig = {
 export type TenantPmsConfig = {
   baseUrl?: string;
   tokens?: TenantPmsTokenConfig;
+  /**
+   * Somente PMS VB: se `profilePhotoUrl` e `documentPhotoUrl` do hóspede vierem
+   * como URL HTTP(S) no localizador, o portal trata a reserva como já com check-in.
+   * Opcional — desligado não altera o fluxo atual.
+   */
+  treatGuestPhotoUrlsAsCheckedIn?: boolean;
 };
 
 export type TenantPmsSettings = {
@@ -48,6 +54,9 @@ export function normalizeTenantPmsConfig(raw: unknown): TenantPmsConfig {
   return {
     ...(baseUrl ? { baseUrl } : {}),
     ...(Object.keys(tokens).length > 0 ? { tokens: tokens as TenantPmsTokenConfig } : {}),
+    ...(row.treatGuestPhotoUrlsAsCheckedIn === true
+      ? { treatGuestPhotoUrlsAsCheckedIn: true }
+      : {}),
   };
 }
 
@@ -117,6 +126,7 @@ export function maskToken(value: string | undefined): string {
 export function tenantPmsConfigForSave(input: {
   baseUrl?: string | null;
   tokens?: TenantPmsTokenConfig;
+  treatGuestPhotoUrlsAsCheckedIn?: boolean;
 }): TenantPmsConfig {
   const baseUrl = input.baseUrl?.trim() || undefined;
   const tokens = Object.fromEntries(
@@ -128,5 +138,8 @@ export function tenantPmsConfigForSave(input: {
   return {
     ...(baseUrl ? { baseUrl } : {}),
     ...(Object.keys(tokens).length > 0 ? { tokens } : {}),
+    ...(input.treatGuestPhotoUrlsAsCheckedIn === true
+      ? { treatGuestPhotoUrlsAsCheckedIn: true }
+      : {}),
   };
 }

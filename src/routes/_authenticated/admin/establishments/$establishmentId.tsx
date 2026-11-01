@@ -94,6 +94,7 @@ function EstablishmentConfigPage() {
   const [vbEnabled, setVbEnabled] = useState(false);
   const [vbEstablishmentId, setVbEstablishmentId] = useState("");
   const [vbApiToken, setVbApiToken] = useState("");
+  const [vbApiTokenFocused, setVbApiTokenFocused] = useState(false);
   const [vbPhotoLinkEnabled, setVbPhotoLinkEnabled] = useState(false);
   const [inboxUnits, setInboxUnits] = useState<InboxManagedUnitOption[]>([]);
   const [inboxConfigured, setInboxConfigured] = useState(false);
@@ -448,12 +449,36 @@ function EstablishmentConfigPage() {
                       <Label htmlFor="vbApiToken">{t("admin.establishmentConfig.vbApiToken")}</Label>
                       <Input
                         id="vbApiToken"
-                        type="password"
-                        value={vbApiToken}
-                        onChange={(e) => setVbApiToken(e.target.value)}
+                        type="text"
+                        spellCheck={false}
+                        autoCapitalize="off"
+                        autoCorrect="off"
+                        className="font-mono tracking-wide"
+                        value={
+                          vbApiTokenFocused || !vbApiToken.trim()
+                            ? vbApiToken
+                            : formatVbApiTokenPreview(vbApiToken)
+                        }
+                        onFocus={() => setVbApiTokenFocused(true)}
+                        onBlur={() => setVbApiTokenFocused(false)}
+                        onChange={(e) => {
+                          if (!vbApiTokenFocused) return;
+                          setVbApiToken(e.target.value);
+                        }}
                         placeholder={t("admin.establishmentConfig.vbApiTokenPlaceholder")}
                         autoComplete="off"
                       />
+                      {vbApiToken.trim() ? (
+                        <p className="text-xs text-muted-foreground font-mono">
+                          {t("admin.establishmentConfig.vbApiTokenPreview", {
+                            preview: formatVbApiTokenPreview(vbApiToken),
+                          })}
+                        </p>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">
+                          {t("admin.establishmentConfig.vbApiTokenHint")}
+                        </p>
+                      )}
                     </div>
                     <label className="flex items-start gap-3">
                       <Checkbox
@@ -637,4 +662,12 @@ function EstablishmentConfigPage() {
       )}
     </AdminPage>
   );
+}
+
+/** Exibe início e fim do token VB (ex.: T4ND…10sP). */
+function formatVbApiTokenPreview(token: string): string {
+  const value = token.trim();
+  if (!value) return "";
+  if (value.length <= 8) return `${value.slice(0, 2)}…${value.slice(-2)}`;
+  return `${value.slice(0, 4)}…${value.slice(-4)}`;
 }

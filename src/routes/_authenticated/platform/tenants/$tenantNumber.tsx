@@ -113,6 +113,8 @@ function PlatformTenantDetailPage() {
   const [pmsVbBaseUrl, setPmsVbBaseUrl] = useState("");
   const [pmsVbApiToken, setPmsVbApiToken] = useState("");
   const [pmsVbMaskedApiToken, setPmsVbMaskedApiToken] = useState("");
+  const [pmsVbTreatGuestPhotoUrlsAsCheckedIn, setPmsVbTreatGuestPhotoUrlsAsCheckedIn] =
+    useState(false);
 
   const [inboxClientId, setInboxClientId] = useState("");
   const [inboxClientSecret, setInboxClientSecret] = useState("");
@@ -205,6 +207,9 @@ function PlatformTenantDetailPage() {
       setPmsVbBaseUrl(detail.pmsVb.baseUrl);
       setPmsVbApiToken("");
       setPmsVbMaskedApiToken(detail.pmsVb.masked.api);
+      setPmsVbTreatGuestPhotoUrlsAsCheckedIn(
+        detail.pmsVb.treatGuestPhotoUrlsAsCheckedIn === true,
+      );
       setInboxClientId("");
       setInboxClientSecret("");
       setInboxBaseUrl(detail.inbox.baseUrl);
@@ -275,6 +280,9 @@ function PlatformTenantDetailPage() {
     setPmsVbBaseUrl(detail.pmsVb.baseUrl);
     setPmsVbApiToken("");
     setPmsVbMaskedApiToken(detail.pmsVb.masked.api);
+    setPmsVbTreatGuestPhotoUrlsAsCheckedIn(
+      detail.pmsVb.treatGuestPhotoUrlsAsCheckedIn === true,
+    );
     setInboxClientId("");
     setInboxClientSecret("");
     setInboxBaseUrl(detail.inbox.baseUrl);
@@ -384,6 +392,7 @@ function PlatformTenantDetailPage() {
           tokens: pmsVbApiToken.trim() ? { api: pmsVbApiToken.trim() } : {},
           mergeTokens: true,
           provider: "vb",
+          treatGuestPhotoUrlsAsCheckedIn: pmsVbTreatGuestPhotoUrlsAsCheckedIn,
         },
       });
       toast.success(t("platform.tenantDetail.pmsVbSaved"));
@@ -695,6 +704,20 @@ function PlatformTenantDetailPage() {
                   placeholder={pmsVbMaskedApiToken || t("platform.tenantDetail.pmsVbFallbackTokenHint")}
                   value={pmsVbApiToken}
                   onChange={(event) => setPmsVbApiToken(event.target.value)}
+                />
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="font-medium">
+                    {t("platform.tenantDetail.pmsVbTreatGuestPhotoUrlsAsCheckedIn")}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {t("platform.tenantDetail.pmsVbTreatGuestPhotoUrlsAsCheckedInHint")}
+                  </p>
+                </div>
+                <Switch
+                  checked={pmsVbTreatGuestPhotoUrlsAsCheckedIn}
+                  onCheckedChange={setPmsVbTreatGuestPhotoUrlsAsCheckedIn}
                 />
               </div>
               <Button disabled={saving} onClick={() => void handleSaveVbPms()}>

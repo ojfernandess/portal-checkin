@@ -1102,6 +1102,8 @@ export const ptBR = {
         "É o establishmentId retornado pela API VB (ex.: data.establishment.establishmentId). Não é o ID deste hotel no portal — use o valor do Vinibarr.",
       vbApiToken: "Token X-Auth-IApi-Token",
       vbApiTokenPlaceholder: "Token da API VB deste estabelecimento",
+      vbApiTokenHint: "Ao sair do campo, o token é mascarado mostrando só o início e o final.",
+      vbApiTokenPreview: "Token configurado: {preview}",
       vbPhotoLinkEnabled: "Vincular fotos de check-in anteriores ao hóspede",
       vbPhotoLinkEnabledHint:
         "Ao localizar o hóspede por CPF/e-mail, recupera selfie e documento salvos no MinIO de check-ins anteriores pelo portal (somente exibição/Inbox; não altera o fluxo).",
@@ -1418,6 +1420,10 @@ export const ptBR = {
       pmsVbEnabledHint: "Habilita integração VB para estabelecimentos com token configurado.",
       pmsVbFallbackToken: "Token fallback (opcional)",
       pmsVbFallbackTokenHint: "Usado apenas se o estabelecimento não tiver token próprio.",
+      pmsVbTreatGuestPhotoUrlsAsCheckedIn:
+        "Fotos com URL indicam check-in já realizado",
+      pmsVbTreatGuestPhotoUrlsAsCheckedInHint:
+        "Opcional. Se ao buscar o localizador profilePhotoUrl e documentPhotoUrl vierem preenchidos (URL http/https ou caminho no VB, ex.: uploads/...), o portal vai direto para check-in concluído. Não altera o fluxo quando desligado.",
       pmsVbSaved: "Configuração PMS VB salva.",
       inboxTitle: "Credenciais e módulos Inbox",
       inboxHint:

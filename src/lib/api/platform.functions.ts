@@ -368,6 +368,8 @@ export const platformGetTenant = createServerFn({ method: "POST" })
         provider: "vb",
         enabled: pmsVbRow?.enabled !== false,
         baseUrl: pmsVbConfig.baseUrl ?? "",
+        treatGuestPhotoUrlsAsCheckedIn:
+          pmsVbConfig.treatGuestPhotoUrlsAsCheckedIn === true,
         tokens: {
           api: pmsVbConfig.tokens?.api ?? "",
         },
@@ -525,6 +527,7 @@ export const platformSaveTenantPmsConfig = createServerFn({ method: "POST" })
           .optional(),
         mergeTokens: z.boolean().default(true),
         provider: z.enum(["vivakey", "vb"]).default("vivakey"),
+        treatGuestPhotoUrlsAsCheckedIn: z.boolean().optional(),
       })
       .parse(input),
   )
@@ -554,9 +557,15 @@ export const platformSaveTenantPmsConfig = createServerFn({ method: "POST" })
       }
     }
 
+    const treatGuestPhotoUrlsAsCheckedIn =
+      provider === "vb"
+        ? data.treatGuestPhotoUrlsAsCheckedIn === true
+        : existingConfig.treatGuestPhotoUrlsAsCheckedIn === true;
+
     const config = tenantPmsConfigForSave({
       baseUrl: data.baseUrl ?? existingConfig.baseUrl ?? "",
       tokens: mergedTokens,
+      treatGuestPhotoUrlsAsCheckedIn,
     });
 
     const { error } = await supabaseAdmin.from("tenant_pms_configs").upsert(
@@ -578,7 +587,17 @@ export const platformSaveTenantPmsConfig = createServerFn({ method: "POST" })
       action: "platform.tenant.pms",
       entityType: "tenant_pms_configs",
       entityId: tenantUuid,
-      newData: { enabled: data.enabled, baseUrl: config.baseUrl ?? null, tokenKeys: Object.keys(config.tokens ?? {}) },
+      newData: {
+        enabled: data.enabled,
+        baseUrl: config.baseUrl ?? null,
+        tokenKeys: Object.keys(config.tokens ?? {}),
+        ...(provider === "vb"
+          ? {
+              treatGuestPhotoUrlsAsCheckedIn:
+                config.treatGuestPhotoUrlsAsCheckedIn === true,
+            }
+          : {}),
+      },
     });
 
     return { ok: true as const };

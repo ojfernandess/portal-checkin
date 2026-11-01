@@ -73,3 +73,39 @@ export function applyVbCheckedInStatus(
     checkinApi: 1,
   };
 }
+
+/**
+ * Foto "preenchida com URL" no VB: caminho de storage (`uploads/...`) ou http(s).
+ * Ignora rótulos de formato (`JPEG`) e valores vazios/numéricos.
+ */
+function isFilledVbPhotoUrl(value: unknown): boolean {
+  const text = String(value ?? "").trim();
+  if (!text) return false;
+  if (/^(jpeg|jpg|png|webp|gif|heic|heif)$/i.test(text)) return false;
+  if (/^\d+$/.test(text)) return false;
+  if (text.startsWith("data:")) return false;
+  return true;
+}
+
+/**
+ * Regra opcional do tenant VB: profilePhotoUrl + documentPhotoUrl preenchidos
+ * (URL http(s) ou caminho de arquivo no VB) indicam check-in já feito.
+ * Não altera o fluxo quando a opção está desligada (função só é chamada se ativa).
+ */
+export function applyVbGuestPhotoUrlsAsCheckedIn(
+  reservation: Reservation,
+): Reservation {
+  const guest = reservation.mainGuest;
+  const profileOk = isFilledVbPhotoUrl(guest?.profilePhotoUrl);
+  const documentOk = isFilledVbPhotoUrl(guest?.documentPhotoUrl);
+  if (!profileOk || !documentOk) return reservation;
+
+  return {
+    ...reservation,
+    checkin: {
+      ...(reservation.checkin ?? {}),
+      checkin: 1,
+      checkinApi: 1,
+    },
+  };
+}

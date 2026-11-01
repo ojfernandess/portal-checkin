@@ -746,10 +746,22 @@ async function fetchReservationByLocalizer(
     establishmentIdHint ??
     resolveReservationEstablishmentId(reservation);
 
-  return applyPortalEstablishmentContext(reservation, {
+  let withContext = applyPortalEstablishmentContext(reservation, {
     portalEstablishmentId: portalEstablishmentId ? String(portalEstablishmentId) : null,
     provider: result.provider,
   });
+
+  // Opção do Super Admin (PMS VB): URLs de selfie+documento = check-in já realizado.
+  if (withContext && result.provider === "vb") {
+    const { loadTenantPmsSettings } = await import("@/lib/tenant-pms.server");
+    const vbSettings = await loadTenantPmsSettings(tenantId, "vb");
+    if (vbSettings?.config.treatGuestPhotoUrlsAsCheckedIn === true) {
+      const { applyVbGuestPhotoUrlsAsCheckedIn } = await import("@/lib/reservation-status");
+      withContext = applyVbGuestPhotoUrlsAsCheckedIn(withContext);
+    }
+  }
+
+  return withContext;
 }
 
 function clientIpBucket(prefix: string): string {
@@ -2143,8 +2155,21 @@ async function executeSubmitCheckin(data: SubmitCheckinInput) {
         portalEstablishmentId: submitEstablishmentId,
         pmsEstablishmentId: snapshotPmsEstablishmentId,
       });
+      const { loadEstablishmentSettingsRow } = await import(
+        "@/lib/establishment-settings.server"
+      );
+      const { resolveConfiguredVbEstablishmentId } = await import("@/lib/establishment-settings");
+      const ownerSettings = submitEstablishmentId
+        ? await loadEstablishmentSettingsRow(submitEstablishmentId)
+        : null;
+      const vbEstablishmentId = submitEstablishmentId
+        ? resolveConfiguredVbEstablishmentId(
+            submitEstablishmentId,
+            ownerSettings?.settings ?? { vbEstablishmentId: null },
+          )
+        : null;
       console.info(
-        `[checkin] VB submit localizer=${localizerCode} establishmentId=${submitEstablishmentId}`,
+        `[checkin] VB submit localizer=${localizerCode} portalEstablishmentId=${submitEstablishmentId} vbEstablishmentId=${vbEstablishmentId ?? "?"}`,
       );
     }
 

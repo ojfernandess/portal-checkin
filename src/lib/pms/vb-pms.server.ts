@@ -270,6 +270,14 @@ function formatVbApiErrorMessage(rawMessage: string, status: number): string {
     return `Erro ${status} no PMS VB (Slim Application Error). Verifique o cadastro do hotel no Vinibarr.`;
   }
 
+  // GET localizer pode funcionar com token de outro hotel; o POST /checkin exige o token dono.
+  if (status === 404 && lower.includes("reserva não encontrada")) {
+    return (
+      "Reserva não encontrada no PMS VB para este token. Confirme no Admin o ID VB do hotel e " +
+      "cole o X-Auth-IApi-Token de escrita gerado no Vinibarr para esse mesmo estabelecimento."
+    );
+  }
+
   return text;
 }
 
