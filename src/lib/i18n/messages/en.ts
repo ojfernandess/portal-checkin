@@ -414,7 +414,7 @@ export const en: MessageTree = {
       alreadyRegistered: "Already registered",
       inboxPhotoTitle: "Photo for front desk (optional)",
       inboxPhotoHint:
-        "Companion selfie for front-desk access (sent to Inbox only, not to the PMS). Use a clear, well-lit photo with the face visible. When you confirm, it goes through the same security check as the main guest.",
+        "Companion selfie for identification and facial recognition to grant hotel entry. Use a clear, well-lit photo with the face visible. When you confirm, it goes through the same security check as the main guest.",
       inboxPhotoAdd: "Add photo",
       inboxPhotoChange: "Change photo",
       inboxPhotoSave: "Send photo to front desk",

@@ -413,7 +413,7 @@ export const ptBR = {
       alreadyRegistered: "Já cadastrado",
       inboxPhotoTitle: "Foto para portaria (opcional)",
       inboxPhotoHint:
-        "Selfie do acompanhante para liberação de acesso na portaria (enviada somente à Inbox, não ao PMS). Use uma foto nítida, bem iluminada e com o rosto visível. Ao confirmar, a selfie passará pela mesma verificação de segurança do hóspede principal.",
+        "Selfie do acompanhante para identificação e reconhecimento facial na liberação da entrada no hotel. Use uma foto nítida, bem iluminada e com o rosto visível. Ao confirmar, a selfie passará pela mesma verificação de segurança do hóspede principal.",
       inboxPhotoAdd: "Adicionar foto",
       inboxPhotoChange: "Alterar foto",
       inboxPhotoSave: "Enviar foto para portaria",
