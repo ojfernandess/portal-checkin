@@ -14,9 +14,9 @@ export type TenantPmsConfig = {
   baseUrl?: string;
   tokens?: TenantPmsTokenConfig;
   /**
-   * Somente PMS VB: se `profilePhotoUrl` e `documentPhotoUrl` do hóspede vierem
-   * como URL HTTP(S) no localizador, o portal trata a reserva como já com check-in.
-   * Opcional — desligado não altera o fluxo atual.
+   * Somente PMS VB: se o `guest` do localizador vier completo (name, email, phone,
+   * documentNumber, documentType ≠ 0, profilePhotoUrl e documentPhotoUrl), o portal
+   * trata a reserva como já com check-in. Opcional — desligado não altera o fluxo.
    */
   treatGuestPhotoUrlsAsCheckedIn?: boolean;
 };

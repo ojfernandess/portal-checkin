@@ -1422,9 +1422,9 @@ export const es: MessageTree = {
       pmsVbFallbackToken: "Token fallback (opcional)",
       pmsVbFallbackTokenHint: "Se usa solo si el establecimiento no tiene token propio.",
       pmsVbTreatGuestPhotoUrlsAsCheckedIn:
-        "Fotos con URL indican check-in ya realizado",
+        "Datos completos del huésped indican check-in ya realizado",
       pmsVbTreatGuestPhotoUrlsAsCheckedInHint:
-        "Opcional. Si al buscar el localizador profilePhotoUrl y documentPhotoUrl vienen rellenados (URL http/https o ruta en VB, ej.: uploads/...), el portal va directo a check-in concluido. No cambia el flujo cuando está desactivado.",
+        "Opcional. Si en el localizador name, email, phone, documentNumber, documentType, profilePhotoUrl y documentPhotoUrl están todos rellenados (fotos pueden ser URL, ruta o JPEG/WEBP), el portal va a check-in concluido. Si alguno está vacío o documentType es 0, sigue el flujo normal.",
       pmsVbSaved: "Configuración PMS VB guardada.",
       inboxTitle: "Credenciales y módulos Inbox",
       inboxHint:

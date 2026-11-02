@@ -74,31 +74,52 @@ export function applyVbCheckedInStatus(
   };
 }
 
+function isFilledVbGuestText(value: unknown): boolean {
+  return String(value ?? "").trim().length > 0;
+}
+
+/** documentType válido: preenchido e diferente de 0. */
+function isFilledVbDocumentType(value: unknown): boolean {
+  if (!isFilledVbGuestText(value)) return false;
+  const numeric = Number(value);
+  if (Number.isFinite(numeric) && numeric === 0) return false;
+  return true;
+}
+
 /**
- * Foto "preenchida com URL" no VB: caminho de storage (`uploads/...`) ou http(s).
- * Ignora rótulos de formato (`JPEG`) e valores vazios/numéricos.
+ * Foto preenchida no VB: URL http(s), caminho (`uploads/...`) ou rótulo de mídia
+ * enviado após upload (`JPEG`, `WEBP`, etc.).
  */
-function isFilledVbPhotoUrl(value: unknown): boolean {
+function isFilledVbPhotoRef(value: unknown): boolean {
   const text = String(value ?? "").trim();
   if (!text) return false;
-  if (/^(jpeg|jpg|png|webp|gif|heic|heif)$/i.test(text)) return false;
-  if (/^\d+$/.test(text)) return false;
   if (text.startsWith("data:")) return false;
   return true;
 }
 
 /**
- * Regra opcional do tenant VB: profilePhotoUrl + documentPhotoUrl preenchidos
- * (URL http(s) ou caminho de arquivo no VB) indicam check-in já feito.
+ * Regra opcional do tenant VB: guest completo no localizador = check-in já feito.
+ * Exige name, email, phone, documentNumber, documentType (>0), profilePhotoUrl e
+ * documentPhotoUrl preenchidos. Qualquer vazio / documentType 0 = sem check-in.
  * Não altera o fluxo quando a opção está desligada (função só é chamada se ativa).
  */
 export function applyVbGuestPhotoUrlsAsCheckedIn(
   reservation: Reservation,
 ): Reservation {
   const guest = reservation.mainGuest;
-  const profileOk = isFilledVbPhotoUrl(guest?.profilePhotoUrl);
-  const documentOk = isFilledVbPhotoUrl(guest?.documentPhotoUrl);
-  if (!profileOk || !documentOk) return reservation;
+  if (!guest) return reservation;
+
+  const phone = guest.mobilePhoneNumber;
+  const complete =
+    isFilledVbGuestText(guest.name) &&
+    isFilledVbGuestText(guest.email) &&
+    isFilledVbGuestText(phone) &&
+    isFilledVbGuestText(guest.documentNumber) &&
+    isFilledVbDocumentType(guest.documentType) &&
+    isFilledVbPhotoRef(guest.profilePhotoUrl) &&
+    isFilledVbPhotoRef(guest.documentPhotoUrl);
+
+  if (!complete) return reservation;
 
   return {
     ...reservation,
