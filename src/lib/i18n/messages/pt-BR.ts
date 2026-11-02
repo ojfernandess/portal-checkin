@@ -1421,9 +1421,9 @@ export const ptBR = {
       pmsVbFallbackToken: "Token fallback (opcional)",
       pmsVbFallbackTokenHint: "Usado apenas se o estabelecimento não tiver token próprio.",
       pmsVbTreatGuestPhotoUrlsAsCheckedIn:
-        "Dados completos do hóspede indicam check-in já realizado",
+        "Documento do hóspede indica check-in já realizado",
       pmsVbTreatGuestPhotoUrlsAsCheckedInHint:
-        "Opcional. Se no localizador name, email, phone, documentNumber, documentType, profilePhotoUrl e documentPhotoUrl estiverem todos preenchidos (fotos podem ser URL, caminho ou JPEG/WEBP), o portal vai para check-in concluído. Se algum estiver vazio ou documentType for 0, segue o fluxo normal.",
+        "Opcional. Se no localizador documentNumber estiver preenchido e documentType for diferente de 0 (ex.: 2), o portal vai para check-in concluído. Se documentNumber estiver vazio ou documentType for 0, segue o fluxo normal.",
       pmsVbSaved: "Configuração PMS VB salva.",
       inboxTitle: "Credenciais e módulos Inbox",
       inboxHint:

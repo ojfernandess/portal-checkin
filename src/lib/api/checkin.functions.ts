@@ -751,7 +751,7 @@ async function fetchReservationByLocalizer(
     provider: result.provider,
   });
 
-  // Opção do Super Admin (PMS VB): guest completo no localizador = check-in já realizado.
+  // Opção do Super Admin (PMS VB): documentNumber + documentType ≠ 0 = check-in já realizado.
   if (withContext && result.provider === "vb") {
     const { loadTenantPmsSettings } = await import("@/lib/tenant-pms.server");
     const vbSettings = await loadTenantPmsSettings(tenantId, "vb");

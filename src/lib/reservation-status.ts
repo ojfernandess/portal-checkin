@@ -78,7 +78,7 @@ function isFilledVbGuestText(value: unknown): boolean {
   return String(value ?? "").trim().length > 0;
 }
 
-/** documentType válido: preenchido e diferente de 0. */
+/** documentType válido: preenchido e diferente de 0 (ex.: 2 = CPF). */
 function isFilledVbDocumentType(value: unknown): boolean {
   if (!isFilledVbGuestText(value)) return false;
   const numeric = Number(value);
@@ -87,20 +87,9 @@ function isFilledVbDocumentType(value: unknown): boolean {
 }
 
 /**
- * Foto preenchida no VB: URL http(s), caminho (`uploads/...`) ou rótulo de mídia
- * enviado após upload (`JPEG`, `WEBP`, etc.).
- */
-function isFilledVbPhotoRef(value: unknown): boolean {
-  const text = String(value ?? "").trim();
-  if (!text) return false;
-  if (text.startsWith("data:")) return false;
-  return true;
-}
-
-/**
- * Regra opcional do tenant VB: guest completo no localizador = check-in já feito.
- * Exige name, email, phone, documentNumber, documentType (>0), profilePhotoUrl e
- * documentPhotoUrl preenchidos. Qualquer vazio / documentType 0 = sem check-in.
+ * Regra opcional do tenant VB: documento do hóspede no localizador = check-in feito.
+ * Feito: documentNumber preenchido e documentType ≠ 0.
+ * Não feito: documentNumber vazio e/ou documentType 0.
  * Não altera o fluxo quando a opção está desligada (função só é chamada se ativa).
  */
 export function applyVbGuestPhotoUrlsAsCheckedIn(
@@ -109,17 +98,11 @@ export function applyVbGuestPhotoUrlsAsCheckedIn(
   const guest = reservation.mainGuest;
   if (!guest) return reservation;
 
-  const phone = guest.mobilePhoneNumber;
-  const complete =
-    isFilledVbGuestText(guest.name) &&
-    isFilledVbGuestText(guest.email) &&
-    isFilledVbGuestText(phone) &&
+  const documentFilled =
     isFilledVbGuestText(guest.documentNumber) &&
-    isFilledVbDocumentType(guest.documentType) &&
-    isFilledVbPhotoRef(guest.profilePhotoUrl) &&
-    isFilledVbPhotoRef(guest.documentPhotoUrl);
+    isFilledVbDocumentType(guest.documentType);
 
-  if (!complete) return reservation;
+  if (!documentFilled) return reservation;
 
   return {
     ...reservation,

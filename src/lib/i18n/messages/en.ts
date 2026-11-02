@@ -1411,9 +1411,9 @@ export const en: MessageTree = {
       pmsVbFallbackToken: "Fallback token (optional)",
       pmsVbFallbackTokenHint: "Used only when the establishment has no dedicated token.",
       pmsVbTreatGuestPhotoUrlsAsCheckedIn:
-        "Complete guest data means check-in already completed",
+        "Guest document means check-in already completed",
       pmsVbTreatGuestPhotoUrlsAsCheckedInHint:
-        "Optional. When the locator guest has name, email, phone, documentNumber, documentType, profilePhotoUrl and documentPhotoUrl all filled (photos may be URL, path, or JPEG/WEBP), the portal goes to check-in completed. If any is empty or documentType is 0, the normal flow continues.",
+        "Optional. When the locator has documentNumber filled and documentType other than 0 (e.g. 2), the portal goes to check-in completed. If documentNumber is empty or documentType is 0, the normal flow continues.",
       pmsVbSaved: "VB PMS configuration saved.",
       inboxTitle: "Inbox credentials and modules",
       inboxHint: "Configure client_id, client_secret, base URL and which Inbox panel areas the company can use.",
