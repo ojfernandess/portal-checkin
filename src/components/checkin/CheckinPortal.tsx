@@ -470,11 +470,15 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
       (type === "profile" ? result.profilePhotoUrl : result.documentPhotoUrl) ?? result.url;
     const uploadedId =
       (type === "profile" ? result.profilePhotoId : result.documentPhotoId) ?? result.mediaId;
-    // VB: se o espelho MinIO falhar e o PMS não devolver URL http, mantém a data URL
-    // para o POST /checkin enviar a foto em base64.
-    const keepDataUrl =
-      reservation?.pmsProvider === "vb" &&
-      (!uploadedUrl?.trim() || !/^https?:\/\//i.test(uploadedUrl));
+    const uploadedRef = uploadedUrl?.trim() ?? "";
+    // Mantém data URL só se não houver referência utilizável (http, chave MinIO ou path).
+    // Antes: chave `profile-photos/...` era descartada e o vínculo MinIO nunca gravava.
+    const hasPortalPhotoRef =
+      /^https?:\/\//i.test(uploadedRef) ||
+      uploadedRef.startsWith("minio:") ||
+      uploadedRef.startsWith("profile-photos/") ||
+      uploadedRef.startsWith("document-photos/");
+    const keepDataUrl = reservation?.pmsProvider === "vb" && !hasPortalPhotoRef;
     if (reservation?.pmsProvider === "vb") {
       vbMediaUploadedRef.current[type] = true;
     }

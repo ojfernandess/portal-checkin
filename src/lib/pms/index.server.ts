@@ -322,17 +322,25 @@ export async function pmsUploadCheckinMedia(
         base64Data: base64,
       });
       const publicUrl = buildPortalPublicObjectUrl(objectKey);
-      const photoUrl =
-        String(fromVb.url ?? fromVb.fileUrl ?? fromVb.keyName ?? "").trim() ||
-        publicUrl ||
-        objectKey;
+      const vbUrl = String(fromVb.url ?? fromVb.fileUrl ?? fromVb.keyName ?? "").trim();
+      const vbUrlUsable =
+        Boolean(vbUrl) &&
+        !/^(jpe?g|png|webp|gif|heic|heif|bmp|image)$/i.test(vbUrl) &&
+        (vbUrl.startsWith("http") || vbUrl.includes("/"));
+      // Preferir chave MinIO do portal (vínculo de fotos / reenvio em acompanhantes).
+      const photoUrl = publicUrl || objectKey || (vbUrlUsable ? vbUrl : "");
       const urlKey = input.type === "profile" ? "profilePhotoUrl" : "documentPhotoUrl";
       const idKey = input.type === "profile" ? "profilePhotoId" : "documentPhotoId";
+      const vbField = String(fromVb[urlKey] ?? "").trim();
+      const vbFieldUsable =
+        Boolean(vbField) &&
+        !/^(jpe?g|png|webp|gif|heic|heif|bmp|image)$/i.test(vbField) &&
+        (vbField.startsWith("http") || vbField.includes("/"));
 
       return {
         ...fromVb,
         url: photoUrl,
-        [urlKey]: fromVb[urlKey] ?? photoUrl,
+        [urlKey]: photoUrl || (vbFieldUsable ? vbField : photoUrl),
         ...(fromVb[idKey] != null ? { [idKey]: fromVb[idKey] } : {}),
         minioObjectKey: objectKey,
         storageProvider: "minio",

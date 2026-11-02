@@ -751,6 +751,53 @@ export async function resolvePhotoBase64(
 }
 
 /** Resolve foto para envio multipart ou photo_base64 (Inbox, etc.). */
+/**
+ * Recupera a última selfie/documento espelhada no MinIO para um localizador VB
+ * (`profile-photos/vb/{establishmentId}/{localizer}/…`), quando o vínculo em
+ * `guest_portal_photos` ainda não foi gravado.
+ */
+export async function findLatestVbPortalPhotoObjectKey(
+  type: "profile" | "document",
+  input: { establishmentId: string; localizer: string },
+): Promise<string | null> {
+  const config = readPortalS3Config();
+  if (!config) return null;
+
+  const establishmentId = String(input.establishmentId ?? "").trim();
+  const safeLocalizer = input.localizer.trim().toUpperCase().replace(/[^A-Z0-9-]/g, "");
+  if (!establishmentId || !safeLocalizer) return null;
+
+  const prefix = `${type === "profile" ? profilePhotoPrefix() : documentPhotoPrefix()}vb/${establishmentId}/${safeLocalizer}/`;
+
+  try {
+    const { ListObjectsV2Command } = await import("@aws-sdk/client-s3");
+    const client = await getS3Client(config);
+    const listed = await client.send(
+      new ListObjectsV2Command({
+        Bucket: config.bucket,
+        Prefix: prefix,
+        MaxKeys: 20,
+      }),
+    );
+    const contents = listed.Contents ?? [];
+    if (contents.length === 0) return null;
+
+    contents.sort((a, b) => {
+      const aTime = a.LastModified?.getTime() ?? 0;
+      const bTime = b.LastModified?.getTime() ?? 0;
+      return bTime - aTime;
+    });
+    const key = contents[0]?.Key?.trim();
+    return key || null;
+  } catch (error) {
+    console.warn(
+      `[S3] list VB portal photos failed (${prefix}):`,
+      error instanceof Error ? error.message : error,
+    );
+    return null;
+  }
+}
+
 export async function uploadCheckinPhotoObject(
   type: "profile" | "document",
   input: { establishmentId: string; localizer: string; base64Data: string },

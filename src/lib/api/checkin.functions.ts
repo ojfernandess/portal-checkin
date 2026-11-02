@@ -300,7 +300,7 @@ async function normalizeVbMainGuestPhotoFields(
   guest: MainGuest,
 ): Promise<Record<string, unknown>> {
   const next = { ...row };
-  const { buildPortalPublicObjectUrl, resolvePhotoBase64 } = await import("@/lib/s3.server");
+  const { resolvePhotoBase64 } = await import("@/lib/s3.server");
 
   for (const kind of ["profile", "document"] as const) {
     const urlKey = kind === "profile" ? "profilePhotoUrl" : "documentPhotoUrl";
@@ -319,20 +319,14 @@ async function normalizeVbMainGuestPhotoFields(
       continue;
     }
 
-    if (urlRaw.startsWith("minio:") || urlRaw.startsWith("profile-photos/") || urlRaw.startsWith("document-photos/")) {
-      const publicUrl = buildPortalPublicObjectUrl(urlRaw);
-      if (publicUrl) urlRaw = publicUrl;
-    }
-
-    if (!urlRaw || (!urlRaw.startsWith("http") && !/^\d+$/.test(urlRaw))) {
-      const base64 = await resolvePhotoBase64(kind, {
-        url: guest[urlKey],
-        id: guest[idKey] ?? (typeof idRaw === "string" || typeof idRaw === "number" ? idRaw : null),
-      });
-      if (base64) {
-        next[urlKey] = base64;
-        continue;
-      }
+    // MinIO / data / media: converter para base64 — o VB não depende de URL pública.
+    const base64 = await resolvePhotoBase64(kind, {
+      url: (typeof guest[urlKey] === "string" && String(guest[urlKey]).trim()) || urlRaw || null,
+      id: guest[idKey] ?? (typeof idRaw === "string" || typeof idRaw === "number" ? idRaw : null),
+    });
+    if (base64) {
+      next[urlKey] = base64;
+      continue;
     }
 
     if (urlRaw.startsWith("http")) {
@@ -379,6 +373,12 @@ async function prepareMainGuestPayloadForPms(
         `[checkin] VB companions: mainGuest sem fotos (keys=${Object.keys(row).join(",")})`,
       );
     }
+  } else if (provider === "vb") {
+    const hasProfile = typeof row["profilePhotoUrl"] === "string" && String(row["profilePhotoUrl"]).length > 0;
+    const hasDocument = typeof row["documentPhotoUrl"] === "string" && String(row["documentPhotoUrl"]).length > 0;
+    console.info(
+      `[checkin] VB mainGuest fotos no payload profile=${hasProfile} document=${hasDocument}`,
+    );
   }
   return row;
 }
@@ -648,15 +648,16 @@ function resolveUploadedMediaReference(
     | string
     | number
     | undefined;
+  // MinIO primeiro: necessário para "Vincular fotos…" e reenvio no POST de acompanhantes.
   const candidates = [
+    source["minioObjectKey"],
+    type === "profile" ? source["profilePhotoKey"] : source["documentPhotoKey"],
     source["url"],
     source["fileUrl"],
     source["keyName"],
     source["fileKey"],
     source["path"],
-    source["minioObjectKey"],
     type === "profile" ? source["profilePhotoUrl"] : source["documentPhotoUrl"],
-    type === "profile" ? source["profilePhotoKey"] : source["documentPhotoKey"],
   ];
 
   for (const raw of candidates) {
@@ -1437,33 +1438,153 @@ async function applyPortalPhotosForVbCompanionSubmit(
   guest: MainGuest,
   tenantId: string,
   establishmentId: string,
-): Promise<MainGuest> {
+  localizer?: string | null,
+): Promise<{ guest: MainGuest; linked: boolean }> {
   const { findGuestPortalPhotos } = await import("@/lib/guest-portal-photos.server");
+  let profileObjectKey: string | null = null;
+  let documentObjectKey: string | null = null;
+  let photoId: string | undefined;
+
   const stored = await findGuestPortalPhotos({
     tenantId,
     establishmentId,
     documentNumber: guest.documentNumber,
     email: guest.email,
   });
-  if (!stored?.profileObjectKey && !stored?.documentObjectKey) {
-    return guest;
+  if (stored?.profileObjectKey || stored?.documentObjectKey) {
+    profileObjectKey = stored.profileObjectKey;
+    documentObjectKey = stored.documentObjectKey;
+    photoId = stored.id;
+  } else if (localizer?.trim()) {
+    // Fallback: espelho MinIO do /checkin/media (mesmo sem linha em guest_portal_photos).
+    const { findLatestVbPortalPhotoObjectKey } = await import("@/lib/s3.server");
+    const code = localizer.trim().toUpperCase();
+    profileObjectKey = await findLatestVbPortalPhotoObjectKey("profile", {
+      establishmentId,
+      localizer: code,
+    });
+    documentObjectKey = await findLatestVbPortalPhotoObjectKey("document", {
+      establishmentId,
+      localizer: code,
+    });
+    if (profileObjectKey || documentObjectKey) {
+      console.info(
+        `[checkin] VB companions: fotos MinIO via localizer=${code} (sem guest_portal_photos)`,
+      );
+      // Repara o vínculo para as próximas consultas.
+      const { upsertGuestPortalPhotos } = await import("@/lib/guest-portal-photos.server");
+      photoId =
+        (await upsertGuestPortalPhotos({
+          tenantId,
+          establishmentId,
+          documentNumber: guest.documentNumber,
+          email: guest.email,
+          profileObjectKey,
+          documentObjectKey,
+        })) ?? undefined;
+    }
+  }
+
+  if (!profileObjectKey && !documentObjectKey) {
+    return { guest, linked: false };
   }
 
   return {
-    ...guest,
-    ...(stored.profileObjectKey
-      ? {
-          profilePhotoUrl: stored.profileObjectKey,
-          profilePhotoId: guest.profilePhotoId ?? stored.id,
-        }
-      : {}),
-    ...(stored.documentObjectKey
-      ? {
-          documentPhotoUrl: stored.documentObjectKey,
-          documentPhotoId: guest.documentPhotoId ?? stored.id,
-        }
-      : {}),
+    linked: true,
+    guest: {
+      ...guest,
+      ...(profileObjectKey
+        ? {
+            profilePhotoUrl: profileObjectKey,
+            profilePhotoId: guest.profilePhotoId ?? photoId,
+          }
+        : {}),
+      ...(documentObjectKey
+        ? {
+            documentPhotoUrl: documentObjectKey,
+            documentPhotoId: guest.documentPhotoId ?? photoId,
+          }
+        : {}),
+    },
   };
+}
+
+function guestHasResolvablePhotoSource(guest: MainGuest): boolean {
+  for (const value of [guest.profilePhotoUrl, guest.documentPhotoUrl]) {
+    const text = String(value ?? "").trim();
+    if (!text) continue;
+    if (text.startsWith("data:")) return true;
+    if (text.startsWith("minio:") || text.startsWith("profile-photos/") || text.startsWith("document-photos/")) {
+      return true;
+    }
+    if (/^https?:\/\//i.test(text)) return true;
+  }
+  return false;
+}
+
+/** Grava no MinIO as keys do titular para reuso (lookup / acompanhantes). */
+async function upsertMainGuestPortalPhotosFromCheckin(input: {
+  tenantId: string;
+  establishmentId: string;
+  localizer: string;
+  guest: MainGuest;
+}): Promise<void> {
+  const { resolveObjectKey, uploadCheckinPhotoObject } = await import("@/lib/s3.server");
+  const { upsertGuestPortalPhotos } = await import("@/lib/guest-portal-photos.server");
+
+  async function resolveKey(
+    kind: "profile" | "document",
+    url?: string | null,
+    id?: string | number | null,
+  ): Promise<string | null> {
+    const existing = resolveObjectKey(kind, { url, id }) ?? null;
+    if (existing) return existing;
+    const raw = url?.trim() ?? "";
+    if (!raw.startsWith("data:")) return null;
+    try {
+      return await uploadCheckinPhotoObject(kind, {
+        establishmentId: input.establishmentId,
+        localizer: input.localizer,
+        base64Data: raw,
+      });
+    } catch (error) {
+      console.warn(
+        `[checkin] MinIO ${kind} a partir de data URL falhou:`,
+        error instanceof Error ? error.message : error,
+      );
+      return null;
+    }
+  }
+
+  const profileObjectKey = await resolveKey(
+    "profile",
+    input.guest.profilePhotoUrl,
+    input.guest.profilePhotoId,
+  );
+  const documentObjectKey = await resolveKey(
+    "document",
+    input.guest.documentPhotoUrl,
+    input.guest.documentPhotoId,
+  );
+
+  if (!profileObjectKey && !documentObjectKey) {
+    console.warn(
+      `[checkin] Vínculo MinIO: nenhuma key resolvida para titular (establishmentId=${input.establishmentId})`,
+    );
+    return;
+  }
+
+  const id = await upsertGuestPortalPhotos({
+    tenantId: input.tenantId,
+    establishmentId: input.establishmentId,
+    documentNumber: input.guest.documentNumber,
+    email: input.guest.email,
+    profileObjectKey,
+    documentObjectKey,
+  });
+  console.info(
+    `[checkin] Vínculo MinIO salvo id=${id ?? "?"} profile=${profileObjectKey ? "ok" : "-"} document=${documentObjectKey ? "ok" : "-"}`,
+  );
 }
 
 /** Foto já presente no PMS VB (URL, caminho ou rótulo JPEG/WEBP após upload). */
@@ -2258,15 +2379,23 @@ async function executeSubmitCheckin(data: SubmitCheckinInput) {
           ? vbOwnerSettings
           : await loadEstablishmentSettingsRow(portalPhotoEstablishmentId);
       if (photoLinkSettings?.settings.vbPhotoLinkEnabled) {
-        mainGuestForPms = await applyPortalPhotosForVbCompanionSubmit(
+        const linked = await applyPortalPhotosForVbCompanionSubmit(
           mainGuest,
           photoLinkSettings.tenantId,
           portalPhotoEstablishmentId,
+          localizerCode,
         );
-        omitMainGuestPhotos = false;
-        console.info(
-          `[checkin] VB companions: fotos do titular via vínculo MinIO (establishmentId=${portalPhotoEstablishmentId})`,
-        );
+        mainGuestForPms = linked.guest;
+        if (linked.linked || guestHasResolvablePhotoSource(mainGuestForPms)) {
+          omitMainGuestPhotos = false;
+          console.info(
+            `[checkin] VB companions: fotos do titular via vínculo MinIO linked=${linked.linked} (establishmentId=${portalPhotoEstablishmentId}) profile=${String(mainGuestForPms.profilePhotoUrl ?? "").slice(0, 48)} document=${String(mainGuestForPms.documentPhotoUrl ?? "").slice(0, 48)}`,
+          );
+        } else {
+          console.warn(
+            `[checkin] VB companions: vínculo MinIO ativo, mas sem fotos salvas/resolvíveis (establishmentId=${portalPhotoEstablishmentId})`,
+          );
+        }
       }
     }
 
@@ -2389,21 +2518,11 @@ async function executeSubmitCheckin(data: SubmitCheckinInput) {
           const { loadEstablishmentSettingsRow } = await import("@/lib/establishment-settings.server");
           const settingsRow = await loadEstablishmentSettingsRow(String(resolvedEstablishmentId));
           if (settingsRow?.settings.vbPhotoLinkEnabled) {
-            const { resolveObjectKey } = await import("@/lib/s3.server");
-            const { upsertGuestPortalPhotos } = await import("@/lib/guest-portal-photos.server");
-            await upsertGuestPortalPhotos({
+            await upsertMainGuestPortalPhotosFromCheckin({
               tenantId,
               establishmentId: String(resolvedEstablishmentId),
-              documentNumber: mainGuest.documentNumber,
-              email: mainGuest.email,
-              profileObjectKey: resolveObjectKey("profile", {
-                url: mainGuest.profilePhotoUrl,
-                id: mainGuest.profilePhotoId,
-              }) ?? null,
-              documentObjectKey: resolveObjectKey("document", {
-                url: mainGuest.documentPhotoUrl,
-                id: mainGuest.documentPhotoId,
-              }) ?? null,
+              localizer: localizerCode,
+              guest: mainGuest,
             });
           }
         }
