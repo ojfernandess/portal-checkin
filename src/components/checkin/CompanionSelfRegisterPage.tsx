@@ -278,6 +278,7 @@ export function CompanionSelfRegisterPage({ localizer }: Props) {
                     <CompanionsStep
                       key={formKey}
                       guestsQuantity={(context.remainingSlots ?? 0) + 1}
+                      establishmentId={context.establishmentId ?? null}
                       mainGuest={{
                         documentNumber: context.mainGuestDocumentNumber ?? "",
                         documentType: context.mainGuestDocumentType ?? "CPF",
@@ -345,6 +346,7 @@ export function CompanionSelfRegisterPage({ localizer }: Props) {
                 ) : null}
                 <CompanionsStep
                   guestsQuantity={(context?.remainingSlots ?? 0) + 1}
+                  establishmentId={context?.establishmentId ?? null}
                   mainGuest={{
                     documentNumber: context?.mainGuestDocumentNumber ?? "",
                     documentType: context?.mainGuestDocumentType ?? "CPF",

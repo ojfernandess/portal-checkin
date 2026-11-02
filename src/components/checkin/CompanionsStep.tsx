@@ -65,6 +65,8 @@ type Props = {
     companionKey?: string,
   ) => Promise<void>;
   companionInboxPhotoSavingKey?: string | null;
+  /** Necessário para carregar países via catálogo nativo quando o hotel usa só PMS VB. */
+  establishmentId?: string | null;
 } & Partial<ExclusiveCameraProps>;
 
 const EMPTY: Dependent = {
@@ -147,6 +149,7 @@ export function CompanionsStep({
   onValidateSelfie,
   onSaveCompanionInboxPhoto,
   companionInboxPhotoSavingKey = null,
+  establishmentId = null,
   captureId: _captureId,
   activeCaptureId,
   onRequestCapture,
@@ -186,7 +189,11 @@ export function CompanionsStep({
   useEffect(() => {
     let active = true;
     setCountriesLoading(true);
-    void loadReference({ data: {} })
+    void loadReference({
+      data: {
+        ...(establishmentId?.trim() ? { establishmentId: establishmentId.trim() } : {}),
+      },
+    })
       .then((raw) => {
         if (!active) return;
         const options = toPmsCountryOptions(normalizeEmbratur(raw).countries);
@@ -197,6 +204,9 @@ export function CompanionsStep({
           country: matchPmsCountryValue(current.country, options) || BRAZIL_PMS_COUNTRY,
         }));
       })
+      .catch((error) => {
+        console.error("[CompanionsStep] Falha ao carregar países:", error);
+      })
       .finally(() => {
         if (active) setCountriesLoading(false);
       });
@@ -204,7 +214,7 @@ export function CompanionsStep({
     return () => {
       active = false;
     };
-  }, [loadReference]);
+  }, [establishmentId, loadReference]);
 
   useEffect(() => {
     if (!useMainGuestAddress) return;

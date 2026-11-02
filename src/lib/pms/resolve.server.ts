@@ -160,7 +160,12 @@ export function isRecoverablePmsMissError(error: unknown): boolean {
     msg.includes("não encontrad") ||
     msg.includes("nao encontrad") ||
     msg.includes("reserva não encontrada") ||
-    msg.includes("reserva nao encontrada")
+    msg.includes("reserva nao encontrada") ||
+    // Misconfig de URL no Vivakey não deve bloquear fallback para VB.
+    msg.includes("invalid url") ||
+    msg.includes("url base") ||
+    msg.includes("url inválida") ||
+    msg.includes("url invalida")
   );
 }
 

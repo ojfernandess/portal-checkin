@@ -1106,7 +1106,7 @@ export const ptBR = {
       vbApiTokenPreview: "Token configurado: {preview}",
       vbPhotoLinkEnabled: "Vincular fotos de check-in anteriores ao hóspede",
       vbPhotoLinkEnabledHint:
-        "Ao localizar o hóspede por CPF/e-mail, recupera selfie e documento salvos no MinIO de check-ins anteriores pelo portal (somente exibição/Inbox; não altera o fluxo).",
+        "Ao localizar o hóspede por CPF/e-mail, recupera selfie e documento salvos no MinIO de check-ins anteriores. No VB, ao cadastrar acompanhantes após o check-in, reenvia essas fotos no titular para o PMS (evita enviar sem imagem).",
       requireBirthDateConfirmation: "Exigir confirmação da data de nascimento",
       requireBirthDateConfirmationHint:
         "Quando o hóspede for localizado pelo CPF ou e-mail, será necessário informar a data de nascimento cadastrada antes de continuar.",

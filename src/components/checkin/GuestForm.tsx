@@ -36,9 +36,11 @@ type Props = {
   initial: MainGuest;
   onSubmit: (guest: MainGuest) => void;
   onBack: () => void;
+  /** Necessário para carregar países via catálogo nativo quando o hotel usa só PMS VB. */
+  establishmentId?: string | null;
 };
 
-export function GuestForm({ foreign, initial, onSubmit, onBack }: Props) {
+export function GuestForm({ foreign, initial, onSubmit, onBack, establishmentId }: Props) {
   const { t } = useI18n();
   const loadReference = useServerFn(getEmbraturReference);
   const [guest, setGuest] = useState<MainGuest>(initial);
@@ -53,7 +55,11 @@ export function GuestForm({ foreign, initial, onSubmit, onBack }: Props) {
   useEffect(() => {
     let active = true;
     setCountriesLoading(true);
-    void loadReference({ data: {} })
+    void loadReference({
+      data: {
+        ...(establishmentId?.trim() ? { establishmentId: establishmentId.trim() } : {}),
+      },
+    })
       .then((raw) => {
         if (!active) return;
         const options = toPmsCountryOptions(normalizeEmbratur(raw).countries);
@@ -70,6 +76,9 @@ export function GuestForm({ foreign, initial, onSubmit, onBack }: Props) {
           };
         });
       })
+      .catch((error) => {
+        console.error("[GuestForm] Falha ao carregar países:", error);
+      })
       .finally(() => {
         if (active) setCountriesLoading(false);
       });
@@ -77,7 +86,7 @@ export function GuestForm({ foreign, initial, onSubmit, onBack }: Props) {
     return () => {
       active = false;
     };
-  }, [foreign, loadReference]);
+  }, [establishmentId, foreign, loadReference]);
 
   function set(field: string, value: string) {
     setGuest((current) => ({ ...current, [field]: value }));

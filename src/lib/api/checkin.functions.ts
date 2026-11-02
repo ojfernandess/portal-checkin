@@ -290,6 +290,8 @@ function stripMainGuestPhotoFieldsFromPmsRow(row: Record<string, unknown>): Reco
   delete next.documentPhotoUrl;
   delete next.profilePhotoId;
   delete next.documentPhotoId;
+  delete next.profilePhotoDisplayUrl;
+  delete next.documentPhotoDisplayUrl;
   return next;
 }
 
@@ -358,7 +360,8 @@ async function prepareMainGuestPayloadForPms(
   },
 ): Promise<Record<string, unknown>> {
   const provider = await resolveSubmitPmsProvider(input);
-  let row = pickMainGuestForApi(guest);
+  // Acompanhantes pós-check-in: monta o titular sem chaves de foto (VB/Vivakey).
+  let row = pickMainGuestForApi(guest, { omitPhotos: input.omitPhotos === true });
   if (provider === "vb") {
     const vbDocumentType = portalDocumentTypeToVb(String(row["documentType"] ?? "CPF"));
     if (vbDocumentType != null) row["documentType"] = vbDocumentType;
@@ -371,6 +374,11 @@ async function prepareMainGuestPayloadForPms(
   }
   if (input.omitPhotos) {
     row = stripMainGuestPhotoFieldsFromPmsRow(row);
+    if (provider === "vb") {
+      console.info(
+        `[checkin] VB companions: mainGuest sem fotos (keys=${Object.keys(row).join(",")})`,
+      );
+    }
   }
   return row;
 }
@@ -420,7 +428,10 @@ function appendAddressFieldsToPayload(
   );
 }
 
-function pickMainGuestForApi(guest: MainGuest): Record<string, unknown> {
+function pickMainGuestForApi(
+  guest: MainGuest,
+  options?: { omitPhotos?: boolean },
+): Record<string, unknown> {
   const documentType = String(guest.documentType ?? "CPF");
   const row: Record<string, unknown> = {
     name: trimPmsGuestName(guest.name) ?? guest.name,
@@ -430,15 +441,21 @@ function pickMainGuestForApi(guest: MainGuest): Record<string, unknown> {
     birthDate: guest.birthDate,
     profession: guest.profession,
     citizenship: formatCitizenshipForApi(guest.citizenship),
-    profilePhotoUrl: guest.profilePhotoUrl,
-    documentPhotoUrl: guest.documentPhotoUrl,
   };
+
+  if (!options?.omitPhotos) {
+    if (guest.profilePhotoUrl != null && String(guest.profilePhotoUrl).trim() !== "") {
+      row["profilePhotoUrl"] = guest.profilePhotoUrl;
+    }
+    if (guest.documentPhotoUrl != null && String(guest.documentPhotoUrl).trim() !== "") {
+      row["documentPhotoUrl"] = guest.documentPhotoUrl;
+    }
+    if (guest.profilePhotoId != null) row["profilePhotoId"] = guest.profilePhotoId;
+    if (guest.documentPhotoId != null) row["documentPhotoId"] = guest.documentPhotoId;
+  }
 
   assignTrimmedField(row, "mobilePhoneNumber", normalizePhoneForApi(guest.mobilePhoneNumber));
   appendAddressFieldsToPayload(row, guest);
-
-  if (guest.profilePhotoId != null) row["profilePhotoId"] = guest.profilePhotoId;
-  if (guest.documentPhotoId != null) row["documentPhotoId"] = guest.documentPhotoId;
 
   row["gender"] = formatGenderForApi(guest.gender);
 
@@ -1412,14 +1429,57 @@ function prepareMainGuestForCompanionSubmit(
   return normalizeGuestContactFields(guest);
 }
 
+/**
+ * Com "Vincular fotos…" ativo: usa selfie/documento salvos no MinIO do check-in
+ * anterior ao reenviar o titular no POST de acompanhantes (VB).
+ */
+async function applyPortalPhotosForVbCompanionSubmit(
+  guest: MainGuest,
+  tenantId: string,
+  establishmentId: string,
+): Promise<MainGuest> {
+  const { findGuestPortalPhotos } = await import("@/lib/guest-portal-photos.server");
+  const stored = await findGuestPortalPhotos({
+    tenantId,
+    establishmentId,
+    documentNumber: guest.documentNumber,
+    email: guest.email,
+  });
+  if (!stored?.profileObjectKey && !stored?.documentObjectKey) {
+    return guest;
+  }
+
+  return {
+    ...guest,
+    ...(stored.profileObjectKey
+      ? {
+          profilePhotoUrl: stored.profileObjectKey,
+          profilePhotoId: guest.profilePhotoId ?? stored.id,
+        }
+      : {}),
+    ...(stored.documentObjectKey
+      ? {
+          documentPhotoUrl: stored.documentObjectKey,
+          documentPhotoId: guest.documentPhotoId ?? stored.id,
+        }
+      : {}),
+  };
+}
+
+/** Foto já presente no PMS VB (URL, caminho ou rótulo JPEG/WEBP após upload). */
+function hasPmsPhotoEvidence(url: unknown, id: unknown): boolean {
+  if (id != null && String(id).trim() !== "") return true;
+  const text = String(url ?? "").trim();
+  if (!text) return false;
+  if (isMediaFormatLabel(text)) return true;
+  return isUsablePmsPhotoUrl(text);
+}
+
 function hasCompanionPhotoRefs(guest: MainGuest): boolean {
-  const hasProfile = Boolean(
-    isUsablePmsPhotoUrl(guest.profilePhotoUrl) || guest.profilePhotoId != null,
+  return (
+    hasPmsPhotoEvidence(guest.profilePhotoUrl, guest.profilePhotoId) &&
+    hasPmsPhotoEvidence(guest.documentPhotoUrl, guest.documentPhotoId)
   );
-  const hasDocument = Boolean(
-    isUsablePmsPhotoUrl(guest.documentPhotoUrl) || guest.documentPhotoId != null,
-  );
-  return hasProfile && hasDocument;
 }
 
 function hasCompanionMainGuestIdentity(guest: MainGuest): boolean {
@@ -2143,6 +2203,11 @@ async function executeSubmitCheckin(data: SubmitCheckinInput) {
     let submitEstablishmentId = resolvedEstablishmentIdForTenant
       ? String(resolvedEstablishmentIdForTenant)
       : null;
+    let vbOwnerSettings: Awaited<
+      ReturnType<
+        typeof import("@/lib/establishment-settings.server").loadEstablishmentSettingsRow
+      >
+    > | null = null;
     if ((pmsProvider ?? snapshot?.pmsProvider) === "vb") {
       const { resolveVbOwnerEstablishmentIdForMutation } = await import("@/lib/pms/vb-pms.server");
       const snapshotPmsEstablishmentId =
@@ -2159,18 +2224,50 @@ async function executeSubmitCheckin(data: SubmitCheckinInput) {
         "@/lib/establishment-settings.server"
       );
       const { resolveConfiguredVbEstablishmentId } = await import("@/lib/establishment-settings");
-      const ownerSettings = submitEstablishmentId
+      vbOwnerSettings = submitEstablishmentId
         ? await loadEstablishmentSettingsRow(submitEstablishmentId)
         : null;
       const vbEstablishmentId = submitEstablishmentId
         ? resolveConfiguredVbEstablishmentId(
             submitEstablishmentId,
-            ownerSettings?.settings ?? { vbEstablishmentId: null },
+            vbOwnerSettings?.settings ?? { vbEstablishmentId: null },
           )
         : null;
       console.info(
         `[checkin] VB submit localizer=${localizerCode} portalEstablishmentId=${submitEstablishmentId} vbEstablishmentId=${vbEstablishmentId ?? "?"}`,
       );
+    }
+
+    let mainGuestForPms = mainGuest;
+    let omitMainGuestPhotos = purpose === "companions";
+    // VB + "Vincular fotos…": reenvia selfie/documento do titular a partir do MinIO
+    // (busca pelo establishment do portal, onde as fotos foram gravadas no check-in).
+    const portalPhotoEstablishmentId = resolvedEstablishmentIdForTenant
+      ? String(resolvedEstablishmentIdForTenant)
+      : submitEstablishmentId;
+    if (
+      purpose === "companions" &&
+      (pmsProvider ?? snapshot?.pmsProvider) === "vb" &&
+      portalPhotoEstablishmentId
+    ) {
+      const { loadEstablishmentSettingsRow } = await import(
+        "@/lib/establishment-settings.server"
+      );
+      const photoLinkSettings =
+        portalPhotoEstablishmentId === submitEstablishmentId && vbOwnerSettings
+          ? vbOwnerSettings
+          : await loadEstablishmentSettingsRow(portalPhotoEstablishmentId);
+      if (photoLinkSettings?.settings.vbPhotoLinkEnabled) {
+        mainGuestForPms = await applyPortalPhotosForVbCompanionSubmit(
+          mainGuest,
+          photoLinkSettings.tenantId,
+          portalPhotoEstablishmentId,
+        );
+        omitMainGuestPhotos = false;
+        console.info(
+          `[checkin] VB companions: fotos do titular via vínculo MinIO (establishmentId=${portalPhotoEstablishmentId})`,
+        );
+      }
     }
 
     const body: Record<string, unknown> = {
@@ -2179,11 +2276,11 @@ async function executeSubmitCheckin(data: SubmitCheckinInput) {
       validatedCheckin: true,
       approveCheckin: true,
       sentToReception: true,
-      mainGuest: await prepareMainGuestPayloadForPms(mainGuest, {
+      mainGuest: await prepareMainGuestPayloadForPms(mainGuestForPms, {
         tenantId,
         establishmentId: submitEstablishmentId,
         pmsProvider,
-        omitPhotos: purpose === "companions",
+        omitPhotos: omitMainGuestPhotos,
       }),
       embratur: data.embratur as unknown as EmbraturForm,
     };

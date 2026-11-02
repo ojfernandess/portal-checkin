@@ -22,13 +22,22 @@ function getBaseUrl(): string {
 }
 
 async function resolveBaseUrl(tenantId?: string): Promise<string> {
+  const { normalizePmsAbsoluteBaseUrl, loadTenantPmsSettings, resolveTenantPmsBaseUrl } =
+    await import("@/lib/tenant-pms.server");
+
   if (tenantId) {
-    const { loadTenantPmsSettings, resolveTenantPmsBaseUrl } = await import("@/lib/tenant-pms.server");
     const settings = await loadTenantPmsSettings(tenantId);
-    const tenantBaseUrl = resolveTenantPmsBaseUrl(settings?.config ?? null);
+    const tenantBaseUrl = normalizePmsAbsoluteBaseUrl(
+      resolveTenantPmsBaseUrl(settings?.config ?? null),
+    );
     if (tenantBaseUrl) return tenantBaseUrl;
   }
-  return getBaseUrl();
+
+  return (
+    normalizePmsAbsoluteBaseUrl(getBaseUrl()) ??
+    normalizePmsAbsoluteBaseUrl(DEFAULT_BASE_URL) ??
+    DEFAULT_BASE_URL
+  );
 }
 
 /** Tokens vkr_* devem ir em x-api-key; JWT em Authorization Bearer. */
@@ -150,7 +159,16 @@ export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promi
     );
   }
 
-  const url = new URL(path, await resolveBaseUrl(options.tenantId));
+  const baseUrl = await resolveBaseUrl(options.tenantId);
+  let url: URL;
+  try {
+    url = new URL(path, baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`);
+  } catch (error) {
+    console.error(`[techospitality] Invalid URL base=${baseUrl} path=${path}`, error);
+    throw new Error(
+      `URL base do PMS TecHospitality inválida (${baseUrl || "vazia"}). Informe uma URL absoluta (ex.: https://backend.techospitality.com).`,
+    );
+  }
   if (options.query) {
     for (const [key, value] of Object.entries(options.query)) {
       if (value !== undefined && value !== "") url.searchParams.set(key, value);

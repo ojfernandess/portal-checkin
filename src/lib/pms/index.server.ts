@@ -66,11 +66,19 @@ async function establishmentIdFromVivakeyPayload(payload: unknown): Promise<stri
  * 2) se VB estiver ativo nesse estabelecimento → Vinibarr;
  * 3) caso contrário → TecHospitality/Vivakey.
  */
+async function canUseVivakeyForLocalizer(tenantId: string): Promise<boolean> {
+  const { loadTenantPmsSettings } = await import("@/lib/tenant-pms.server");
+  const settings = await loadTenantPmsSettings(tenantId, "vivakey");
+  // Super Admin desligou Vivakey: consulta só VB (quando aplicável).
+  if (settings != null && settings.enabled === false) return false;
+  return isVivakeyAvailable(tenantId);
+}
+
 export async function pmsFetchLocalizer(
   localizer: string,
   input: { tenantId: string; establishmentId?: string | null },
 ): Promise<{ payload: unknown; provider: PmsProviderId; establishmentId?: string }> {
-  const vivakeyAvailable = await isVivakeyAvailable(input.tenantId);
+  const vivakeyAvailable = await canUseVivakeyForLocalizer(input.tenantId);
   const known = await resolveLocalizerEstablishmentHint(localizer, input.establishmentId);
 
   if (known?.establishmentId) {
@@ -215,14 +223,31 @@ export async function pmsGetEmbraturReference(input: {
   tenantId: string;
   establishmentId?: string | null;
 }): Promise<Record<string, unknown>> {
-  const provider = await resolvePmsProvider(input.tenantId, input.establishmentId);
+  const provider = input.establishmentId
+    ? await resolvePmsProvider(input.tenantId, input.establishmentId)
+    : await resolvePmsProviderForLocalizer(input.tenantId, null);
   if (provider === "vb") return getNativeEmbraturReference();
 
-  const { apiFetch, unwrap } = await import("@/lib/api/techospitality.server");
-  const payload = await apiFetch<unknown>("/api/reservations/hub/embratur-reference", {
-    tenantId: input.tenantId,
-  });
-  return unwrap<Record<string, unknown>>(payload);
+  // Vivakey desligado no Super Admin: catálogo nativo (fluxo só VB).
+  const { loadTenantPmsSettings } = await import("@/lib/tenant-pms.server");
+  const vivakey = await loadTenantPmsSettings(input.tenantId, "vivakey");
+  if (vivakey != null && vivakey.enabled === false) {
+    return getNativeEmbraturReference();
+  }
+
+  try {
+    const { apiFetch, unwrap } = await import("@/lib/api/techospitality.server");
+    const payload = await apiFetch<unknown>("/api/reservations/hub/embratur-reference", {
+      tenantId: input.tenantId,
+    });
+    return unwrap<Record<string, unknown>>(payload);
+  } catch (error) {
+    console.warn(
+      "[pms] Embratur TecHospitality indisponível; usando catálogo nativo:",
+      error instanceof Error ? error.message : error,
+    );
+    return getNativeEmbraturReference();
+  }
 }
 
 export async function unwrapPmsPayload<T>(

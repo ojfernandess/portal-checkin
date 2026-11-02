@@ -117,6 +117,39 @@ export function resolveTenantPmsBaseUrl(config: TenantPmsConfig | null | undefin
   return value || undefined;
 }
 
+/**
+ * Garante URL absoluta http(s) para montar chamadas PMS (`new URL(...)`).
+ * Aceita host sem protocolo (ex.: api.vinibarr.com.br/v1) e rejeita valores inválidos.
+ */
+export function normalizePmsAbsoluteBaseUrl(
+  value: string | null | undefined,
+): string | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed) return undefined;
+
+  let candidate = trimmed;
+  if (!/^https?:\/\//i.test(candidate)) {
+    candidate = `http://${candidate.replace(/^\/+/, "")}`;
+  }
+
+  try {
+    const parsed = new URL(candidate);
+    const host = parsed.hostname?.trim().toLowerCase() ?? "";
+    if (
+      (parsed.protocol !== "http:" && parsed.protocol !== "https:") ||
+      !host ||
+      host === "http" ||
+      host === "https"
+    ) {
+      return undefined;
+    }
+    const path = parsed.pathname.replace(/\/+$/, "");
+    return `${parsed.origin}${!path || path === "/" ? "" : path}`;
+  } catch {
+    return undefined;
+  }
+}
+
 export function maskToken(value: string | undefined): string {
   if (!value) return "";
   if (value.length <= 8) return "••••••••";

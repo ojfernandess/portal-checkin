@@ -26,13 +26,21 @@ export type VbApiOptions = {
 };
 
 async function resolveVbBaseUrl(tenantId?: string): Promise<string> {
+  const { normalizePmsAbsoluteBaseUrl, loadTenantPmsSettings, resolveTenantPmsBaseUrl } =
+    await import("@/lib/tenant-pms.server");
+
   if (tenantId) {
-    const { loadTenantPmsSettings, resolveTenantPmsBaseUrl } = await import("@/lib/tenant-pms.server");
     const settings = await loadTenantPmsSettings(tenantId, "vb");
-    const tenantBaseUrl = resolveTenantPmsBaseUrl(settings?.config ?? null);
-    if (tenantBaseUrl) return tenantBaseUrl.replace(/\/$/, "");
+    const tenantBaseUrl = normalizePmsAbsoluteBaseUrl(
+      resolveTenantPmsBaseUrl(settings?.config ?? null),
+    );
+    if (tenantBaseUrl) return tenantBaseUrl;
   }
-  return (readEnv("VB_PMS_BASE_URL") ?? DEFAULT_VB_BASE_URL).replace(/\/$/, "");
+
+  const fromEnv = normalizePmsAbsoluteBaseUrl(readEnv("VB_PMS_BASE_URL"));
+  if (fromEnv) return fromEnv;
+
+  return normalizePmsAbsoluteBaseUrl(DEFAULT_VB_BASE_URL) ?? DEFAULT_VB_BASE_URL;
 }
 
 /**
@@ -167,7 +175,15 @@ export async function vbApiFetch<T>(path: string, options: VbApiOptions = {}): P
   const baseUrl = (await resolveVbBaseUrl(options.tenantId)).replace(/\/$/, "");
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
   // Path absoluto em new URL() substitui todo o pathname da base (perde /v1).
-  const url = new URL(`${baseUrl}${normalizedPath}`);
+  let url: URL;
+  try {
+    url = new URL(`${baseUrl}${normalizedPath}`);
+  } catch (error) {
+    console.error(`[vb-pms] Invalid URL base=${baseUrl} path=${normalizedPath}`, error);
+    throw new Error(
+      `URL base do PMS VB inválida (${baseUrl || "vazia"}). Em Super Admin → Integração PMS VB, informe uma URL absoluta (ex.: http://api.vinibarr.com.br/v1).`,
+    );
+  }
 
   if (options.query) {
     for (const [key, value] of Object.entries(options.query)) {

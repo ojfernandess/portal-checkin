@@ -1097,7 +1097,7 @@ export const en: MessageTree = {
       vbApiTokenPreview: "Configured token: {preview}",
       vbPhotoLinkEnabled: "Link previous check-in photos to guest",
       vbPhotoLinkEnabledHint:
-        "When the guest is found by document/email, restore selfie and document photos stored in MinIO from prior portal check-ins (display/Inbox only; flow unchanged).",
+        "When the guest is found by document/email, restore selfie and document photos stored in MinIO from prior check-ins. For VB, when registering companions after check-in, resends those photos on the main guest to the PMS (avoids sending without images).",
       requireBirthDateConfirmation: "Require date of birth confirmation",
       requireBirthDateConfirmationHint:
         "When a guest is found by CPF or email, they must enter their registered date of birth before continuing.",

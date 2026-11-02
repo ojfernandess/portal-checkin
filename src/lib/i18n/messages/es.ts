@@ -1107,7 +1107,7 @@ export const es: MessageTree = {
       vbApiTokenPreview: "Token configurado: {preview}",
       vbPhotoLinkEnabled: "Vincular fotos de check-in anteriores al huésped",
       vbPhotoLinkEnabledHint:
-        "Al localizar al huésped por documento/correo, recupera selfie y documento guardados en MinIO de check-ins anteriores del portal (solo visualización/Inbox; no altera el flujo).",
+        "Al localizar al huésped por documento/correo, recupera selfie y documento guardados en MinIO de check-ins anteriores. En VB, al registrar acompañantes tras el check-in, reenvía esas fotos en el titular al PMS (evita enviar sin imagen).",
       requireBirthDateConfirmation: "Exigir confirmación de fecha de nacimiento",
       requireBirthDateConfirmationHint:
         "Cuando el huésped sea localizado por CPF o correo, deberá ingresar la fecha de nacimiento registrada antes de continuar.",

@@ -1811,6 +1811,11 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
             <GuestForm
               foreign={foreign}
               initial={guest}
+              establishmentId={
+                reservation?.establishmentId != null
+                  ? String(reservation.establishmentId)
+                  : null
+              }
               onBack={() => {
                 setLookupResult(null);
                 clearRegisteredPhotoState();
@@ -1831,6 +1836,11 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
             <CompanionsStep
               guestsQuantity={guestsQuantity}
               localizer={String(reservation?.localizer ?? localizer)}
+              establishmentId={
+                reservation?.establishmentId != null
+                  ? String(reservation.establishmentId)
+                  : null
+              }
               mainGuest={guest}
               dependents={dependents}
               inboxEnabled={establishmentSettings.inboxEnabled}
@@ -2034,6 +2044,11 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
                         mode="postCheckin"
                         guestsQuantity={postCompanionsContext.guestsQuantity}
                         localizer={String(reservation?.localizer ?? localizer)}
+                        establishmentId={
+                          reservation?.establishmentId != null
+                            ? String(reservation.establishmentId)
+                            : null
+                        }
                         mainGuest={postCompanionsContext.mainGuest}
                         dependents={postCompanionsDraft}
                         lockedCount={postCompanionsLockedCount}
