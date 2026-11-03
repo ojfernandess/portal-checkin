@@ -27,9 +27,11 @@ import { buildTenantLoginUrl } from "@/lib/api/auth.functions";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   platformAddTenantMember,
+  platformBuildFnrhPayload,
   platformGetTenant,
   platformListTenantMembers,
   platformRemoveTenantMember,
+  platformSaveTenantFnrhApiToken,
   platformSaveTenantInboxConfig,
   platformSaveTenantWhatsAppChatConfig,
   platformSaveTenantZepirisConfig,
@@ -40,8 +42,13 @@ import {
   type PlatformTenantMember,
   type PlatformTenantStatus,
 } from "@/lib/api/platform.functions";
+import { FNRH_BUILD_ENDPOINT_DOC, FNRH_EXAMPLE_PAYLOAD } from "@/lib/fnrh-payload.example";
 import { INBOX_MODULE_KEYS, DEFAULT_INBOX_MODULES, type InboxModuleKey, type InboxModules } from "@/lib/inbox/modules";
 import { useI18n } from "@/lib/i18n/context";
+
+const FNRH_EXAMPLE_JSON = JSON.stringify(FNRH_EXAMPLE_PAYLOAD, null, 2);
+const FNRH_REQUEST_EXAMPLE_JSON = JSON.stringify(FNRH_BUILD_ENDPOINT_DOC.requestExample, null, 2);
+const FNRH_RESPONSE_SHAPE_JSON = JSON.stringify(FNRH_BUILD_ENDPOINT_DOC.responseShape, null, 2);
 
 export const Route = createFileRoute("/_authenticated/platform/tenants/$tenantNumber")({
   head: () => ({ meta: [{ title: "Super Admin | Empresa" }] }),
@@ -89,6 +96,8 @@ function PlatformTenantDetailPage() {
   const membersFn = useServerFn(platformListTenantMembers);
   const addMemberFn = useServerFn(platformAddTenantMember);
   const removeMemberFn = useServerFn(platformRemoveTenantMember);
+  const buildFnrhFn = useServerFn(platformBuildFnrhPayload);
+  const saveFnrhTokenFn = useServerFn(platformSaveTenantFnrhApiToken);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -154,6 +163,19 @@ function PlatformTenantDetailPage() {
   const [members, setMembers] = useState<PlatformTenantMember[]>([]);
   const [memberEmail, setMemberEmail] = useState("");
   const [memberRole, setMemberRole] = useState<"admin" | "reception">("reception");
+
+  const [fnrhLocalizer, setFnrhLocalizer] = useState("");
+  const [fnrhLoading, setFnrhLoading] = useState(false);
+  const [fnrhJson, setFnrhJson] = useState("");
+  const [fnrhMeta, setFnrhMeta] = useState<{
+    localizer: string;
+    checkedInAt: string;
+    establishmentName: string | null;
+  } | null>(null);
+  const [fnrhApiConfigured, setFnrhApiConfigured] = useState(false);
+  const [fnrhMaskedApiToken, setFnrhMaskedApiToken] = useState<string | null>(null);
+  const [fnrhPlainApiToken, setFnrhPlainApiToken] = useState<string | null>(null);
+  const [fnrhTokenSaving, setFnrhTokenSaving] = useState(false);
 
   const loginUrl = useMemo(() => {
     if (!slug.trim()) return "";
@@ -222,6 +244,9 @@ function PlatformTenantDetailPage() {
       setWhatsappBaseUrl(detail.whatsapp.baseUrl ?? "");
       setWhatsappConfigured(detail.whatsapp.configured);
       setWhatsappMaskedApiToken(detail.whatsapp.maskedApiToken);
+      setFnrhApiConfigured(detail.fnrh.configured);
+      setFnrhMaskedApiToken(detail.fnrh.maskedApiToken);
+      setFnrhPlainApiToken(null);
       setZepirisOperational(detail.zepiris.operational);
       setZepirisGloballyEnabled(detail.zepiris.globallyEnabled);
       setZepirisApiKeyConfigured(detail.zepiris.apiKeyConfigured);
@@ -295,6 +320,9 @@ function PlatformTenantDetailPage() {
     setWhatsappBaseUrl(detail.whatsapp.baseUrl ?? "");
     setWhatsappConfigured(detail.whatsapp.configured);
     setWhatsappMaskedApiToken(detail.whatsapp.maskedApiToken);
+    setFnrhApiConfigured(detail.fnrh.configured);
+    setFnrhMaskedApiToken(detail.fnrh.maskedApiToken);
+    setFnrhPlainApiToken(null);
     setZepirisOperational(detail.zepiris.operational);
     setZepirisGloballyEnabled(detail.zepiris.globallyEnabled);
     setZepirisApiKeyConfigured(detail.zepiris.apiKeyConfigured);
@@ -517,6 +545,105 @@ function PlatformTenantDetailPage() {
     }
   }
 
+  async function handleBuildFnrh() {
+    const code = fnrhLocalizer.trim().toUpperCase();
+    if (code.length < 3) {
+      toast.error(t("platform.tenantDetail.fnrhEmpty"));
+      return;
+    }
+    setFnrhLoading(true);
+    setFnrhJson("");
+    setFnrhMeta(null);
+    try {
+      const result = await buildFnrhFn({
+        data: { publicNumber, localizer: code },
+      });
+      setFnrhJson(JSON.stringify(result.payload, null, 2));
+      setFnrhMeta({
+        localizer: result.localizer,
+        checkedInAt: result.checkedInAt,
+        establishmentName: result.establishmentName,
+      });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("platform.tenantDetail.fnrhNotFound"));
+    } finally {
+      setFnrhLoading(false);
+    }
+  }
+
+  async function handleCopyFnrh() {
+    if (!fnrhJson) return;
+    try {
+      await navigator.clipboard.writeText(fnrhJson);
+      toast.success(t("platform.tenantDetail.fnrhCopied"));
+    } catch {
+      toast.error(t("platform.tenantDetail.fnrhCopyError"));
+    }
+  }
+
+  function handleDownloadFnrh() {
+    if (!fnrhJson || !fnrhMeta) return;
+    const blob = new Blob([fnrhJson], { type: "application/json;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `fnrh-${fnrhMeta.localizer}.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function handleGenerateFnrhApiToken() {
+    setFnrhTokenSaving(true);
+    try {
+      const result = await saveFnrhTokenFn({ data: { publicNumber, generate: true } });
+      setFnrhApiConfigured(result.fnrh.configured);
+      setFnrhMaskedApiToken(result.fnrh.maskedApiToken);
+      setFnrhPlainApiToken(result.fnrh.apiToken);
+      toast.success(t("platform.tenantDetail.fnrhTokenGenerated"));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("errors.saveFailed"));
+    } finally {
+      setFnrhTokenSaving(false);
+    }
+  }
+
+  async function handleClearFnrhApiToken() {
+    setFnrhTokenSaving(true);
+    try {
+      const result = await saveFnrhTokenFn({ data: { publicNumber, clear: true } });
+      setFnrhApiConfigured(result.fnrh.configured);
+      setFnrhMaskedApiToken(result.fnrh.maskedApiToken);
+      setFnrhPlainApiToken(null);
+      toast.success(t("platform.tenantDetail.fnrhTokenCleared"));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("errors.saveFailed"));
+    } finally {
+      setFnrhTokenSaving(false);
+    }
+  }
+
+  async function handleCopyFnrhApiToken() {
+    if (!fnrhPlainApiToken) return;
+    try {
+      await navigator.clipboard.writeText(fnrhPlainApiToken);
+      toast.success(t("platform.tenantDetail.fnrhTokenCopied"));
+    } catch {
+      toast.error(t("platform.tenantDetail.fnrhCopyError"));
+    }
+  }
+
+  const fnrhCurlExample = useMemo(() => {
+    const origin =
+      typeof window !== "undefined" ? window.location.origin : "https://{host}";
+    const tokenPlaceholder = fnrhPlainApiToken || "{fnrhApiToken}";
+    return [
+      `curl -X POST '${origin}${FNRH_BUILD_ENDPOINT_DOC.path}' \\`,
+      `  -H 'Authorization: Bearer ${tokenPlaceholder}' \\`,
+      `  -H 'Content-Type: application/json' \\`,
+      `  -d '{"localizer":"ABC123456"}'`,
+    ].join("\n");
+  }, [fnrhPlainApiToken]);
+
   if (loading) {
     return (
       <PlatformShell account={account}>
@@ -558,6 +685,7 @@ function PlatformTenantDetailPage() {
           <TabsTrigger value="inbox">{t("platform.tenantDetail.tabInbox")}</TabsTrigger>
           <TabsTrigger value="whatsapp">{t("platform.tenantDetail.tabWhatsApp")}</TabsTrigger>
           <TabsTrigger value="zepiris">{t("platform.tenantDetail.tabZepiris")}</TabsTrigger>
+          <TabsTrigger value="fnrh">{t("platform.tenantDetail.tabFnrh")}</TabsTrigger>
           <TabsTrigger value="members">{t("platform.tenantDetail.tabMembers")}</TabsTrigger>
         </TabsList>
 
@@ -996,6 +1124,218 @@ function PlatformTenantDetailPage() {
                 </Button>
               </PlatformCard>
             )}
+          </PlatformSection>
+        </TabsContent>
+
+        <TabsContent value="fnrh">
+          <PlatformSection
+            title={t("platform.tenantDetail.fnrhTitle")}
+            description={t("platform.tenantDetail.fnrhHint")}
+          >
+            <div className="space-y-6">
+              <PlatformCard className="space-y-4">
+                <div>
+                  <h3 className="font-medium">{t("platform.tenantDetail.fnrhEndpointTitle")}</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {t("platform.tenantDetail.fnrhEndpointHint")}
+                  </p>
+                </div>
+                <div className="grid gap-3 text-sm sm:grid-cols-2">
+                  <p>
+                    <span className="text-muted-foreground">
+                      {t("platform.tenantDetail.fnrhEndpointMethod")}:
+                    </span>{" "}
+                    <code className="rounded bg-muted px-1.5 py-0.5 text-xs font-semibold">
+                      {FNRH_BUILD_ENDPOINT_DOC.method}
+                    </code>
+                  </p>
+                  <p>
+                    <span className="text-muted-foreground">
+                      {t("platform.tenantDetail.fnrhEndpointPath")}:
+                    </span>{" "}
+                    <code className="rounded bg-muted px-1.5 py-0.5 text-xs font-semibold">
+                      {FNRH_BUILD_ENDPOINT_DOC.path}
+                    </code>
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">{t("platform.tenantDetail.fnrhAuthTitle")}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {t("platform.tenantDetail.fnrhAuthHint")}
+                  </p>
+                  <pre className="overflow-auto rounded-lg border border-border bg-muted/40 p-3 text-xs leading-relaxed">
+                    {`${FNRH_BUILD_ENDPOINT_DOC.auth.primary}\n${FNRH_BUILD_ENDPOINT_DOC.auth.alternative}`}
+                  </pre>
+                </div>
+                <div className="space-y-3 rounded-lg border border-border p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-medium">{t("platform.tenantDetail.fnrhTokenTitle")}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {fnrhApiConfigured
+                          ? t("platform.tenantDetail.fnrhTokenConfigured")
+                          : t("platform.tenantDetail.fnrhTokenMissing")}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={fnrhTokenSaving}
+                        onClick={() => void handleGenerateFnrhApiToken()}
+                      >
+                        {fnrhTokenSaving ? (
+                          <Loader2 className="mr-2 size-4 animate-spin" aria-hidden />
+                        ) : null}
+                        {fnrhApiConfigured
+                          ? t("platform.tenantDetail.fnrhTokenRotate")
+                          : t("platform.tenantDetail.fnrhTokenGenerate")}
+                      </Button>
+                      {fnrhApiConfigured ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={fnrhTokenSaving}
+                          onClick={() => void handleClearFnrhApiToken()}
+                        >
+                          {t("platform.tenantDetail.fnrhTokenClear")}
+                        </Button>
+                      ) : null}
+                    </div>
+                  </div>
+                  {fnrhMaskedApiToken ? (
+                    <p className="text-sm">
+                      <span className="text-muted-foreground">
+                        {t("platform.tenantDetail.fnrhTokenMasked")}:
+                      </span>{" "}
+                      <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                        {fnrhMaskedApiToken}
+                      </code>
+                    </p>
+                  ) : null}
+                  {fnrhPlainApiToken ? (
+                    <div className="space-y-2">
+                      <p className="text-sm text-amber-700 dark:text-amber-400">
+                        {t("platform.tenantDetail.fnrhTokenOnce")}
+                      </p>
+                      <pre className="overflow-auto rounded-lg border border-border bg-muted/40 p-3 text-xs leading-relaxed">
+                        {fnrhPlainApiToken}
+                      </pre>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => void handleCopyFnrhApiToken()}
+                      >
+                        {t("platform.tenantDetail.fnrhTokenCopy")}
+                      </Button>
+                    </div>
+                  ) : null}
+                </div>
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">{t("platform.tenantDetail.fnrhCurlTitle")}</p>
+                  <pre className="overflow-auto rounded-lg border border-border bg-muted/40 p-3 text-xs leading-relaxed">
+                    {fnrhCurlExample}
+                  </pre>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">{t("platform.tenantDetail.fnrhEndpointRequest")}</p>
+                  <pre className="max-h-40 overflow-auto rounded-lg border border-border bg-muted/40 p-3 text-xs leading-relaxed">
+                    {FNRH_REQUEST_EXAMPLE_JSON}
+                  </pre>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">{t("platform.tenantDetail.fnrhEndpointResponse")}</p>
+                  <pre className="max-h-56 overflow-auto rounded-lg border border-border bg-muted/40 p-3 text-xs leading-relaxed">
+                    {FNRH_RESPONSE_SHAPE_JSON}
+                  </pre>
+                </div>
+              </PlatformCard>
+
+              <PlatformCard className="space-y-3">
+                <div>
+                  <h3 className="font-medium">{t("platform.tenantDetail.fnrhExampleTitle")}</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {t("platform.tenantDetail.fnrhExampleHint")}
+                  </p>
+                </div>
+                <pre className="max-h-[22rem] overflow-auto rounded-lg border border-border bg-muted/40 p-4 text-xs leading-relaxed">
+                  {FNRH_EXAMPLE_JSON}
+                </pre>
+              </PlatformCard>
+
+              <PlatformCard className="space-y-4">
+                <h3 className="font-medium">{t("platform.tenantDetail.fnrhGeneratedTitle")}</h3>
+                <div className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
+                  <div className="space-y-2">
+                    <Label htmlFor="fnrh-localizer">{t("platform.tenantDetail.fnrhLocalizer")}</Label>
+                    <Input
+                      id="fnrh-localizer"
+                      value={fnrhLocalizer}
+                      placeholder={t("platform.tenantDetail.fnrhLocalizerPlaceholder")}
+                      onChange={(event) => setFnrhLocalizer(event.target.value.toUpperCase())}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          void handleBuildFnrh();
+                        }
+                      }}
+                    />
+                  </div>
+                  <Button disabled={fnrhLoading} onClick={() => void handleBuildFnrh()}>
+                    {fnrhLoading ? (
+                      <>
+                        <Loader2 className="mr-2 size-4 animate-spin" aria-hidden />
+                        {t("common.loading")}
+                      </>
+                    ) : (
+                      t("platform.tenantDetail.fnrhGenerate")
+                    )}
+                  </Button>
+                </div>
+
+                {fnrhMeta ? (
+                  <div className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-3">
+                    <p>
+                      <span className="font-medium text-foreground">
+                        {t("platform.tenantDetail.fnrhLocalizer")}:
+                      </span>{" "}
+                      {fnrhMeta.localizer}
+                    </p>
+                    <p>
+                      <span className="font-medium text-foreground">
+                        {t("platform.tenantDetail.fnrhCheckedInAt")}:
+                      </span>{" "}
+                      {new Date(fnrhMeta.checkedInAt).toLocaleString()}
+                    </p>
+                    <p>
+                      <span className="font-medium text-foreground">
+                        {t("platform.tenantDetail.fnrhEstablishment")}:
+                      </span>{" "}
+                      {fnrhMeta.establishmentName || "—"}
+                    </p>
+                  </div>
+                ) : null}
+
+                {fnrhJson ? (
+                  <>
+                    <div className="flex flex-wrap gap-2">
+                      <Button type="button" variant="outline" onClick={() => void handleCopyFnrh()}>
+                        {t("platform.tenantDetail.fnrhCopy")}
+                      </Button>
+                      <Button type="button" variant="outline" onClick={handleDownloadFnrh}>
+                        {t("platform.tenantDetail.fnrhDownload")}
+                      </Button>
+                    </div>
+                    <pre className="max-h-[28rem] overflow-auto rounded-lg border border-border bg-muted/40 p-4 text-xs leading-relaxed">
+                      {fnrhJson}
+                    </pre>
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground">{t("platform.tenantDetail.fnrhEmpty")}</p>
+                )}
+              </PlatformCard>
+            </div>
           </PlatformSection>
         </TabsContent>
 

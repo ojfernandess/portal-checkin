@@ -27,6 +27,8 @@ export type TenantSettings = {
   whatsappInboxId?: string | null;
   /** Base URL opcional da API WhatsApp Chat. */
   whatsappChatBaseUrl?: string | null;
+  /** Token Bearer/X-Api-Key para o endpoint HTTP FNRH desta empresa. */
+  fnrhApiToken?: string | null;
 };
 
 export const DEFAULT_TENANT_SETTINGS: TenantSettings = {
@@ -39,6 +41,7 @@ export const DEFAULT_TENANT_SETTINGS: TenantSettings = {
   whatsappOrganizationId: null,
   whatsappInboxId: null,
   whatsappChatBaseUrl: null,
+  fnrhApiToken: null,
 };
 
 export const MAX_TENANT_LOGO_BYTES = 400_000;
@@ -82,6 +85,7 @@ export function parseTenantSettings(raw: unknown): TenantSettings {
     whatsappOrganizationId: parseOptionalString(settings.whatsappOrganizationId, 64),
     whatsappInboxId: parseOptionalString(settings.whatsappInboxId, 64),
     whatsappChatBaseUrl: parseOptionalString(settings.whatsappChatBaseUrl, 512),
+    fnrhApiToken: parseOptionalString(settings.fnrhApiToken, 128),
   };
 }
 
@@ -97,6 +101,7 @@ export function tenantSettingsForSave(input: Partial<TenantSettings>): TenantSet
     whatsappOrganizationId: parsed.whatsappOrganizationId,
     whatsappInboxId: parsed.whatsappInboxId,
     whatsappChatBaseUrl: parsed.whatsappChatBaseUrl,
+    fnrhApiToken: parsed.fnrhApiToken,
   };
 }
 
@@ -105,6 +110,7 @@ export function mergeTenantSettingsForSave(
   patch: Partial<TenantSettings> & {
     clearInboxClientSecret?: boolean;
     clearWhatsAppChatApiToken?: boolean;
+    clearFnrhApiToken?: boolean;
   },
 ): TenantSettings {
   const next: TenantSettings = {
@@ -132,6 +138,12 @@ export function mergeTenantSettingsForSave(
     next.whatsappChatApiToken = null;
   } else if (patch.whatsappChatApiToken !== undefined) {
     next.whatsappChatApiToken = patch.whatsappChatApiToken;
+  }
+
+  if (patch.clearFnrhApiToken) {
+    next.fnrhApiToken = null;
+  } else if (patch.fnrhApiToken !== undefined) {
+    next.fnrhApiToken = patch.fnrhApiToken;
   }
 
   return tenantSettingsForSave(next);

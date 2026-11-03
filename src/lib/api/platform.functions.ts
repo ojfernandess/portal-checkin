@@ -318,6 +318,8 @@ export const platformGetTenant = createServerFn({ method: "POST" })
     const inbox = await loadTenantInboxContext(tenantUuid);
     const { loadTenantWhatsAppChatContext } = await import("@/lib/whatsapp-chat/tenant.server");
     const whatsapp = await loadTenantWhatsAppChatContext(tenantUuid);
+    const { loadTenantFnrhApiContext } = await import("@/lib/fnrh-api.server");
+    const fnrh = await loadTenantFnrhApiContext(tenantUuid);
     const zepiris = await loadTenantZepirisContext(tenantUuid);
     const runtime = readZepirisRuntimeConfig();
     const zepirisOperational =
@@ -393,6 +395,7 @@ export const platformGetTenant = createServerFn({ method: "POST" })
         inboxId: whatsapp.inboxId,
         baseUrl: whatsapp.baseUrl,
       },
+      fnrh,
       zepiris: {
         featureEnabled: zepiris.featureEnabled,
         active: zepiris.active,
@@ -846,6 +849,81 @@ export const platformSaveTenantLogo = createServerFn({ method: "POST" })
     });
 
     return { ok: true as const, settings };
+  });
+
+/** Monta o JSON FNRH a partir do check-in salvo (localizador) da empresa — só exporta, sem POST externo. */
+export const platformBuildFnrhPayload = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth, requirePlatformAdmin])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        publicNumber: tenantPublicNumberSchema,
+        localizer: z
+          .string()
+          .trim()
+          .min(3)
+          .max(40)
+          .regex(/^[A-Za-z0-9-]+$/, "Localizador inválido."),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    const { getFnrhPayloadByTenantLocalizer } = await import("@/lib/fnrh-api.server");
+    const tenantUuid = await resolveTenantUuidByPublicNumber(data.publicNumber);
+    return getFnrhPayloadByTenantLocalizer(tenantUuid, data.localizer);
+  });
+
+/** Gera, define ou remove o token da API HTTP FNRH da empresa. */
+export const platformSaveTenantFnrhApiToken = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth, requirePlatformAdmin])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        publicNumber: tenantPublicNumberSchema,
+        generate: z.boolean().optional(),
+        clear: z.boolean().optional(),
+        fnrhApiToken: z.string().max(128).nullable().optional(),
+      })
+      .refine(
+        (value) =>
+          value.generate === true ||
+          value.clear === true ||
+          value.fnrhApiToken !== undefined,
+        { message: "Informe generate, clear ou fnrhApiToken." },
+      )
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const tenantUuid = await resolveTenantUuidByPublicNumber(data.publicNumber);
+    const { saveTenantFnrhApiToken } = await import("@/lib/fnrh-api.server");
+
+    const refreshed = await saveTenantFnrhApiToken(tenantUuid, {
+      generate: data.generate,
+      clear: data.clear,
+      fnrhApiToken: data.fnrhApiToken,
+    });
+
+    await writeAuditLog({
+      userId: context.userId,
+      tenantId: tenantUuid,
+      action: "platform.tenant.fnrh_api_token",
+      entityType: "tenants",
+      entityId: tenantUuid,
+      newData: {
+        configured: refreshed.configured,
+        generated: data.generate === true,
+        cleared: data.clear === true,
+      },
+    });
+
+    return {
+      ok: true as const,
+      fnrh: {
+        configured: refreshed.configured,
+        maskedApiToken: refreshed.maskedApiToken,
+        apiToken: refreshed.apiToken,
+      },
+    };
   });
 
 export const platformListTenantMembers = createServerFn({ method: "POST" })

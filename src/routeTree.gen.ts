@@ -28,6 +28,7 @@ import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authentic
 import { Route as AuthenticatedPlatformAdminsRouteImport } from './routes/_authenticated/platform/admins'
 import { Route as AuthenticatedPlatformDashboardRouteImport } from './routes/_authenticated/platform/dashboard'
 import { Route as AuthenticatedPlatformMinioRouteImport } from './routes/_authenticated/platform/minio'
+import { Route as ApiFnrhPayloadRouteImport } from './routes/api/fnrh/payload'
 import { Route as AuthenticatedAdminEstablishmentsIndexRouteImport } from './routes/_authenticated/admin/establishments/index'
 import { Route as AuthenticatedAdminEstablishmentsEstablishmentIdRouteImport } from './routes/_authenticated/admin/establishments/$establishmentId'
 import { Route as AuthenticatedAdminInboxIndexRouteImport } from './routes/_authenticated/admin/inbox/index'
@@ -144,6 +145,11 @@ const AuthenticatedPlatformMinioRoute =
     path: '/minio',
     getParentRoute: () => AuthenticatedPlatformRouteRoute,
   } as any)
+const ApiFnrhPayloadRoute = ApiFnrhPayloadRouteImport.update({
+  id: '/api/fnrh/payload',
+  path: '/api/fnrh/payload',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedAdminEstablishmentsIndexRoute =
   AuthenticatedAdminEstablishmentsIndexRouteImport.update({
     id: '/establishments/',
@@ -236,6 +242,7 @@ export interface FileRoutesByFullPath {
   '/platform/admins': typeof AuthenticatedPlatformAdminsRoute
   '/platform/dashboard': typeof AuthenticatedPlatformDashboardRoute
   '/platform/minio': typeof AuthenticatedPlatformMinioRoute
+  '/api/fnrh/payload': typeof ApiFnrhPayloadRoute
   '/admin/establishments/$establishmentId': typeof AuthenticatedAdminEstablishmentsEstablishmentIdRoute
   '/admin/inbox/portfolio': typeof AuthenticatedAdminInboxPortfolioRoute
   '/platform/tenants/$tenantNumber': typeof AuthenticatedPlatformTenantsTenantNumberRoute
@@ -267,6 +274,7 @@ export interface FileRoutesByTo {
   '/platform/admins': typeof AuthenticatedPlatformAdminsRoute
   '/platform/dashboard': typeof AuthenticatedPlatformDashboardRoute
   '/platform/minio': typeof AuthenticatedPlatformMinioRoute
+  '/api/fnrh/payload': typeof ApiFnrhPayloadRoute
   '/admin/establishments/$establishmentId': typeof AuthenticatedAdminEstablishmentsEstablishmentIdRoute
   '/admin/inbox/portfolio': typeof AuthenticatedAdminInboxPortfolioRoute
   '/platform/tenants/$tenantNumber': typeof AuthenticatedPlatformTenantsTenantNumberRoute
@@ -301,6 +309,7 @@ export interface FileRoutesById {
   '/_authenticated/platform/admins': typeof AuthenticatedPlatformAdminsRoute
   '/_authenticated/platform/dashboard': typeof AuthenticatedPlatformDashboardRoute
   '/_authenticated/platform/minio': typeof AuthenticatedPlatformMinioRoute
+  '/api/fnrh/payload': typeof ApiFnrhPayloadRoute
   '/_authenticated/admin/establishments/$establishmentId': typeof AuthenticatedAdminEstablishmentsEstablishmentIdRoute
   '/_authenticated/admin/inbox/portfolio': typeof AuthenticatedAdminInboxPortfolioRoute
   '/_authenticated/platform/tenants/$tenantNumber': typeof AuthenticatedPlatformTenantsTenantNumberRoute
@@ -335,6 +344,7 @@ export interface FileRouteTypes {
     | '/platform/admins'
     | '/platform/dashboard'
     | '/platform/minio'
+    | '/api/fnrh/payload'
     | '/admin/establishments/$establishmentId'
     | '/admin/inbox/portfolio'
     | '/platform/tenants/$tenantNumber'
@@ -366,6 +376,7 @@ export interface FileRouteTypes {
     | '/platform/admins'
     | '/platform/dashboard'
     | '/platform/minio'
+    | '/api/fnrh/payload'
     | '/admin/establishments/$establishmentId'
     | '/admin/inbox/portfolio'
     | '/platform/tenants/$tenantNumber'
@@ -399,6 +410,7 @@ export interface FileRouteTypes {
     | '/_authenticated/platform/admins'
     | '/_authenticated/platform/dashboard'
     | '/_authenticated/platform/minio'
+    | '/api/fnrh/payload'
     | '/_authenticated/admin/establishments/$establishmentId'
     | '/_authenticated/admin/inbox/portfolio'
     | '/_authenticated/platform/tenants/$tenantNumber'
@@ -420,6 +432,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRouteWithChildren
   LocalizerGuestRoute: typeof LocalizerGuestRoute
   LocalizerGuestAcessoRoute: typeof LocalizerGuestAcessoRoute
+  ApiFnrhPayloadRoute: typeof ApiFnrhPayloadRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -556,6 +569,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/platform/minio'
       preLoaderRoute: typeof AuthenticatedPlatformMinioRouteImport
       parentRoute: typeof AuthenticatedPlatformRouteRoute
+    }
+    '/api/fnrh/payload': {
+      id: '/api/fnrh/payload'
+      path: '/api/fnrh/payload'
+      fullPath: '/api/fnrh/payload'
+      preLoaderRoute: typeof ApiFnrhPayloadRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_authenticated/admin/establishments/': {
       id: '/_authenticated/admin/establishments/'
@@ -766,6 +786,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRouteWithChildren,
   LocalizerGuestRoute: LocalizerGuestRoute,
   LocalizerGuestAcessoRoute: LocalizerGuestAcessoRoute,
+  ApiFnrhPayloadRoute: ApiFnrhPayloadRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
