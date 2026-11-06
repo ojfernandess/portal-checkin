@@ -238,11 +238,26 @@ export async function vbApiFetch<T>(path: string, options: VbApiOptions = {}): P
       (row
         ? String(row["mensagem"] ?? row["message"] ?? row["error"] ?? "").trim()
         : "") || slimDetail;
-    const message =
+    const formatted =
       formatVbApiErrorMessage(rawMessage, response.status) ||
       `Erro ${response.status} ao consultar o PMS VB.`;
-    console.error(`[vb-pms] ${method} ${url.pathname} -> ${response.status}`, parsed);
-    throw new Error(code ? `${message} (code: ${code})` : message);
+    console.error(`[vb-pms] ${method} ${url.pathname} -> ${response.status}`, {
+      code,
+      formatted,
+      rawMessage,
+      parsed,
+    });
+    // Mensagem ao cliente: só status amigável; detalhes ficam no log (humanize no portal).
+    if (response.status >= 500) {
+      throw new Error(`Erro ${response.status} no serviço de hospedagem.`);
+    }
+    if (response.status === 400 || response.status === 422) {
+      throw new Error(`Erro ${response.status} — verifique os dados informados.`);
+    }
+    if (response.status === 404) {
+      throw new Error("Reserva não encontrada para este localizador.");
+    }
+    throw new Error(`Erro ${response.status} ao consultar a reserva.`);
   }
 
   return parsed as T;

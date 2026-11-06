@@ -218,26 +218,27 @@ export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promi
     if (response.status === 401 || response.status === 403) {
       console.error(
         `[techospitality] ${options.method ?? "GET"} ${path} -> ${response.status} (scope: ${scope}, env: ${TOKEN_ENV[scope]})`,
+        { message, code, detail },
       );
-      if (scope === "hub" && message.toLowerCase().includes("invalid token")) {
-        throw new Error(
-          `Token inválido para check-in (hub). Defina TECHOSPITALITY_HUB_TOKEN com vkr_chk_… no .env e .dev.vars.`,
-        );
-      }
-      if (scope === "reservations" && message.toLowerCase().includes("invalid token")) {
-        throw new Error(
-          `Token inválido para consulta de reserva. Use TECHOSPITALITY_RESERVATIONS_TOKEN (vkr_loc_…) no .env e .dev.vars — não use o token vkr_chk_ do hub.`,
-        );
-      }
-    } else {
-      console.error(
-        `[techospitality] ${options.method ?? "GET"} ${path} -> ${response.status}`,
-        parsed,
-      );
+      throw new Error("Não foi possível concluir a operação. Tente novamente ou fale com a recepção.");
     }
 
-    const suffix = [code && `código: ${code}`, detail].filter(Boolean).join(" — ");
-    throw new Error(suffix ? `${message} (${suffix})` : message);
+    console.error(
+      `[techospitality] ${options.method ?? "GET"} ${path} -> ${response.status}`,
+      parsed,
+    );
+
+    // Mensagens técnicas ficam só no log; o cliente humaniza códigos HTTP.
+    if (response.status >= 500) {
+      throw new Error(`Erro ${response.status} no serviço de hospedagem.`);
+    }
+    if (response.status === 400 || response.status === 422) {
+      throw new Error(`Erro ${response.status} — verifique os dados informados.`);
+    }
+    if (response.status === 404) {
+      throw new Error("Reserva não encontrada para este localizador.");
+    }
+    throw new Error(`Erro ${response.status} ao consultar a reserva.`);
   }
 
   return parsed as T;

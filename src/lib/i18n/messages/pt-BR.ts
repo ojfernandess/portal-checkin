@@ -145,6 +145,10 @@ export const ptBR = {
     neighborhood: "Bairro",
     city: "Cidade",
     state: "Estado",
+    statePlaceholder: "SP",
+    statePlaceholderForeign: "CA",
+    stateHint: "Use só a sigla do estado (ex.: SP, RJ, MG).",
+    stateHintForeign: "Use só a sigla do estado/província (ex.: CA, NY, ON).",
     country: "País",
     personalData: "Dados pessoais",
     documentSection: "Documento",
@@ -164,6 +168,11 @@ export const ptBR = {
       neighborhood: "Informe o bairro",
       city: "Informe a cidade",
       state: "Informe o estado",
+      stateAbbrev:
+        "Informe apenas a sigla do estado (ex.: SP). Não use o nome por extenso.",
+      stateAbbrevForeign:
+        "Informe apenas a sigla do estado/província (ex.: CA). Não use o nome por extenso.",
+      stateUf: "Sigla inválida. Use uma UF brasileira com 2 letras (ex.: SP, RJ).",
       country: "Selecione o país",
       citizenship: "Selecione a naturalidade / cidadania",
       profession: "Informe a profissão",
@@ -466,6 +475,12 @@ export const ptBR = {
         "Revise os dados do hóspede principal. Campo(s) pendente(s): {fields}.",
       apiIncompleteCompanions:
         "Revise os dados dos acompanhantes. Campo(s) pendente(s): {fields}.",
+      apiBadRequest:
+        "Alguns dados precisam ser corrigidos. Volte às etapas anteriores e confira os campos.",
+      apiServerUnavailable:
+        "O serviço está temporariamente indisponível. Tente novamente em instantes ou fale com a recepção.",
+      apiFixAndRetry:
+        "Revise os dados preenchidos, corrija o que estiver incompleto e tente novamente.",
       steps: {
         guest: "Dados do hóspede",
         companions: "Acompanhantes",

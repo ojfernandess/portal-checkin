@@ -147,6 +147,10 @@ export const es: MessageTree = {
     neighborhood: "Barrio",
     city: "Ciudad",
     state: "Estado",
+    statePlaceholder: "SP",
+    statePlaceholderForeign: "CA",
+    stateHint: "Use solo la sigla del estado (ej.: SP, RJ, MG).",
+    stateHintForeign: "Use solo la sigla del estado/provincia (ej.: CA, NY, ON).",
     country: "País",
     personalData: "Datos personales",
     documentSection: "Documento",
@@ -166,6 +170,11 @@ export const es: MessageTree = {
       neighborhood: "Ingrese el barrio",
       city: "Ingrese la ciudad",
       state: "Ingrese el estado",
+      stateAbbrev:
+        "Ingrese solo la sigla del estado (ej.: SP). No use el nombre completo.",
+      stateAbbrevForeign:
+        "Ingrese solo la sigla del estado/provincia (ej.: CA). No use el nombre completo.",
+      stateUf: "Sigla inválida. Use una UF brasileña de 2 letras (ej.: SP, RJ).",
       country: "Seleccione el país",
       citizenship: "Seleccione naturalidad / ciudadanía",
       profession: "Ingrese la profesión",
@@ -468,6 +477,12 @@ export const es: MessageTree = {
         "Revise los datos del huésped principal. Campo(s) pendiente(s): {fields}.",
       apiIncompleteCompanions:
         "Revise los datos de los acompañantes. Campo(s) pendiente(s): {fields}.",
+      apiBadRequest:
+        "Algunos datos necesitan corrección. Vuelva a los pasos anteriores y revise los campos.",
+      apiServerUnavailable:
+        "El servicio no está disponible temporalmente. Intente de nuevo en unos minutos o hable con recepción.",
+      apiFixAndRetry:
+        "Revise los datos ingresados, corrija lo incompleto e intente nuevamente.",
       steps: {
         guest: "Datos del huésped",
         companions: "Acompañantes",

@@ -33,6 +33,7 @@ import { buildCheckinErrorLabels, splitCheckinErrorMessage } from "@/lib/checkin
 import { formatCheckinIssues, validateDependent } from "@/lib/checkin-validation";
 import { buildGenderSelectOptions } from "@/lib/guest-gender";
 import { defaultCallingCodeForGuest } from "@/lib/phone-display";
+import { validateGuestState } from "@/lib/guest-state";
 import { fetchViaCep, maskCep, maskCpf, onlyDigits } from "@/lib/validators";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -300,6 +301,23 @@ export function CompanionsStep({
         }
       }
 
+      if (issue.field === "state") {
+        const stateValue = useMainGuestAddress
+          ? mainGuest.state
+          : draft.state;
+        const stateResult = validateGuestState(stateValue, { foreign: isForeignDocument });
+        if (!stateResult.ok && stateResult.reason === "missing") {
+          next.state = t("guest.validation.state");
+        } else if (!stateResult.ok && stateResult.reason === "invalid_uf") {
+          next.state = t("guest.validation.stateUf");
+        } else {
+          next.state = isForeignDocument
+            ? t("guest.validation.stateAbbrevForeign")
+            : t("guest.validation.stateAbbrev");
+        }
+        continue;
+      }
+
       const validationKey =
         issue.field === "zipCode"
           ? isForeignDocument
@@ -357,7 +375,12 @@ export function CompanionsStep({
       number: address.number?.trim(),
       neighborhood: address.neighborhood?.trim(),
       city: address.city?.trim(),
-      state: address.state?.trim(),
+      state: (() => {
+        const stateResult = validateGuestState(address.state, {
+          foreign: isForeignDocument,
+        });
+        return stateResult.ok ? stateResult.normalized : address.state?.trim();
+      })(),
       country: address.country?.trim() || BRAZIL_PMS_COUNTRY,
       fnrhId: null,
       ...(draft.profilePhotoUrl?.trim() ? { profilePhotoUrl: draft.profilePhotoUrl.trim() } : {}),
@@ -787,7 +810,40 @@ export function CompanionsStep({
             </div>
             <div className="grid grid-cols-2 gap-3">
               {field("city", `${t("guest.city")} *`, {}, useMainGuestAddress)}
-              {field("state", `${t("guest.state")} *`, {}, useMainGuestAddress)}
+              <div className="space-y-1.5">
+                <Label htmlFor="dep-state">{`${t("guest.state")} *`}</Label>
+                <Input
+                  id="dep-state"
+                  className="tap-safe font-code uppercase"
+                  autoComplete="address-level1"
+                  disabled={useMainGuestAddress}
+                  maxLength={40}
+                  placeholder={
+                    isForeignDocument
+                      ? t("guest.statePlaceholderForeign")
+                      : t("guest.statePlaceholder")
+                  }
+                  value={String(draft.state ?? "")}
+                  onChange={(event) => {
+                    const next = event.target.value.toUpperCase().replace(/[^A-ZÀ-ÿ\s]/gi, "");
+                    setDraftField("state", next.slice(0, 40));
+                  }}
+                  onBlur={() => {
+                    const result = validateGuestState(draft.state, {
+                      foreign: isForeignDocument,
+                    });
+                    if (result.ok) setDraftField("state", result.normalized);
+                  }}
+                  aria-invalid={Boolean(errors.state)}
+                />
+                {errors.state ? (
+                  <p className="text-xs text-destructive">{errors.state}</p>
+                ) : useMainGuestAddress ? null : (
+                  <p className="text-xs text-muted-foreground">
+                    {isForeignDocument ? t("guest.stateHintForeign") : t("guest.stateHint")}
+                  </p>
+                )}
+              </div>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="dep-country">{`${t("guest.country")} *`}</Label>

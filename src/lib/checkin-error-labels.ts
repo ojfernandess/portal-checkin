@@ -61,6 +61,9 @@ export function buildCheckinErrorLabels(t: TranslateFn): CheckinErrorLabels {
     apiIncompleteMainGuest: t("checkin.errors.apiIncompleteMainGuest"),
     apiIncompleteCompanions: t("checkin.errors.apiIncompleteCompanions"),
     apiInvalidImageFormat: t("checkin.photos.invalidFormat"),
+    apiBadRequest: t("checkin.errors.apiBadRequest"),
+    apiServerUnavailable: t("checkin.errors.apiServerUnavailable"),
+    apiFixAndRetry: t("checkin.errors.apiFixAndRetry"),
   };
 }
 
@@ -116,5 +119,11 @@ export function buildCheckinErrorLabelsPt(): CheckinErrorLabels {
     apiIncompleteCompanions: "Revise os dados dos acompanhantes. Campo(s) pendente(s): {fields}.",
     apiInvalidImageFormat:
       "O formato da imagem é inválido. Tire uma nova foto ou envie um arquivo JPG ou PNG.",
+    apiBadRequest:
+      "Alguns dados precisam ser corrigidos. Volte às etapas anteriores e confira os campos.",
+    apiServerUnavailable:
+      "O serviço está temporariamente indisponível. Tente novamente em instantes ou fale com a recepção.",
+    apiFixAndRetry:
+      "Revise os dados preenchidos, corrija o que estiver incompleto e tente novamente.",
   };
 }

@@ -644,13 +644,16 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
         setStep(0);
       }
     } catch (error) {
-      toast.error(
-        isEstablishmentNotRegisteredError(error)
-          ? t("checkin.search.establishmentNotRegistered")
-          : error instanceof Error
-            ? error.message
+      if (isEstablishmentNotRegisteredError(error)) {
+        toast.error(t("checkin.search.establishmentNotRegistered"));
+      } else {
+        const labels = buildCheckinErrorLabels(t);
+        toast.error(
+          error instanceof Error
+            ? humanizeCheckinApiError(error.message, labels)
             : t("checkin.search.error"),
-      );
+        );
+      }
     } finally {
       setLoading(false);
     }
@@ -1283,7 +1286,12 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
       setPostCompanionsCanAdd(true);
       setAddingPostCompanions(true);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : t("checkin.companions.postLoadFailed"));
+      const labels = buildCheckinErrorLabels(t);
+      toast.error(
+        error instanceof Error
+          ? humanizeCheckinApiError(error.message, labels)
+          : t("checkin.companions.postLoadFailed"),
+      );
     } finally {
       setLoading(false);
     }
@@ -1332,8 +1340,11 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
       );
       toast.success(t("checkin.companions.inboxPhotoSaved"));
     } catch (error) {
+      const labels = buildCheckinErrorLabels(t);
       toast.error(
-        error instanceof Error ? error.message : t("checkin.companions.inboxPhotoSaveFailed"),
+        error instanceof Error
+          ? humanizeCheckinApiError(error.message, labels)
+          : t("checkin.companions.inboxPhotoSaveFailed"),
       );
     } finally {
       setCompanionInboxPhotoSavingKey(null);

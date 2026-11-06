@@ -146,6 +146,10 @@ export const en: MessageTree = {
     neighborhood: "Neighborhood",
     city: "City",
     state: "State",
+    statePlaceholder: "SP",
+    statePlaceholderForeign: "CA",
+    stateHint: "Use only the state abbreviation (e.g. SP, RJ, MG).",
+    stateHintForeign: "Use only the state/province abbreviation (e.g. CA, NY, ON).",
     country: "Country",
     personalData: "Personal information",
     documentSection: "Document",
@@ -165,6 +169,11 @@ export const en: MessageTree = {
       neighborhood: "Enter neighborhood",
       city: "Enter city",
       state: "Enter state",
+      stateAbbrev:
+        "Enter only the state abbreviation (e.g. SP). Do not use the full name.",
+      stateAbbrevForeign:
+        "Enter only the state/province abbreviation (e.g. CA). Do not use the full name.",
+      stateUf: "Invalid abbreviation. Use a 2-letter Brazilian UF (e.g. SP, RJ).",
       country: "Select country",
       citizenship: "Select place of birth / citizenship",
       profession: "Enter occupation",
@@ -463,6 +472,12 @@ export const en: MessageTree = {
       apiReviewCompanions: "Review companion details (Companions step).",
       apiIncompleteMainGuest: "Review the main guest details. Pending field(s): {fields}.",
       apiIncompleteCompanions: "Review companion details. Pending field(s): {fields}.",
+      apiBadRequest:
+        "Some details need to be corrected. Go back to the previous steps and check the fields.",
+      apiServerUnavailable:
+        "The service is temporarily unavailable. Try again shortly or contact the front desk.",
+      apiFixAndRetry:
+        "Review the information you entered, fix anything incomplete, and try again.",
       steps: {
         guest: "Guest details",
         companions: "Companions",

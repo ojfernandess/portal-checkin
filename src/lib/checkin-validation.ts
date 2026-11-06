@@ -1,5 +1,6 @@
 import type { Dependent, EmbraturForm, MainGuest } from "@/lib/api/types";
 import { hasGenderSelection } from "@/lib/guest-gender";
+import { isValidGuestState } from "@/lib/guest-state";
 import { isValidPhoneWithDialCode, splitPhoneInput } from "@/lib/phone-display";
 import { isValidEmail, onlyDigits } from "@/lib/validators";
 
@@ -61,6 +62,9 @@ export type CheckinErrorLabels = {
   apiIncompleteMainGuest: string;
   apiIncompleteCompanions: string;
   apiInvalidImageFormat: string;
+  apiBadRequest: string;
+  apiServerUnavailable: string;
+  apiFixAndRetry: string;
 };
 
 function normalizeDoc(value: string, documentType: string): string {
@@ -117,7 +121,9 @@ export function validateMainGuest(
   pushIfMissing(issues, "guest", "number", guest.number);
   pushIfMissing(issues, "guest", "neighborhood", guest.neighborhood);
   pushIfMissing(issues, "guest", "city", guest.city);
-  pushIfMissing(issues, "guest", "state", guest.state);
+  if (!isValidGuestState(guest.state, { foreign })) {
+    issues.push({ step: "guest", field: "state" });
+  }
   pushIfMissing(issues, "guest", "country", guest.country);
 
   if (
@@ -170,7 +176,9 @@ export function validateDependent(
   pushIfMissing(issues, "companions", "number", dependent.number, ctx);
   pushIfMissing(issues, "companions", "neighborhood", dependent.neighborhood, ctx);
   pushIfMissing(issues, "companions", "city", dependent.city, ctx);
-  pushIfMissing(issues, "companions", "state", dependent.state, ctx);
+  if (!isValidGuestState(dependent.state, { foreign: isPassport })) {
+    issues.push({ step: "companions", field: "state", ...ctx });
+  }
   pushIfMissing(issues, "companions", "country", dependent.country, ctx);
 
   if (mainGuest?.documentNumber?.trim() && dependent.documentNumber?.trim()) {
@@ -293,6 +301,9 @@ const API_FIELD_HINTS: Array<{ pattern: RegExp; step: CheckinStepId; field: Chec
   { pattern: /mainguest.*profession/i, step: "guest", field: "profession" },
   { pattern: /mainguest.*zip|cep/i, step: "guest", field: "zipCode" },
   { pattern: /mainguest.*neighborhood|bairro/i, step: "guest", field: "neighborhood" },
+  { pattern: /mainguest.*\bstate\b|estado|uf\b/i, step: "guest", field: "state" },
+  { pattern: /mainguest.*city|cidade/i, step: "guest", field: "city" },
+  { pattern: /mainguest.*street|logradouro/i, step: "guest", field: "street" },
   { pattern: /mainguest.*profilephoto|selfie/i, step: "photos", field: "profilePhoto" },
   { pattern: /mainguest.*documentphoto/i, step: "photos", field: "documentPhoto" },
   { pattern: /dependent.*email|dependents.*email/i, step: "companions", field: "email" },
@@ -302,6 +313,7 @@ const API_FIELD_HINTS: Array<{ pattern: RegExp; step: CheckinStepId; field: Chec
   { pattern: /dependent.*phone/i, step: "companions", field: "mobilePhoneNumber" },
   { pattern: /dependent.*rg/i, step: "companions", field: "rg" },
   { pattern: /dependent.*expeditor|expedidor/i, step: "companions", field: "expeditor" },
+  { pattern: /dependent.*\bstate\b|estado/i, step: "companions", field: "state" },
   { pattern: /embratur|snmotvia|sntiptran|ibge/i, step: "embratur", field: "snmotvia" },
 ];
 
@@ -362,8 +374,41 @@ function parseApiMissingFields(message: string): {
   return { scope, fields: [...new Set(fields)] };
 }
 
+function isAlreadyFriendlyGuestMessage(message: string, labels: CheckinErrorLabels): boolean {
+  const trimmed = message.trim();
+  if (!trimmed) return false;
+  if (trimmed.startsWith(labels.intro)) return true;
+  if (trimmed.startsWith(labels.apiGeneric)) return true;
+  if (trimmed === labels.apiInvalidImageFormat) return true;
+  if (trimmed.startsWith(labels.apiBadRequest)) return true;
+  if (trimmed.startsWith(labels.apiServerUnavailable)) return true;
+  return false;
+}
+
+function looksTechnicalOrUnsafe(message: string): boolean {
+  return (
+    /\b(erro|error|status|http)\s*[45]\d{2}\b/i.test(message) ||
+    /\b[45]\d{2}\b/.test(message) ||
+    /TECHOSPITALITY|VB_PMS|Vivakey|Vinibarr|X-Auth|IApi-Token|\.env|dev\.vars|vkr_|Bearer|api[_-]?key|stack|exception|TypeError|SyntaxError|ECONNREFUSED|fetch failed|supabase|postgres|internal server|undefined is not|null is not|at\s+\w+\.\w+|Admin\s*→|Slim Application|\$cnpj/i.test(
+      message,
+    ) ||
+    /token inválido|token invalido|invalid token|código:\s*[A-Z0-9_]+|code:\s*[A-Z0-9_]+/i.test(
+      message,
+    ) ||
+    /PMS VB|estabelecimento não identificado para upload/i.test(message)
+  );
+}
+
 export function humanizeCheckinApiError(message: string, labels: CheckinErrorLabels): string {
   const trimmed = message.trim();
+  if (!trimmed) {
+    return `${labels.apiGeneric}\n${labels.apiFixAndRetry}`;
+  }
+
+  if (isAlreadyFriendlyGuestMessage(trimmed, labels)) {
+    return trimmed;
+  }
+
   const lower = trimmed.toLowerCase();
 
   if (
@@ -378,6 +423,20 @@ export function humanizeCheckinApiError(message: string, labels: CheckinErrorLab
 
   const raw = stripApiErrorCodes(trimmed);
   const normalized = raw.toLowerCase();
+
+  if (
+    /\b(500|502|503|504)\b/.test(normalized) ||
+    normalized.includes("internal server") ||
+    normalized.includes("temporariamente indispon") ||
+    normalized.includes("não foi possível contatar") ||
+    normalized.includes("nao foi possivel contatar")
+  ) {
+    return `${labels.apiServerUnavailable}\n${labels.apiFixAndRetry}`;
+  }
+
+  if (/\b(400|422)\b/.test(normalized) || normalized.includes("bad request") || normalized.includes("validation")) {
+    return `${labels.apiBadRequest}\n${labels.apiReviewGuest}\n${labels.apiReviewCompanions}`;
+  }
 
   const missing = parseApiMissingFields(raw);
   if (missing) {
@@ -406,17 +465,28 @@ export function humanizeCheckinApiError(message: string, labels: CheckinErrorLab
     if (hint.pattern.test(raw) || hint.pattern.test(normalized)) {
       return `${labels.apiGeneric}\n${labels.stepLine
         .replace("{step}", labels.steps[hint.step])
-        .replace("{fields}", labels.fields[hint.field])}`;
+        .replace("{fields}", labels.fields[hint.field])}\n${labels.apiFixAndRetry}`;
     }
   }
 
   if (normalized.includes("dependent") || normalized.includes("acompanhante")) {
-    return `${labels.apiGeneric}\n${labels.apiReviewCompanions}`;
+    return `${labels.apiGeneric}\n${labels.apiReviewCompanions}\n${labels.apiFixAndRetry}`;
   }
 
   if (normalized.includes("mainguest") || normalized.includes("hóspede") || normalized.includes("hospede")) {
-    return `${labels.apiGeneric}\n${labels.apiReviewGuest}`;
+    return `${labels.apiGeneric}\n${labels.apiReviewGuest}\n${labels.apiFixAndRetry}`;
   }
 
-  return raw || labels.apiGeneric;
+  if (normalized.includes("reserva não encontrada") || normalized.includes("reserva nao encontrada")) {
+    return `${labels.apiGeneric}\n${labels.stepLine
+      .replace("{step}", labels.steps.search)
+      .replace("{fields}", labels.fields.localizer)}`;
+  }
+
+  // Nunca expor mensagem crua de API/servidor ao hóspede.
+  if (looksTechnicalOrUnsafe(raw) || raw.length > 180) {
+    return `${labels.apiGeneric}\n${labels.apiFixAndRetry}`;
+  }
+
+  return `${labels.apiGeneric}\n${labels.apiFixAndRetry}`;
 }

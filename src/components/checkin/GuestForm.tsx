@@ -29,6 +29,7 @@ import {
   isValidPhoneWithDialCode,
   splitPhoneInput,
 } from "@/lib/phone-display";
+import { validateGuestState } from "@/lib/guest-state";
 import { fetchViaCep, isValidEmail, maskCep, maskCpf } from "@/lib/validators";
 
 type Props = {
@@ -107,6 +108,16 @@ export function GuestForm({ foreign, initial, onSubmit, onBack, establishmentId 
     }
   }
 
+  function stateValidationMessage(value: string | undefined): string | null {
+    const result = validateGuestState(value, { foreign });
+    if (result.ok) return null;
+    if (result.reason === "missing") return t("guest.validation.state");
+    if (result.reason === "invalid_uf") return t("guest.validation.stateUf");
+    return foreign
+      ? t("guest.validation.stateAbbrevForeign")
+      : t("guest.validation.stateAbbrev");
+  }
+
   function validateAddress(next: Record<string, string>) {
     const zipKey = foreign ? "zipCodeIntl" : "zipCode";
     if (!guest.zipCode?.trim()) next["zipCode"] = t(`guest.validation.${zipKey}`);
@@ -114,7 +125,8 @@ export function GuestForm({ foreign, initial, onSubmit, onBack, establishmentId 
     if (!guest.number?.trim()) next["number"] = t("guest.validation.streetNumber");
     if (!guest.neighborhood?.trim()) next["neighborhood"] = t("guest.validation.neighborhood");
     if (!guest.city?.trim()) next["city"] = t("guest.validation.city");
-    if (!guest.state?.trim()) next["state"] = t("guest.validation.state");
+    const stateError = stateValidationMessage(guest.state);
+    if (stateError) next["state"] = stateError;
     if (!guest.country?.trim()) next["country"] = t("guest.validation.country");
   }
 
@@ -146,8 +158,10 @@ export function GuestForm({ foreign, initial, onSubmit, onBack, establishmentId 
   function submit(event: React.FormEvent) {
     event.preventDefault();
     if (!validate()) return;
+    const stateResult = validateGuestState(guest.state, { foreign });
     onSubmit({
       ...guest,
+      state: stateResult.ok ? stateResult.normalized : guest.state,
       birthDate: birthDateToIso(guest.birthDate) ?? guest.birthDate,
       documentType: foreign ? "PASSPORT" : (guest.documentType ?? "CPF"),
       citizenship:
@@ -315,7 +329,33 @@ export function GuestForm({ foreign, initial, onSubmit, onBack, establishmentId 
         </div>
         <div className="grid grid-cols-2 gap-3">
           {field("city", `${t("guest.city")} *`)}
-          {field("state", `${t("guest.state")} *`)}
+          <div className="space-y-1.5">
+            <Label htmlFor="state">{`${t("guest.state")} *`}</Label>
+            <Input
+              id="state"
+              className="tap-safe font-code uppercase"
+              autoComplete="address-level1"
+              maxLength={40}
+              placeholder={foreign ? t("guest.statePlaceholderForeign") : t("guest.statePlaceholder")}
+              value={String(guest.state ?? "")}
+              onChange={(event) => {
+                const next = event.target.value.toUpperCase().replace(/[^A-ZÀ-ÿ\s]/gi, "");
+                set("state", next.slice(0, 40));
+              }}
+              onBlur={() => {
+                const result = validateGuestState(guest.state, { foreign });
+                if (result.ok) set("state", result.normalized);
+              }}
+              aria-invalid={Boolean(errors.state)}
+            />
+            {errors.state ? (
+              <p className="text-xs text-destructive">{errors.state}</p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                {foreign ? t("guest.stateHintForeign") : t("guest.stateHint")}
+              </p>
+            )}
+          </div>
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="country">{`${t("guest.country")} *`}</Label>
