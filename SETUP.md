@@ -1,12 +1,12 @@
 # Setup — Welcome Inn (Web Check-in)
 
-Portal de check-in hoteleiro com painel administrativo, construído com **TanStack Start**, **React 19**, **Supabase** e integração **TecHospitality**.
+Portal de check-in hoteleiro com painel administrativo, construído com **TanStack Start**, **React 19**, **Postgres** (auth JWT própria) e integração **TecHospitality**.
 
 ## Pré-requisitos
 
 - Node.js 20+ (ou 22+)
 - npm (ou Bun)
-- Conta Supabase com projeto configurado
+- Postgres 16+ (local via Docker Compose ou VPS)
 - Token da API TecHospitality
 
 ## Instalação
@@ -23,21 +23,19 @@ Copie `.env` e preencha:
 
 | Variável | Obrigatória | Descrição |
 |----------|-------------|-----------|
-| `SUPABASE_URL` | Sim | URL do projeto Supabase |
-| `SUPABASE_PUBLISHABLE_KEY` | Sim | Chave publishable (anon) |
-| `SUPABASE_SERVICE_ROLE_KEY` | Sim | Service role (operações admin no servidor) |
-| `VITE_SUPABASE_URL` | Sim | Mesma URL (client-side) |
-| `VITE_SUPABASE_PUBLISHABLE_KEY` | Sim | Mesma publishable key |
+| `DATABASE_URL` | Sim | Connection string Postgres |
+| `AUTH_JWT_SECRET` | Sim | Segredo JWT (≥ 16 caracteres) |
+| `AUTH_JWT_TTL` | Não | Validade do token (padrão `7d`) |
 | `TECHOSPITALITY_RESERVATIONS_TOKEN` | Sim* | Token para `/api/reservations/*` e busca por localizador |
 | `TECHOSPITALITY_HUB_TOKEN` | Sim* | Token para `/api/reservations/hub/*` |
-| `TECHOSPITALITY_ADMIN_TOKEN` | Não | Opcional; listagem de reservas no painel (não usado para estabelecimentos) |
+| `TECHOSPITALITY_ADMIN_TOKEN` | Não | Opcional; listagem de reservas no painel |
 | `TECHOSPITALITY_API_TOKEN` | Não | Fallback global se os tokens acima estiverem vazios |
 
-**Importante (Cloudflare Workers):** em `npm run dev`, o servidor roda no runtime Wrangler. Copie os tokens TecHospitality também para **`.dev.vars`** (mesmos valores do `.env`). Sem isso, a busca por localizador retorna *Invalid token*.
+**Importante:** em `npm run dev`, copie também `DATABASE_URL`, `AUTH_JWT_SECRET` e os tokens TecHospitality para **`.dev.vars`**.
 
 ```bash
 cp .dev.vars.example .dev.vars
-# Edite .dev.vars com os tokens reais vkr_loc_ e vkr_chk_
+# Edite .dev.vars com DATABASE_URL, AUTH_JWT_SECRET e tokens vkr_loc_ / vkr_chk_
 ```
 
 \* Pelo menos um token de grupo **ou** o fallback global deve estar preenchido.
@@ -65,27 +63,28 @@ TECHOSPITALITY_ADMIN_TOKEN=token_admin_aqui
 
 Ordem de resolução: **token do grupo → fallback global**. Erros 401/403 registram qual scope falhou (sem expor o token).
 
-## Banco de dados (Supabase)
-
-Aplique as migrations em ordem:
+## Banco de dados (Postgres)
 
 ```bash
-# Com Supabase CLI
-supabase db push
+# Sobe o Postgres local
+docker compose up -d postgres
 
-# Ou execute manualmente no SQL Editor:
-# supabase/migrations/*.sql
+# Aplica o schema limpo (db/migrations)
+npm run db:migrate
 ```
 
-Tabelas criadas:
+O schema consolidado está em `db/migrations/001_init.sql` (sem dependência do Supabase Auth).
+As migrations históricas em `supabase/migrations/` ficam só como referência.
 
-- `profiles`, `user_roles` — equipe do painel
-- `establishments` — cadastro local de hotéis (establishmentId da API TecHospitality)
-- `establishment_terms`, `establishment_terms_history` — termos por hotel
-- `establishment_contacts` — telefone/WhatsApp de suporte
-- `establishment_extra_fields` — campos personalizados
-- `audit_logs` — log de auditoria administrativa
-- `rate_limit_buckets` — rate limiting da busca por localizador
+Tabelas principais:
+
+- `auth_users`, `profiles`, `user_roles` — identidade e equipe
+- `tenants`, `tenant_memberships`, `platform_admins` — multi-tenant
+- `establishments`, termos, contatos, settings, extra fields
+- `checkin_records`, `checkin_sessions`, `guest_portal_photos`
+- `audit_logs`, `rate_limit_buckets`
+
+Primeiro acesso: abra `/auth` e use o fluxo de bootstrap (primeiro admin da plataforma).
 
 ## Desenvolvimento
 
@@ -142,16 +141,14 @@ App em `http://localhost:3000`.
 1. **Novo app** → tipo **Docker Compose** ou **Dockerfile** (repositório Git).
 2. **Repositório:** `https://github.com/ojfernandess/portal-checkin.git`, branch **`main`**.
 3. **Porta interna:** `3000` (variáveis `PORT`, `HOST=0.0.0.0`, `NITRO_HOST=0.0.0.0`).
-4. **Build args** (obrigatórios para o bundle do cliente):
-   - `VITE_SUPABASE_PROJECT_ID`
-   - `VITE_SUPABASE_URL`
-   - `VITE_SUPABASE_PUBLISHABLE_KEY`
+4. **Build args:**
    - `GIT_COMMIT` — use o SHA do commit (ex.: `$GIT_SHA` do webhook) para forçar rebuild sem cache Docker
    - `BUILD_DATE` — opcional, timestamp ISO do deploy
 5. **Environment** (runtime — servidor):
-   - Supabase: `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
+   - Postgres / auth: `DATABASE_URL`, `AUTH_JWT_SECRET` (e opcionalmente `AUTH_JWT_TTL`)
    - TecHospitality: `TECHOSPITALITY_BASE_URL`, tokens (`RESERVATIONS`, `HUB`, `CHECKOUTS`, `CREATED`, …)
-   - AWS S3: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, `AWS_S3_BUCKET`, …
+   - MinIO / AWS S3: `AWS_*` ou `MINIO_*`
+6. **Antes do primeiro start:** aplique o schema (`npm run db:migrate` apontando para o mesmo `DATABASE_URL`).
 
 Não commite `.env` — configure tudo no painel do EasyPanel.
 
@@ -178,14 +175,18 @@ ADMIN_PANEL_ORIGIN=https://checkin.techospitality.com
 
 Se o proxy redirecionar antes do Node, `/auth` no domínio audaar nunca chega à aplicação e o painel não abre no domínio correto.
 
-### Variáveis VITE vs runtime
+### Variáveis de runtime
 
-| Momento | Variáveis |
-|---------|-----------|
-| **Build** (ARG) | `VITE_SUPABASE_*` — embutidas no JS do browser |
-| **Runtime** (ENV) | Supabase service role, TecHospitality, AWS — só no servidor |
+Auth e banco são só no servidor (`DATABASE_URL`, `AUTH_JWT_SECRET`). Tokens TecHospitality e MinIO/S3 também. Rebuild da imagem só é necessário quando o código muda (use `GIT_COMMIT` para invalidar cache).
 
-Se alterar `VITE_*`, faça **rebuild** da imagem.
+### Smoke checklist (pós-migrate)
+
+1. Login / bootstrap em `/auth`
+2. Super Admin: criar tenant e membership
+3. Busca por localizador no portal
+4. Submit de check-in
+5. Upload de foto (MinIO)
+6. Inbox / VB configs por estabelecimento (se aplicável)
 
 ### Verificar se o deploy pegou o código novo
 
@@ -218,7 +219,7 @@ Se `/admin/inbox` retorna **404**, o Easypanel ainda está servindo imagem antig
 3. Passe `GIT_COMMIT` diferente a cada deploy (build arg).
 4. Confirme que o serviço reiniciou (container novo, não só restart).
 
-Depois do deploy correto, habilite **Portaria Inbox** no Super Admin (`/platform/tenants`) e aplique as migrations multi-tenant no Supabase de produção.
+Depois do deploy correto, habilite **Portaria Inbox** no Super Admin (`/platform/tenants`). O schema multi-tenant já está em `db/migrations/001_init.sql`.
 
 ## Rotas principais
 
@@ -236,9 +237,10 @@ Depois do deploy correto, habilite **Portaria Inbox** no Super Admin (`/platform
 ## Arquitetura
 
 ```
-Hóspede (/)  →  checkin.functions.ts  →  TecHospitality API (proxy server-side)
-Admin        →  admin.functions.ts    →  Supabase + TecHospitality
-Termos       →  establishment_terms   →  Supabase (por establishmentId)
+Hóspede (/)  →  checkin.functions.ts  →  TecHospitality / VB (proxy server-side)
+Admin        →  admin.functions.ts    →  Postgres + TecHospitality
+Termos       →  establishment_terms   →  Postgres (por establishmentId)
+Fotos        →  s3.server.ts          →  MinIO / S3
 ```
 
 ## Segurança
@@ -256,5 +258,6 @@ Termos       →  establishment_terms   →  Supabase (por establishmentId)
 | `npm run build` | Build de produção (Node / Docker) |
 | `npm start` | Sobe o servidor `.output` (após build) |
 | `npm run preview` | Preview Vite (dev) |
+| `npm run db:migrate` | Aplica `db/migrations/*.sql` no Postgres (`DATABASE_URL`) |
 | `npm run lint` | ESLint |
 | `npm run format` | Prettier |

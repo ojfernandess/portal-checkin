@@ -1,9 +1,22 @@
 # Wrangler / Cloudflare Workers (dev local) — copie para .dev.vars
 # O .env sozinho NÃO injeta variáveis no runtime Cloudflare em npm run dev.
+
+# --- Postgres + Auth JWT ---
+DATABASE_URL=postgresql://welcome:welcome@127.0.0.1:5432/welcome_inn
+AUTH_JWT_SECRET=troque-por-um-segredo-longo
+AUTH_JWT_TTL=7d
+
+# --- TecHospitality ---
 TECHOSPITALITY_BASE_URL=https://backend.techospitality.com
 TECHOSPITALITY_RESERVATIONS_TOKEN=vkr_loc_
 TECHOSPITALITY_HUB_TOKEN=vkr_chk_
 
-# Cloudflare Turnstile (obrigatório no servidor em dev local)
+# --- Cloudflare Turnstile ---
 VITE_TURNSTILE_SITE_KEY=
 TURNSTILE_SECRET_KEY=
+
+# --- MinIO / S3 (se usar upload de fotos em dev) ---
+# MINIO_ACCESS_KEY=
+# MINIO_SECRET_KEY=
+# MINIO_ENDPOINT=http://127.0.0.1:9000
+# MINIO_BUCKET=checkin-photos

@@ -299,11 +299,16 @@ const API_FIELD_HINTS: Array<{ pattern: RegExp; step: CheckinStepId; field: Chec
   { pattern: /mainguest.*birth/i, step: "guest", field: "birthDate" },
   { pattern: /mainguest.*gender/i, step: "guest", field: "gender" },
   { pattern: /mainguest.*profession/i, step: "guest", field: "profession" },
-  { pattern: /mainguest.*zip|cep/i, step: "guest", field: "zipCode" },
-  { pattern: /mainguest.*neighborhood|bairro/i, step: "guest", field: "neighborhood" },
-  { pattern: /mainguest.*\bstate\b|estado|uf\b/i, step: "guest", field: "state" },
-  { pattern: /mainguest.*city|cidade/i, step: "guest", field: "city" },
-  { pattern: /mainguest.*street|logradouro/i, step: "guest", field: "street" },
+  // Evitar `/cep/` solto — casa dentro de "recepção" e gera falso positivo de ZIP.
+  {
+    pattern: /mainguest.*(?:zip(?:code)?|\bcep\b)|(?:zip(?:code)?|\bcep\b).*mainguest|\bzipcode\b/i,
+    step: "guest",
+    field: "zipCode",
+  },
+  { pattern: /mainguest.*(?:neighborhood|bairro)/i, step: "guest", field: "neighborhood" },
+  { pattern: /mainguest.*(?:\bstate\b|\bestado\b|\buf\b)/i, step: "guest", field: "state" },
+  { pattern: /mainguest.*(?:city|cidade)/i, step: "guest", field: "city" },
+  { pattern: /mainguest.*(?:street|logradouro)/i, step: "guest", field: "street" },
   { pattern: /mainguest.*profilephoto|selfie/i, step: "photos", field: "profilePhoto" },
   { pattern: /mainguest.*documentphoto/i, step: "photos", field: "documentPhoto" },
   { pattern: /dependent.*email|dependents.*email/i, step: "companions", field: "email" },
@@ -311,10 +316,15 @@ const API_FIELD_HINTS: Array<{ pattern: RegExp; step: CheckinStepId; field: Chec
   { pattern: /dependent.*gender|dependents.*gender/i, step: "companions", field: "gender" },
   { pattern: /dependent.*birth/i, step: "companions", field: "birthDate" },
   { pattern: /dependent.*phone/i, step: "companions", field: "mobilePhoneNumber" },
-  { pattern: /dependent.*rg/i, step: "companions", field: "rg" },
+  { pattern: /dependent.*\brg\b/i, step: "companions", field: "rg" },
   { pattern: /dependent.*expeditor|expedidor/i, step: "companions", field: "expeditor" },
-  { pattern: /dependent.*\bstate\b|estado/i, step: "companions", field: "state" },
-  { pattern: /embratur|snmotvia|sntiptran|ibge/i, step: "embratur", field: "snmotvia" },
+  {
+    pattern: /dependent.*(?:zip(?:code)?|\bcep\b)|(?:zip(?:code)?|\bcep\b).*dependent/i,
+    step: "companions",
+    field: "zipCode",
+  },
+  { pattern: /dependent.*(?:\bstate\b|\bestado\b)/i, step: "companions", field: "state" },
+  { pattern: /\b(?:snmotvia|sntiptran|snidcidadeibge)\b|embratur/i, step: "embratur", field: "snmotvia" },
 ];
 
 const API_FIELD_PATH_ALIASES: Record<string, CheckinFieldKey> = {
@@ -385,16 +395,23 @@ function isAlreadyFriendlyGuestMessage(message: string, labels: CheckinErrorLabe
   return false;
 }
 
+function looksLikeAuthOrInfraFailure(message: string): boolean {
+  return (
+    /access token required|invalid token|token inválido|token invalido|unauthorized|forbidden|exceed_egress_quota|egress_quota|service for this project is restricted|spend caps|supabase/i.test(
+      message,
+    ) || /não foi possível concluir a operação|nao foi possivel concluir a operacao/i.test(message)
+  );
+}
+
 function looksTechnicalOrUnsafe(message: string): boolean {
   return (
+    looksLikeAuthOrInfraFailure(message) ||
     /\b(erro|error|status|http)\s*[45]\d{2}\b/i.test(message) ||
     /\b[45]\d{2}\b/.test(message) ||
-    /TECHOSPITALITY|VB_PMS|Vivakey|Vinibarr|X-Auth|IApi-Token|\.env|dev\.vars|vkr_|Bearer|api[_-]?key|stack|exception|TypeError|SyntaxError|ECONNREFUSED|fetch failed|supabase|postgres|internal server|undefined is not|null is not|at\s+\w+\.\w+|Admin\s*→|Slim Application|\$cnpj/i.test(
+    /TECHOSPITALITY|VB_PMS|Vivakey|Vinibarr|X-Auth|IApi-Token|\.env|dev\.vars|vkr_|Bearer|api[_-]?key|stack|exception|TypeError|SyntaxError|ECONNREFUSED|fetch failed|postgres|internal server|undefined is not|null is not|at\s+\w+\.\w+|Admin\s*→|Slim Application|\$cnpj/i.test(
       message,
     ) ||
-    /token inválido|token invalido|invalid token|código:\s*[A-Z0-9_]+|code:\s*[A-Z0-9_]+/i.test(
-      message,
-    ) ||
+    /código:\s*[A-Z0-9_]+|code:\s*[A-Z0-9_]+/i.test(message) ||
     /PMS VB|estabelecimento não identificado para upload/i.test(message)
   );
 }
@@ -425,6 +442,7 @@ export function humanizeCheckinApiError(message: string, labels: CheckinErrorLab
   const normalized = raw.toLowerCase();
 
   if (
+    looksLikeAuthOrInfraFailure(raw) ||
     /\b(500|502|503|504)\b/.test(normalized) ||
     normalized.includes("internal server") ||
     normalized.includes("temporariamente indispon") ||

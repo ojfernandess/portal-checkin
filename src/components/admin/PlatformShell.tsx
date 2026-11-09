@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
-import { supabase } from "@/integrations/supabase/client";
+import { appAuth } from "@/lib/auth-client";
 import { platformMe } from "@/lib/api/platform.functions";
 import { useI18n } from "@/lib/i18n/context";
 import { Button } from "@/components/ui/button";
@@ -115,7 +115,7 @@ export function PlatformShell({ title, subtitle, account, breadcrumbs, children 
   const [mobileOpen, setMobileOpen] = useState(false);
 
   async function signOut() {
-    await supabase.auth.signOut();
+    await appAuth.signOut();
     navigate({ to: "/auth", replace: true });
   }
 

@@ -16,10 +16,11 @@ import { PortalFeatureGrid } from "@/components/PortalFeatureGrid";
 import { PortalHeroBackground } from "@/components/PortalHeroBackground";
 import { PortalSplitLayout } from "@/components/PortalSplitLayout";
 import { TurnstileWidget, type TurnstileWidgetRef } from "@/components/TurnstileWidget";
-import { supabase } from "@/integrations/supabase/client";
 import type { TenantLoginBranding } from "@/lib/api/auth.functions";
 import { adminBootstrapStatus, adminMyTenants } from "@/lib/api/admin.functions";
+import { authBootstrap, authLogin } from "@/lib/api/auth-session.functions";
 import { getTurnstileConfig, verifyAuthTurnstile } from "@/lib/api/turnstile.functions";
+import { appAuth, setAuthSession } from "@/lib/auth-client";
 import { formatAuthError, redirectAfterLogin } from "@/lib/auth-login";
 import {
   sanitizeAuthEmailInput,
@@ -82,6 +83,8 @@ export function StaffAuthPage({ mode, tenant, tenantLoading = false, tenantError
   const { t } = useI18n();
   const checkBootstrap = useServerFn(adminBootstrapStatus);
   const loadMyTenants = useServerFn(adminMyTenants);
+  const loginFn = useServerFn(authLogin);
+  const bootstrapFn = useServerFn(authBootstrap);
   const fetchTurnstileConfig = useServerFn(getTurnstileConfig);
   const verifyTurnstile = useServerFn(verifyAuthTurnstile);
   const turnstileRef = useRef<TurnstileWidgetRef>(null);
@@ -122,7 +125,7 @@ export function StaffAuthPage({ mode, tenant, tenantLoading = false, tenantError
   useEffect(() => {
     let active = true;
     void (async () => {
-      const { data } = await supabase.auth.getSession();
+      const { data } = await appAuth.getSession();
       if (!data.session) {
         try {
           const [status, turnstile] = await Promise.all([
@@ -147,7 +150,7 @@ export function StaffAuthPage({ mode, tenant, tenantLoading = false, tenantError
         });
       } catch (err) {
         if (!active) return;
-        await supabase.auth.signOut();
+        await appAuth.signOut();
         clearStoredActiveTenantId();
         setError(formatAuthError(err, t));
       }
@@ -187,28 +190,22 @@ export function StaffAuthPage({ mode, tenant, tenantLoading = false, tenantError
         await verifyTurnstile({ data: { token: turnstileToken ?? undefined } });
       }
 
-      if (showBootstrap) {
-        const { error: signUpError } = await supabase.auth.signUp({
-          email: safeEmail,
-          password: safePassword,
-          options: {
-            emailRedirectTo: window.location.origin,
-            data: { full_name: safeFullName },
-          },
-        });
-        if (signUpError) throw signUpError;
-        const { error: signInError } = await supabase.auth.signInWithPassword({
-          email: safeEmail,
-          password: safePassword,
-        });
-        if (signInError) throw signInError;
-      } else {
-        const { error: signInError } = await supabase.auth.signInWithPassword({
-          email: safeEmail,
-          password: safePassword,
-        });
-        if (signInError) throw signInError;
-      }
+      const session = showBootstrap
+        ? await bootstrapFn({
+            data: { email: safeEmail, password: safePassword, fullName: safeFullName },
+          })
+        : await loginFn({
+            data: { email: safeEmail, password: safePassword },
+          });
+
+      setAuthSession({
+        accessToken: session.accessToken,
+        user: {
+          id: session.user.id,
+          email: session.user.email,
+          fullName: session.user.fullName,
+        },
+      });
 
       await redirectAfterLogin(navigate, loadMyTenants, {
         tenantSlug: tenant?.slug,
@@ -217,7 +214,7 @@ export function StaffAuthPage({ mode, tenant, tenantLoading = false, tenantError
     } catch (err) {
       turnstileRef.current?.reset();
       if (err instanceof Error && ["NO_TENANT", "WRONG_TENANT"].includes(err.message)) {
-        await supabase.auth.signOut();
+        await appAuth.signOut();
         clearStoredActiveTenantId();
       }
       setError(formatAuthError(err, t));

@@ -18,26 +18,10 @@ type I18nContextValue = {
 
 const I18nContext = createContext<I18nContextValue | null>(null);
 
-function readInitialLocale(): Locale {
-  if (typeof window === "undefined") return DEFAULT_LOCALE;
-
-  const { locale, fromStorage } = readPreferredLocale();
-
-  // Persiste a primeira detecção do navegador para manter o idioma estável
-  // nas próximas visitas, sem sobrescrever escolha manual já salva.
-  if (!fromStorage) {
-    try {
-      localStorage.setItem(LOCALE_STORAGE_KEY, locale);
-    } catch {
-      /* ignore storage errors */
-    }
-  }
-
-  return locale;
-}
-
 export function I18nProvider({ children }: { children: React.ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>(readInitialLocale);
+  // SSR e 1º paint do cliente usam o mesmo locale padrão para evitar hydration mismatch.
+  // Preferência do navegador/localStorage só aplica após o mount.
+  const [locale, setLocaleState] = useState<Locale>(DEFAULT_LOCALE);
 
   const setLocale = useCallback((next: Locale) => {
     setLocaleState(next);
@@ -46,6 +30,18 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
     } catch {
       /* ignore storage errors */
     }
+  }, []);
+
+  useEffect(() => {
+    const { locale: preferred, fromStorage } = readPreferredLocale();
+    if (!fromStorage) {
+      try {
+        localStorage.setItem(LOCALE_STORAGE_KEY, preferred);
+      } catch {
+        /* ignore storage errors */
+      }
+    }
+    setLocaleState((current) => (current === preferred ? current : preferred));
   }, []);
 
   useEffect(() => {

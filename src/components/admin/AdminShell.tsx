@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { supabase } from "@/integrations/supabase/client";
+import { appAuth } from "@/lib/auth-client";
 import { platformMe } from "@/lib/api/platform.functions";
 import { TenantSelector } from "@/components/admin/TenantSelector";
 import { TenantPanelBrand } from "@/components/admin/TenantPanelBrand";
@@ -190,7 +190,7 @@ export function AdminShell({
 
   async function signOut() {
     clearStoredActiveTenantId();
-    await supabase.auth.signOut();
+    await appAuth.signOut();
     navigate({ to: "/auth", replace: true });
   }
 
