@@ -1,0 +1,2 @@
+*.sh text eol=lf
+scripts/postgres-docker-entrypoint.sh text eol=lf

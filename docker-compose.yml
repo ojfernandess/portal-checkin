@@ -1,6 +1,8 @@
 services:
   postgres:
-    image: postgres:16-alpine
+    build:
+      context: .
+      dockerfile: db/Dockerfile.postgres
     restart: unless-stopped
     # Hostname on the compose network is `postgres`. Alias `db` covers EasyPanel templates
     # that set DATABASE_URL=...@db:5432/...
@@ -8,8 +10,6 @@ services:
       default:
         aliases:
           - db
-    entrypoint: ["/bin/sh", "/postgres-docker-entrypoint.sh"]
-    command: ["postgres"]
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-welcome}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-welcome}
@@ -20,18 +20,17 @@ services:
       - "5432"
     volumes:
       - welcome_inn_pg:/var/lib/postgresql/data
-      - ./scripts/postgres-docker-entrypoint.sh:/postgres-docker-entrypoint.sh:ro
     healthcheck:
-      # Wait until password was synced to POSTGRES_PASSWORD (see postgres-docker-entrypoint.sh)
+      # Ready only after password sync flag is written by postgres-docker-entrypoint.sh
       test:
         [
           "CMD-SHELL",
-          "test -f /tmp/postgres-password-synced && pg_isready -U $${POSTGRES_USER:-welcome} -d $${POSTGRES_DB:-welcome_inn}",
+          "test -f /tmp/postgres-password-synced && pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\"",
         ]
       interval: 5s
       timeout: 5s
-      retries: 20
-      start_period: 10s
+      retries: 30
+      start_period: 20s
 
   welcome-inn:
     build:

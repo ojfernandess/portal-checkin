@@ -1,0 +1,9 @@
+FROM postgres:16-alpine
+
+COPY scripts/postgres-docker-entrypoint.sh /postgres-docker-entrypoint.sh
+# EasyPanel / Windows checkouts can leave CRLF; strip so /bin/sh does not break.
+RUN sed -i 's/\r$//' /postgres-docker-entrypoint.sh \
+  && chmod +x /postgres-docker-entrypoint.sh
+
+ENTRYPOINT ["/bin/sh", "/postgres-docker-entrypoint.sh"]
+CMD ["postgres"]
