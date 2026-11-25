@@ -41,6 +41,7 @@ import {
   getEstablishmentTerms,
   getReservationDetails,
   lookupGuest,
+  resolveBedPreferenceStep,
   startCheckinSession,
   submitCheckin,
   updateCompanionInboxPhotos,
@@ -243,6 +244,7 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
   const navigate = useNavigate();
   const find = useServerFn(findReservation);
   const refreshReservation = useServerFn(getReservationDetails);
+  const resolveBedStep = useServerFn(resolveBedPreferenceStep);
   const lookup = useServerFn(lookupGuest);
   const loadTerms = useServerFn(getEstablishmentTerms);
   const loadContact = useServerFn(getEstablishmentContact);
@@ -541,17 +543,38 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
     );
   }
 
-  async function refreshReservationFromLocalizer(): Promise<Reservation | null> {
+  async function resolveBedPreferenceFromLocalizer(): Promise<{
+    show: boolean;
+    reservation: Reservation | null;
+  }> {
     const code = String(reservation?.localizer ?? localizer).trim().toUpperCase();
-    if (code.length < 3) return reservation;
+    const establishmentId = String(reservation?.establishmentId ?? "").trim();
+    if (code.length < 3) {
+      return {
+        show: needsBedPreferenceStep(reservation),
+        reservation,
+      };
+    }
     try {
-      const refreshed = await refreshReservation({ data: { localizer: code } });
-      if (!refreshed) return reservation;
-      const merged = mergeSuccessReservationFromLocalizer(reservation, refreshed);
-      setReservation(merged);
-      return merged;
+      const result = await resolveBedStep({
+        data: {
+          localizer: code,
+          ...(establishmentId ? { establishmentId } : {}),
+        },
+      });
+      if (result.reservation) {
+        const merged = mergeSuccessReservationFromLocalizer(reservation, result.reservation);
+        setReservation(merged);
+        // Usa a decisão do servidor (localizer fresco + fuso do hotel).
+        return { show: result.show, reservation: result.reservation };
+      }
+      return { show: false, reservation };
     } catch {
-      return reservation;
+      // Fallback local se o refresh falhar — ainda aplica a regra de horário.
+      return {
+        show: needsBedPreferenceStep(reservation),
+        reservation,
+      };
     }
   }
 
@@ -585,8 +608,8 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
   }
 
   async function proceedAfterPhotos() {
-    const latest = await refreshReservationFromLocalizer();
-    if (needsBedPreferenceStep(latest)) {
+    const { show } = await resolveBedPreferenceFromLocalizer();
+    if (show) {
       setStep6Kind("bed");
       setStep(6);
       return;
@@ -1130,11 +1153,14 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
       showCheckinError(formatCheckinIssues(issues, labels));
       return;
     }
-    if (needsBedPreferenceStep() && !bedPreference) {
-      toast.error(t("checkin.bedPreference.required"));
-      setStep6Kind("bed");
-      setStep(6);
-      return;
+    if (!bedPreference) {
+      const { show } = await resolveBedPreferenceFromLocalizer();
+      if (show) {
+        toast.error(t("checkin.bedPreference.required"));
+        setStep6Kind("bed");
+        setStep(6);
+        return;
+      }
     }
 
     setLoading(true);
@@ -2095,8 +2121,8 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
               onChange={setEmbratur}
               onBack={() => {
                 void (async () => {
-                  const latest = await refreshReservationFromLocalizer();
-                  if (needsBedPreferenceStep(latest)) {
+                  const { show } = await resolveBedPreferenceFromLocalizer();
+                  if (show) {
                     setStep6Kind("bed");
                     setStep(6);
                     return;

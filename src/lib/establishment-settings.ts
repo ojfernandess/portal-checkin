@@ -160,8 +160,14 @@ export function shouldShowBedPreferenceStep(
   const capacity = resolveReservationRoomCapacity(reservation);
   if (capacity == null || capacity < 2) return false;
 
-  const checkinDate = reservation?.stay?.checkinDate ?? reservation?.checkinDate;
-  const checkinTime = reservation?.stay?.checkinTime ?? reservation?.checkinTime;
+  const checkinDate =
+    reservation?.stay?.checkinDate ||
+    reservation?.checkinDate ||
+    null;
+  const checkinTime =
+    reservation?.stay?.checkinTime ||
+    reservation?.checkinTime ||
+    null;
   if (isCheckinTimePassed(checkinDate, checkinTime, now)) return false;
 
   return true;

@@ -927,6 +927,49 @@ export const getEstablishmentSettings = createServerFn({ method: "POST" })
     return parseEstablishmentSettings(row?.settings ?? null);
   });
 
+/** Recarrega o localizer e decide no servidor se a etapa de preferência de cama deve aparecer. */
+export const resolveBedPreferenceStep = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        localizer: LOCALIZER_SCHEMA,
+        establishmentId: z.string().trim().min(1).max(64).optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    const reservation = await fetchReservationByLocalizer(
+      data.localizer,
+      data.establishmentId ?? null,
+    );
+    if (!reservation) {
+      return { show: false, reservation: null as Reservation | null };
+    }
+
+    const { assertRegisteredEstablishmentAccess, resolveReservationEstablishmentId } = await import(
+      "@/lib/establishment-registry.server"
+    );
+    const establishmentId =
+      data.establishmentId?.trim() ||
+      resolveReservationEstablishmentId(reservation) ||
+      String(reservation.establishmentId ?? "");
+    if (establishmentId) {
+      await assertRegisteredEstablishmentAccess(establishmentId);
+    }
+
+    const { loadEstablishmentSettingsRow } = await import("@/lib/establishment-settings.server");
+    const { parseEstablishmentSettings, shouldShowBedPreferenceStep } = await import(
+      "@/lib/establishment-settings"
+    );
+    const settingsRow = establishmentId
+      ? await loadEstablishmentSettingsRow(establishmentId)
+      : null;
+    const settings = parseEstablishmentSettings(settingsRow?.settings ?? null);
+    const show = shouldShowBedPreferenceStep(settings, reservation);
+
+    return { show, reservation };
+  });
+
 export const getCheckinFaceValidationSettings = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
     z.object({ establishmentId: z.string().trim().min(1).max(64) }).parse(input),

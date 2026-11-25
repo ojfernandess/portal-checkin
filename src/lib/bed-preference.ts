@@ -1,6 +1,20 @@
-import type { BedPreferenceChoice } from "@/lib/establishment-settings";
+import {
+  shouldShowBedPreferenceStep,
+  type BedPreferenceChoice,
+  type EstablishmentSettings,
+} from "@/lib/establishment-settings";
+import type { Reservation } from "@/lib/api/types";
 
 export const BED_PREFERENCE_EXTRA_FIELD_KEY = "bedPreference";
+
+/** Avalia se a etapa deve aparecer com settings + snapshot fresco do localizer. */
+export function evaluateBedPreferenceStep(
+  settings: Pick<EstablishmentSettings, "bedPreferenceEnabled">,
+  reservation: Reservation | null | undefined,
+  now: Date = new Date(),
+): boolean {
+  return shouldShowBedPreferenceStep(settings, reservation, now);
+}
 
 export function normalizeBedPreference(value: unknown): BedPreferenceChoice | null {
   const raw = String(value ?? "").trim().toLowerCase();
