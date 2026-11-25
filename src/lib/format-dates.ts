@@ -100,6 +100,35 @@ export function isCheckoutPast(
   return nowMinutes > checkoutMinutes;
 }
 
+/**
+ * Verifica se o horário de check-in da reserva já passou (dia civil + hora local).
+ * Sem data válida, considera passado (não libera regras que exigem “antes do check-in”).
+ * No mesmo dia, a partir do horário informado (≥) já conta como passado.
+ */
+export function isCheckinTimePassed(
+  checkinDate?: string | null,
+  checkinTime?: string | null,
+  now: Date = new Date(),
+): boolean {
+  if (!checkinDate?.trim()) return true;
+
+  const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(checkinDate.trim());
+  if (!iso) return true;
+
+  const checkinDay = new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]));
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  if (checkinDay < today) return true;
+  if (checkinDay > today) return false;
+
+  const timeMatch = checkinTime?.trim() ? /^(\d{1,2}):(\d{2})/.exec(checkinTime.trim()) : null;
+  if (!timeMatch) return false;
+
+  const checkinMinutes = Number(timeMatch[1]) * 60 + Number(timeMatch[2]);
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  return nowMinutes >= checkinMinutes;
+}
+
 /** Converte ISO datetime para valor de `<input type="datetime-local">`. */
 export function toDateTimeLocalInputValue(value: string | null | undefined): string {
   if (!value?.trim()) return "";

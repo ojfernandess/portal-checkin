@@ -1176,7 +1176,7 @@ export const ptBR = {
       tabWhatsApp: "WhatsApp",
       bedPreferenceEnabled: "Preferência de cama no check-in",
       bedPreferenceEnabledHint:
-        "Após as fotos, exibe a escolha Cama casal ou Solteiro quando o quarto no VB tiver capacity ≥ 2. Quartos com capacity 1 (individual) não mostram a etapa.",
+        "Após as fotos, exibe a escolha Cama casal ou Solteiro quando o quarto no VB tiver capacity ≥ 2 e ainda for antes do horário de check-in (stay.checkinDate/Time). Após o horário ou com capacity 1, a etapa não aparece.",
       whatsappSubTabGuest: "Hóspede",
       whatsappSubTabGovernance: "Governança",
       whatsappBody:

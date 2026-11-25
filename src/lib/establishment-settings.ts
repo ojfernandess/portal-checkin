@@ -1,3 +1,5 @@
+import { isCheckinTimePassed } from "@/lib/format-dates";
+
 export type InboxUnitMapping = {
   /** Fragmento do número/nome da unidade (ex.: "01", "Quarto 101") */
   match: string;
@@ -141,18 +143,28 @@ export function resolveReservationRoomCapacity(
   return Math.floor(n);
 }
 
-/** Etapa de preferência de cama: setting ligado e capacity do VB ≥ 2. */
+/** Etapa de preferência de cama: setting ligado, capacity VB ≥ 2 e ainda antes do horário de check-in. */
 export function shouldShowBedPreferenceStep(
   settings: Pick<EstablishmentSettings, "bedPreferenceEnabled">,
   reservation: {
     capacity?: number;
     room?: { capacity?: number };
+    checkinDate?: string;
+    checkinTime?: string;
+    stay?: { checkinDate?: string; checkinTime?: string };
   } | null
   | undefined,
+  now: Date = new Date(),
 ): boolean {
   if (!settings.bedPreferenceEnabled) return false;
   const capacity = resolveReservationRoomCapacity(reservation);
-  return capacity != null && capacity >= 2;
+  if (capacity == null || capacity < 2) return false;
+
+  const checkinDate = reservation?.stay?.checkinDate ?? reservation?.checkinDate;
+  const checkinTime = reservation?.stay?.checkinTime ?? reservation?.checkinTime;
+  if (isCheckinTimePassed(checkinDate, checkinTime, now)) return false;
+
+  return true;
 }
 
 export const MAX_USEFUL_INFO_ITEMS = 20;

@@ -534,8 +534,25 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
     return merged;
   }
 
-  function needsBedPreferenceStep() {
-    return shouldShowBedPreferenceStep(establishmentSettings, reservation);
+  function needsBedPreferenceStep(reservationOverride?: Reservation | null) {
+    return shouldShowBedPreferenceStep(
+      establishmentSettings,
+      reservationOverride ?? reservation,
+    );
+  }
+
+  async function refreshReservationFromLocalizer(): Promise<Reservation | null> {
+    const code = String(reservation?.localizer ?? localizer).trim().toUpperCase();
+    if (code.length < 3) return reservation;
+    try {
+      const refreshed = await refreshReservation({ data: { localizer: code } });
+      if (!refreshed) return reservation;
+      const merged = mergeSuccessReservationFromLocalizer(reservation, refreshed);
+      setReservation(merged);
+      return merged;
+    } catch {
+      return reservation;
+    }
   }
 
   async function loadEmbraturStep() {
@@ -548,7 +565,6 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
       },
     });
     const normalized = normalizeEmbratur(raw);
-    setReference(normalized);
     setEmbratur((prev) => ({
       ...prev,
       bgstdscpaisdest:
@@ -563,12 +579,14 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
             option.label.toLowerCase().includes(reservation.establishment.city.toLowerCase()),
         )?.value ?? ""),
     }));
+    setReference(normalized);
     setStep6Kind("embratur");
     setStep(6);
   }
 
   async function proceedAfterPhotos() {
-    if (needsBedPreferenceStep()) {
+    const latest = await refreshReservationFromLocalizer();
+    if (needsBedPreferenceStep(latest)) {
       setStep6Kind("bed");
       setStep(6);
       return;
@@ -2076,12 +2094,15 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
               value={embratur}
               onChange={setEmbratur}
               onBack={() => {
-                if (needsBedPreferenceStep()) {
-                  setStep6Kind("bed");
-                  setStep(6);
-                  return;
-                }
-                setStep(5);
+                void (async () => {
+                  const latest = await refreshReservationFromLocalizer();
+                  if (needsBedPreferenceStep(latest)) {
+                    setStep6Kind("bed");
+                    setStep(6);
+                    return;
+                  }
+                  setStep(5);
+                })();
               }}
               onContinue={() => void handleSubmit()}
               submitting={loading}

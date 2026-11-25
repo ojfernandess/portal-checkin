@@ -1177,7 +1177,7 @@ export const es: MessageTree = {
       tabWhatsApp: "WhatsApp",
       bedPreferenceEnabled: "Preferencia de cama en el check-in",
       bedPreferenceEnabledHint:
-        "Después de las fotos, muestra Cama de matrimonio o Individuales cuando la habitación en VB tenga capacity ≥ 2. Habitaciones con capacity 1 (individual) no muestran el paso.",
+        "Después de las fotos, muestra Cama de matrimonio o Individuales cuando la habitación en VB tenga capacity ≥ 2 y aún sea antes de la hora de check-in (stay.checkinDate/Time). Después de esa hora, o con capacity 1, el paso no aparece.",
       whatsappSubTabGuest: "Huésped",
       whatsappSubTabGovernance: "Gobernanza",
       whatsappBody:

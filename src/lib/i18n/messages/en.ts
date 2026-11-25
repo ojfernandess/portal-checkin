@@ -1167,7 +1167,7 @@ export const en: MessageTree = {
       tabWhatsApp: "WhatsApp",
       bedPreferenceEnabled: "Bed preference at check-in",
       bedPreferenceEnabledHint:
-        "After photos, show Double bed or Single beds when the VB room has capacity ≥ 2. Rooms with capacity 1 (individual) skip this step.",
+        "After photos, show Double bed or Single beds when the VB room has capacity ≥ 2 and it is still before check-in time (stay.checkinDate/Time). After that time, or with capacity 1, the step is skipped.",
       whatsappSubTabGuest: "Guest",
       whatsappSubTabGovernance: "Housekeeping",
       whatsappBody:
