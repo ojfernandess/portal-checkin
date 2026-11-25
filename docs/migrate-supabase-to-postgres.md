@@ -48,10 +48,35 @@ SUPABASE_DATABASE_URL="postgresql://postgres....@...:5432/postgres"
 DATABASE_URL="postgresql://welcome:SENHA@HOST:5432/welcome_inn"
 ```
 
+### Importante: só colocar na env **não** importa
+
+`SUPABASE_DATABASE_URL` sozinha não faz nada no deploy. É preciso **uma** destas opções:
+
+**A) EasyPanel / Docker (recomendado uma vez)** — no Environment do serviço `welcome-inn`:
+
+```env
+DATABASE_URL=postgresql://welcome:SENHA@postgres:5432/welcome_inn
+SUPABASE_DATABASE_URL=postgresql://postgres....@...:5432/postgres
+MIGRATE_FROM_SUPABASE_ON_BOOT=1
+```
+
+1. Redeploy e abra os **logs** do container `welcome-inn`.
+2. Procure: `Importing data from Supabase…`, contagens por tabela, e `Done.`
+3. Depois do sucesso, mude para `MIGRATE_FROM_SUPABASE_ON_BOOT=0` (evita reimport em todo restart).
+
+O entrypoint sempre roda `db:migrate` (schema). O dump de dados só roda com a flag `=1`.
+
+**B) Manual** (máquina com acesso aos dois bancos):
+
+```bash
+npm run db:migrate-from-supabase
+```
+
 Opcionais:
 
 | Variável | Efeito |
 |----------|--------|
+| `MIGRATE_FROM_SUPABASE_ON_BOOT=1` | Roda o import ao subir o container |
 | `MIGRATE_DRY_RUN=1` | Só lê/conta; não grava no destino |
 | `MIGRATE_TRUNCATE=1` | Apaga tabelas do destino antes de importar (**destrutivo**) |
 | `MIGRATE_SKIP_RATE_LIMIT=1` | Não copia `rate_limit_buckets` |

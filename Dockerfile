@@ -37,11 +37,17 @@ ENV NITRO_PORT=3000
 ENV APP_BUILD_COMMIT=$GIT_COMMIT
 ENV APP_BUILD_DATE=$BUILD_DATE
 
+# App runtime + migrate tools (schema / optional Supabase import on boot)
+COPY --from=deps /app/node_modules ./node_modules
 COPY --from=build /app/.output ./.output
 COPY --from=build /app/package.json ./package.json
+COPY --from=build /app/db ./db
+COPY --from=build /app/scripts/db-migrate.mjs ./scripts/db-migrate.mjs
+COPY --from=build /app/scripts/migrate-from-supabase.mjs ./scripts/migrate-from-supabase.mjs
+COPY --from=build /app/scripts/docker-entrypoint.mjs ./scripts/docker-entrypoint.mjs
 
 EXPOSE 3000
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:3000/').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
-CMD ["node", ".output/server/index.mjs"]
+CMD ["node", "scripts/docker-entrypoint.mjs"]

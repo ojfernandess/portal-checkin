@@ -148,7 +148,7 @@ App em `http://localhost:3000`.
    - Postgres / auth: `DATABASE_URL`, `AUTH_JWT_SECRET` (e opcionalmente `AUTH_JWT_TTL`)
    - TecHospitality: `TECHOSPITALITY_BASE_URL`, tokens (`RESERVATIONS`, `HUB`, `CHECKOUTS`, `CREATED`, …)
    - MinIO / AWS S3: `AWS_*` ou `MINIO_*`
-6. **Schema + dados:** `npm run db:migrate` e, se for trazer o Supabase, `npm run db:migrate-from-supabase` (ver [docs/migrate-supabase-to-postgres.md](docs/migrate-supabase-to-postgres.md)).
+6. **Schema:** o container aplica `db:migrate` sozinho no start. **Dados do Supabase:** não basta pôr a URL na env — use `MIGRATE_FROM_SUPABASE_ON_BOOT=1` + `SUPABASE_DATABASE_URL` **uma vez**, veja os logs (`Done.`), depois volte a flag para `0` (ver [docs/migrate-supabase-to-postgres.md](docs/migrate-supabase-to-postgres.md)).
 
 #### O deploy já instala o Postgres?
 
