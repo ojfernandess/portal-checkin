@@ -2,12 +2,18 @@ services:
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
+    # Hostname on the compose network is `postgres`. Alias `db` covers EasyPanel templates
+    # that set DATABASE_URL=...@db:5432/...
+    networks:
+      default:
+        aliases:
+          - db
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-welcome}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-welcome}
       POSTGRES_DB: ${POSTGRES_DB:-welcome_inn}
-    # Internal only — EasyPanel / app reach Postgres via Docker network hostname `postgres`.
-    # Do not bind host :5432 (avoids conflicts). For local psql: docker compose exec postgres psql -U welcome -d welcome_inn
+    # Internal only — app reaches Postgres via `postgres` or `db` (no host :5432 publish).
+    # Local shell: docker compose exec postgres psql -U welcome -d welcome_inn
     expose:
       - "5432"
     volumes:

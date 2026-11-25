@@ -13,8 +13,9 @@ Observações importantes:
 
 - Subir o container **não** aplica o schema. Rode `npm run db:migrate` (ou o script abaixo) no banco alvo.
 - Defina `POSTGRES_PASSWORD` / `AUTH_JWT_SECRET` no EasyPanel (não use defaults em produção).
-- Com Compose, `DATABASE_URL` interno típico:  
-  `postgresql://welcome:SENHA@postgres:5432/welcome_inn`
+- Com Compose, `DATABASE_URL` interno típico (hostname = nome do serviço):  
+  `postgresql://welcome:SENHA@postgres:5432/welcome_inn`  
+  Também funciona `@db:5432` (alias). **Não** use host de fora do Compose se o app roda no mesmo stack.
 
 ## 2) Pré-requisitos
 
