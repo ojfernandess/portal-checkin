@@ -50,6 +50,11 @@ export type EstablishmentSettings = {
   inboxUnitMappings: InboxUnitMapping[];
   /** Comodidades, Wi-Fi e demais informações na seção "Informações úteis" do check-in concluído. */
   usefulInfoItems: UsefulInfoItem[];
+  /**
+   * Preferência de cama (Casal/Solteiro) após fotos no check-in.
+   * Só aparece se capacity do quarto (VB) for ≥ 2.
+   */
+  bedPreferenceEnabled: boolean;
   /** Envia template WhatsApp ao hóspede após check-in concluído. */
   whatsappNotifyEnabled: boolean;
   /** ID do template (AgentsLabs Chat API). */
@@ -64,7 +69,19 @@ export type EstablishmentSettings = {
   whatsappSendToWa: boolean;
   /** Fila da caixa: ai (bot) ou human (atendimento humano). */
   whatsappInboxType: "ai" | "human";
+  /** Aviso WhatsApp para governança/equipe após check-in (preferência de cama etc.). */
+  whatsappGovernanceNotifyEnabled: boolean;
+  whatsappGovernanceTemplateId: string | null;
+  whatsappGovernanceTemplateName: string | null;
+  whatsappGovernanceTemplateVariableCount: number;
+  whatsappGovernanceTemplateVariableKeys: string[];
+  whatsappGovernanceSendToWa: boolean;
+  whatsappGovernanceInboxType: "ai" | "human";
+  /** Números E.164/digitais que recebem o template de governança. */
+  whatsappGovernancePhones: string[];
 };
+
+export type BedPreferenceChoice = "double" | "single";
 
 export const DEFAULT_ESTABLISHMENT_SETTINGS: EstablishmentSettings = {
   requireBirthDateConfirmation: false,
@@ -78,6 +95,7 @@ export const DEFAULT_ESTABLISHMENT_SETTINGS: EstablishmentSettings = {
   inboxManagedUnitId: null,
   inboxUnitMappings: [],
   usefulInfoItems: [],
+  bedPreferenceEnabled: false,
   whatsappNotifyEnabled: false,
   whatsappTemplateId: null,
   whatsappTemplateName: null,
@@ -85,7 +103,57 @@ export const DEFAULT_ESTABLISHMENT_SETTINGS: EstablishmentSettings = {
   whatsappTemplateVariableKeys: [],
   whatsappSendToWa: true,
   whatsappInboxType: "ai",
+  whatsappGovernanceNotifyEnabled: false,
+  whatsappGovernanceTemplateId: null,
+  whatsappGovernanceTemplateName: null,
+  whatsappGovernanceTemplateVariableCount: 0,
+  whatsappGovernanceTemplateVariableKeys: [],
+  whatsappGovernanceSendToWa: true,
+  whatsappGovernanceInboxType: "ai",
+  whatsappGovernancePhones: [],
 };
+
+const MAX_GOVERNANCE_PHONES = 10;
+
+function parseGovernancePhones(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const out: string[] = [];
+  for (const item of value) {
+    const digits = String(item ?? "").replace(/\D/g, "");
+    if (digits.length >= 10 && digits.length <= 15 && !out.includes(digits)) {
+      out.push(digits);
+    }
+    if (out.length >= MAX_GOVERNANCE_PHONES) break;
+  }
+  return out;
+}
+
+export function resolveReservationRoomCapacity(
+  reservation: {
+    capacity?: number;
+    room?: { capacity?: number };
+  } | null
+  | undefined,
+): number | null {
+  const raw = reservation?.room?.capacity ?? reservation?.capacity;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return Math.floor(n);
+}
+
+/** Etapa de preferência de cama: setting ligado e capacity do VB ≥ 2. */
+export function shouldShowBedPreferenceStep(
+  settings: Pick<EstablishmentSettings, "bedPreferenceEnabled">,
+  reservation: {
+    capacity?: number;
+    room?: { capacity?: number };
+  } | null
+  | undefined,
+): boolean {
+  if (!settings.bedPreferenceEnabled) return false;
+  const capacity = resolveReservationRoomCapacity(reservation);
+  return capacity != null && capacity >= 2;
+}
 
 export const MAX_USEFUL_INFO_ITEMS = 20;
 export const MAX_USEFUL_INFO_TITLE_LENGTH = 80;
@@ -283,6 +351,7 @@ export function parseEstablishmentSettings(raw: unknown): EstablishmentSettings 
     inboxManagedUnitId: parseInboxManagedUnitId(settings.inboxManagedUnitId),
     inboxUnitMappings: parseInboxUnitMappings(settings.inboxUnitMappings),
     usefulInfoItems: parseUsefulInfoItems(settings.usefulInfoItems),
+    bedPreferenceEnabled: settings.bedPreferenceEnabled === true,
     whatsappNotifyEnabled: settings.whatsappNotifyEnabled === true,
     whatsappTemplateId:
       typeof settings.whatsappTemplateId === "string" && settings.whatsappTemplateId.trim()
@@ -303,6 +372,34 @@ export function parseEstablishmentSettings(raw: unknown): EstablishmentSettings 
       : [],
     whatsappSendToWa: settings.whatsappSendToWa !== false,
     whatsappInboxType: settings.whatsappInboxType === "human" ? "human" : "ai",
+    whatsappGovernanceNotifyEnabled: settings.whatsappGovernanceNotifyEnabled === true,
+    whatsappGovernanceTemplateId:
+      typeof settings.whatsappGovernanceTemplateId === "string" &&
+      settings.whatsappGovernanceTemplateId.trim()
+        ? settings.whatsappGovernanceTemplateId.trim()
+        : null,
+    whatsappGovernanceTemplateName:
+      typeof settings.whatsappGovernanceTemplateName === "string" &&
+      settings.whatsappGovernanceTemplateName.trim()
+        ? settings.whatsappGovernanceTemplateName.trim()
+        : null,
+    whatsappGovernanceTemplateVariableCount: Number.isFinite(
+      Number(settings.whatsappGovernanceTemplateVariableCount),
+    )
+      ? Math.max(0, Math.min(20, Number(settings.whatsappGovernanceTemplateVariableCount)))
+      : 0,
+    whatsappGovernanceTemplateVariableKeys: Array.isArray(
+      settings.whatsappGovernanceTemplateVariableKeys,
+    )
+      ? settings.whatsappGovernanceTemplateVariableKeys
+          .map((item) => String(item ?? "").trim())
+          .filter(Boolean)
+          .slice(0, 20)
+      : [],
+    whatsappGovernanceSendToWa: settings.whatsappGovernanceSendToWa !== false,
+    whatsappGovernanceInboxType:
+      settings.whatsappGovernanceInboxType === "human" ? "human" : "ai",
+    whatsappGovernancePhones: parseGovernancePhones(settings.whatsappGovernancePhones),
   };
 }
 

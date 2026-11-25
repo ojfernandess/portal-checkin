@@ -99,6 +99,7 @@ function EstablishmentConfigPage() {
   const [inboxUnits, setInboxUnits] = useState<InboxManagedUnitOption[]>([]);
   const [inboxConfigured, setInboxConfigured] = useState(false);
   const [inboxUnitsLoading, setInboxUnitsLoading] = useState(false);
+  const [bedPreferenceEnabled, setBedPreferenceEnabled] = useState(false);
   const [whatsappNotifyEnabled, setWhatsappNotifyEnabled] = useState(false);
   const [whatsappTemplateId, setWhatsappTemplateId] = useState<string | null>(null);
   const [whatsappTemplateName, setWhatsappTemplateName] = useState<string | null>(null);
@@ -106,6 +107,23 @@ function EstablishmentConfigPage() {
   const [whatsappTemplateVariableKeys, setWhatsappTemplateVariableKeys] = useState<string[]>([]);
   const [whatsappSendToWa, setWhatsappSendToWa] = useState(true);
   const [whatsappInboxType, setWhatsappInboxType] = useState<"ai" | "human">("ai");
+  const [whatsappGovernanceNotifyEnabled, setWhatsappGovernanceNotifyEnabled] = useState(false);
+  const [whatsappGovernanceTemplateId, setWhatsappGovernanceTemplateId] = useState<string | null>(
+    null,
+  );
+  const [whatsappGovernanceTemplateName, setWhatsappGovernanceTemplateName] = useState<
+    string | null
+  >(null);
+  const [whatsappGovernanceTemplateVariableCount, setWhatsappGovernanceTemplateVariableCount] =
+    useState(0);
+  const [whatsappGovernanceTemplateVariableKeys, setWhatsappGovernanceTemplateVariableKeys] =
+    useState<string[]>([]);
+  const [whatsappGovernanceSendToWa, setWhatsappGovernanceSendToWa] = useState(true);
+  const [whatsappGovernanceInboxType, setWhatsappGovernanceInboxType] = useState<"ai" | "human">(
+    "ai",
+  );
+  const [whatsappGovernancePhones, setWhatsappGovernancePhones] = useState<string[]>([]);
+  const [whatsappSubTab, setWhatsappSubTab] = useState<"guest" | "governance">("guest");
   const [savingSettings, setSavingSettings] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -141,6 +159,7 @@ function EstablishmentConfigPage() {
         setVbEstablishmentId(settings.settings.vbEstablishmentId ?? "");
         setVbApiToken(settings.settings.vbApiToken ?? "");
         setVbPhotoLinkEnabled(settings.settings.vbPhotoLinkEnabled);
+        setBedPreferenceEnabled(settings.settings.bedPreferenceEnabled);
         setWhatsappNotifyEnabled(settings.settings.whatsappNotifyEnabled);
         setWhatsappTemplateId(settings.settings.whatsappTemplateId);
         setWhatsappTemplateName(settings.settings.whatsappTemplateName);
@@ -148,6 +167,18 @@ function EstablishmentConfigPage() {
         setWhatsappTemplateVariableKeys(settings.settings.whatsappTemplateVariableKeys);
         setWhatsappSendToWa(settings.settings.whatsappSendToWa);
         setWhatsappInboxType(settings.settings.whatsappInboxType);
+        setWhatsappGovernanceNotifyEnabled(settings.settings.whatsappGovernanceNotifyEnabled);
+        setWhatsappGovernanceTemplateId(settings.settings.whatsappGovernanceTemplateId);
+        setWhatsappGovernanceTemplateName(settings.settings.whatsappGovernanceTemplateName);
+        setWhatsappGovernanceTemplateVariableCount(
+          settings.settings.whatsappGovernanceTemplateVariableCount,
+        );
+        setWhatsappGovernanceTemplateVariableKeys(
+          settings.settings.whatsappGovernanceTemplateVariableKeys,
+        );
+        setWhatsappGovernanceSendToWa(settings.settings.whatsappGovernanceSendToWa);
+        setWhatsappGovernanceInboxType(settings.settings.whatsappGovernanceInboxType);
+        setWhatsappGovernancePhones(settings.settings.whatsappGovernancePhones);
       })
       .finally(() => setLoading(false));
   }, [establishmentId, getEstablishment, getTerms, getContact, listFields, getSettings]);
@@ -242,6 +273,7 @@ function EstablishmentConfigPage() {
           vbEstablishmentId: vbEstablishmentId.trim() || null,
           vbApiToken: vbApiToken.trim() || null,
           vbPhotoLinkEnabled,
+          bedPreferenceEnabled,
           whatsappNotifyEnabled,
           whatsappTemplateId,
           whatsappTemplateName,
@@ -249,6 +281,14 @@ function EstablishmentConfigPage() {
           whatsappTemplateVariableKeys,
           whatsappSendToWa,
           whatsappInboxType,
+          whatsappGovernanceNotifyEnabled,
+          whatsappGovernanceTemplateId,
+          whatsappGovernanceTemplateName,
+          whatsappGovernanceTemplateVariableCount,
+          whatsappGovernanceTemplateVariableKeys,
+          whatsappGovernanceSendToWa,
+          whatsappGovernanceInboxType,
+          whatsappGovernancePhones,
         },
       });
       toast.success(t("admin.establishmentConfig.settingsSaved"));
@@ -502,6 +542,22 @@ function EstablishmentConfigPage() {
 
             <label className="flex items-start gap-3 rounded-xl border border-border p-4">
               <Checkbox
+                checked={bedPreferenceEnabled}
+                onCheckedChange={(checked) => setBedPreferenceEnabled(checked === true)}
+                className="mt-0.5"
+              />
+              <span className="space-y-1">
+                <span className="block text-sm font-medium">
+                  {t("admin.establishmentConfig.bedPreferenceEnabled")}
+                </span>
+                <span className="block text-xs text-muted-foreground">
+                  {t("admin.establishmentConfig.bedPreferenceEnabledHint")}
+                </span>
+              </span>
+            </label>
+
+            <label className="flex items-start gap-3 rounded-xl border border-border p-4">
+              <Checkbox
                 checked={requireBirthDateConfirmation}
                 onCheckedChange={(checked) => setRequireBirthDateConfirmation(checked === true)}
                 className="mt-0.5"
@@ -555,26 +611,69 @@ function EstablishmentConfigPage() {
           </TabsContent>
 
           <TabsContent value="whatsapp" className="mt-6 space-y-4">
-            <EstablishmentWhatsAppPanel
-              establishmentId={establishmentId}
-              establishmentName={establishmentName}
-              enabled={whatsappNotifyEnabled}
-              onEnabledChange={setWhatsappNotifyEnabled}
-              templateId={whatsappTemplateId}
-              onTemplateChange={(template) => {
-                setWhatsappTemplateId(template?.id ?? null);
-                setWhatsappTemplateName(template?.name ?? null);
-                if (template) setWhatsappTemplateVariableCount(template.bodyVariableCount);
-              }}
-              variableKeys={whatsappTemplateVariableKeys}
-              onVariableKeysChange={setWhatsappTemplateVariableKeys}
-              variableCount={whatsappTemplateVariableCount}
-              onVariableCountChange={setWhatsappTemplateVariableCount}
-              sendToWa={whatsappSendToWa}
-              onSendToWaChange={setWhatsappSendToWa}
-              inboxType={whatsappInboxType}
-              onInboxTypeChange={setWhatsappInboxType}
-            />
+            <Tabs
+              value={whatsappSubTab}
+              onValueChange={(value) => setWhatsappSubTab(value as "guest" | "governance")}
+            >
+              <TabsList>
+                <TabsTrigger value="guest">
+                  {t("admin.establishmentConfig.whatsappSubTabGuest")}
+                </TabsTrigger>
+                <TabsTrigger value="governance">
+                  {t("admin.establishmentConfig.whatsappSubTabGovernance")}
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent value="guest" className="mt-4 space-y-4">
+                <EstablishmentWhatsAppPanel
+                  mode="guest"
+                  establishmentId={establishmentId}
+                  establishmentName={establishmentName}
+                  enabled={whatsappNotifyEnabled}
+                  onEnabledChange={setWhatsappNotifyEnabled}
+                  templateId={whatsappTemplateId}
+                  onTemplateChange={(template) => {
+                    setWhatsappTemplateId(template?.id ?? null);
+                    setWhatsappTemplateName(template?.name ?? null);
+                    if (template) setWhatsappTemplateVariableCount(template.bodyVariableCount);
+                  }}
+                  variableKeys={whatsappTemplateVariableKeys}
+                  onVariableKeysChange={setWhatsappTemplateVariableKeys}
+                  variableCount={whatsappTemplateVariableCount}
+                  onVariableCountChange={setWhatsappTemplateVariableCount}
+                  sendToWa={whatsappSendToWa}
+                  onSendToWaChange={setWhatsappSendToWa}
+                  inboxType={whatsappInboxType}
+                  onInboxTypeChange={setWhatsappInboxType}
+                />
+              </TabsContent>
+              <TabsContent value="governance" className="mt-4 space-y-4">
+                <EstablishmentWhatsAppPanel
+                  mode="governance"
+                  establishmentId={establishmentId}
+                  establishmentName={establishmentName}
+                  enabled={whatsappGovernanceNotifyEnabled}
+                  onEnabledChange={setWhatsappGovernanceNotifyEnabled}
+                  templateId={whatsappGovernanceTemplateId}
+                  onTemplateChange={(template) => {
+                    setWhatsappGovernanceTemplateId(template?.id ?? null);
+                    setWhatsappGovernanceTemplateName(template?.name ?? null);
+                    if (template) {
+                      setWhatsappGovernanceTemplateVariableCount(template.bodyVariableCount);
+                    }
+                  }}
+                  variableKeys={whatsappGovernanceTemplateVariableKeys}
+                  onVariableKeysChange={setWhatsappGovernanceTemplateVariableKeys}
+                  variableCount={whatsappGovernanceTemplateVariableCount}
+                  onVariableCountChange={setWhatsappGovernanceTemplateVariableCount}
+                  sendToWa={whatsappGovernanceSendToWa}
+                  onSendToWaChange={setWhatsappGovernanceSendToWa}
+                  inboxType={whatsappGovernanceInboxType}
+                  onInboxTypeChange={setWhatsappGovernanceInboxType}
+                  phones={whatsappGovernancePhones}
+                  onPhonesChange={setWhatsappGovernancePhones}
+                />
+              </TabsContent>
+            </Tabs>
             <Button disabled={savingSettings} onClick={() => void handleSaveSettings()}>
               {savingSettings ? t("common.loading") : t("admin.establishmentConfig.saveWhatsAppSettings")}
             </Button>

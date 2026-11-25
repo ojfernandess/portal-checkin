@@ -1289,6 +1289,7 @@ export const adminSaveSettings = createServerFn({ method: "POST" })
           .optional(),
         vbApiToken: z.string().trim().max(500).nullable().optional(),
         vbPhotoLinkEnabled: z.boolean().optional(),
+        bedPreferenceEnabled: z.boolean().optional(),
         whatsappNotifyEnabled: z.boolean().optional(),
         whatsappTemplateId: z.string().trim().max(120).nullable().optional(),
         whatsappTemplateName: z.string().trim().max(120).nullable().optional(),
@@ -1296,6 +1297,14 @@ export const adminSaveSettings = createServerFn({ method: "POST" })
         whatsappTemplateVariableKeys: z.array(z.string().trim().max(40)).max(20).optional(),
         whatsappSendToWa: z.boolean().optional(),
         whatsappInboxType: z.enum(["ai", "human"]).optional(),
+        whatsappGovernanceNotifyEnabled: z.boolean().optional(),
+        whatsappGovernanceTemplateId: z.string().trim().max(120).nullable().optional(),
+        whatsappGovernanceTemplateName: z.string().trim().max(120).nullable().optional(),
+        whatsappGovernanceTemplateVariableCount: z.number().int().min(0).max(20).optional(),
+        whatsappGovernanceTemplateVariableKeys: z.array(z.string().trim().max(40)).max(20).optional(),
+        whatsappGovernanceSendToWa: z.boolean().optional(),
+        whatsappGovernanceInboxType: z.enum(["ai", "human"]).optional(),
+        whatsappGovernancePhones: z.array(z.string().trim().max(32)).max(10).optional(),
       })
       .parse(input),
   )
@@ -1365,6 +1374,9 @@ export const adminSaveSettings = createServerFn({ method: "POST" })
       ...(data.vbPhotoLinkEnabled !== undefined
         ? { vbPhotoLinkEnabled: data.vbPhotoLinkEnabled }
         : {}),
+      ...(data.bedPreferenceEnabled !== undefined
+        ? { bedPreferenceEnabled: data.bedPreferenceEnabled }
+        : {}),
       ...(data.whatsappNotifyEnabled !== undefined
         ? { whatsappNotifyEnabled: data.whatsappNotifyEnabled }
         : {}),
@@ -1396,6 +1408,52 @@ export const adminSaveSettings = createServerFn({ method: "POST" })
         : {}),
       ...(data.whatsappSendToWa !== undefined ? { whatsappSendToWa: data.whatsappSendToWa } : {}),
       ...(data.whatsappInboxType !== undefined ? { whatsappInboxType: data.whatsappInboxType } : {}),
+      ...(data.whatsappGovernanceNotifyEnabled !== undefined
+        ? { whatsappGovernanceNotifyEnabled: data.whatsappGovernanceNotifyEnabled }
+        : {}),
+      ...(data.whatsappGovernanceTemplateId !== undefined
+        ? {
+            whatsappGovernanceTemplateId:
+              data.whatsappGovernanceTemplateId && data.whatsappGovernanceTemplateId.trim()
+                ? data.whatsappGovernanceTemplateId.trim()
+                : null,
+          }
+        : {}),
+      ...(data.whatsappGovernanceTemplateName !== undefined
+        ? {
+            whatsappGovernanceTemplateName:
+              data.whatsappGovernanceTemplateName && data.whatsappGovernanceTemplateName.trim()
+                ? data.whatsappGovernanceTemplateName.trim()
+                : null,
+          }
+        : {}),
+      ...(data.whatsappGovernanceTemplateVariableCount !== undefined
+        ? {
+            whatsappGovernanceTemplateVariableCount:
+              data.whatsappGovernanceTemplateVariableCount,
+          }
+        : {}),
+      ...(data.whatsappGovernanceTemplateVariableKeys !== undefined
+        ? {
+            whatsappGovernanceTemplateVariableKeys: sanitizeWhatsAppTemplateVariableKeys(
+              data.whatsappGovernanceTemplateVariableKeys,
+            ),
+          }
+        : {}),
+      ...(data.whatsappGovernanceSendToWa !== undefined
+        ? { whatsappGovernanceSendToWa: data.whatsappGovernanceSendToWa }
+        : {}),
+      ...(data.whatsappGovernanceInboxType !== undefined
+        ? { whatsappGovernanceInboxType: data.whatsappGovernanceInboxType }
+        : {}),
+      ...(data.whatsappGovernancePhones !== undefined
+        ? {
+            whatsappGovernancePhones: data.whatsappGovernancePhones
+              .map((item) => String(item ?? "").replace(/\D/g, ""))
+              .filter((item) => item.length >= 10 && item.length <= 15)
+              .slice(0, 10),
+          }
+        : {}),
     };
 
     const { error } = await supabaseAdmin.from("establishment_settings").upsert(

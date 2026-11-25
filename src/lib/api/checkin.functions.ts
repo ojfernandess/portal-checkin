@@ -2498,14 +2498,24 @@ async function executeSubmitCheckin(data: SubmitCheckinInput) {
                 result != null ? mergeCheckinResult(snapshot, result) : snapshot;
             }
           }
-          await sendCheckinWhatsAppNotification({
+          const notifyPayload = {
             tenantId,
             establishmentId: String(resolvedEstablishmentId),
             localizer: localizerCode,
             mainGuest,
             reservationSnapshot: reservationForNotify,
             checkinRecordId,
-          });
+            extraFields: data.extraFields ?? null,
+          };
+          await sendCheckinWhatsAppNotification(notifyPayload);
+          try {
+            const { sendCheckinGovernanceWhatsAppNotification } = await import(
+              "@/lib/whatsapp-chat/notify.server"
+            );
+            await sendCheckinGovernanceWhatsAppNotification(notifyPayload);
+          } catch (govError) {
+            console.error("[checkin] Falha ao enviar WhatsApp de governança:", govError);
+          }
         } catch (error) {
           console.error("[checkin] Falha ao enviar WhatsApp pós-check-in:", error);
         }

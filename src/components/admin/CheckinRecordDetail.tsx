@@ -15,6 +15,7 @@ import type { CheckinRecordRow } from "@/lib/checkin-records";
 import {
   filterNamedCheckinDependents,
 } from "@/lib/checkin-records";
+import { bedPreferenceLabel, normalizeBedPreference } from "@/lib/bed-preference";
 
 function Field({ label, value }: { label: string; value?: React.ReactNode }) {
   if (value == null || value === "") return null;
@@ -184,9 +185,21 @@ export function CheckinRecordDetail({ record }: { record: CheckinRecordRow }) {
         <section className="space-y-2">
           <h3 className="font-semibold">{t("admin.checkinsPage.extraFields")}</h3>
           <dl className="grid grid-cols-2 gap-3">
-            {Object.entries(record.extra_fields).map(([key, value]) => (
-              <Field key={key} label={key} value={String(value)} />
-            ))}
+            {Object.entries(record.extra_fields).map(([key, value]) => {
+              if (key === "bedPreference") {
+                const normalized = normalizeBedPreference(value);
+                const labelLocale =
+                  locale === "en" || locale === "es" ? locale : "pt-BR";
+                return (
+                  <Field
+                    key={key}
+                    label={t("checkin.bedPreference.title")}
+                    value={bedPreferenceLabel(normalized, labelLocale) || String(value)}
+                  />
+                );
+              }
+              return <Field key={key} label={key} value={String(value)} />;
+            })}
           </dl>
         </section>
       ) : null}

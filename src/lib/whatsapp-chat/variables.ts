@@ -29,6 +29,8 @@ export const WHATSAPP_EXTRA_VARIABLE_KEYS = [
   "linha_wifi_titulo",
   "linha_wifi_rede",
   "linha_wifi_senha",
+  "preferencia_cama",
+  "capacidade_quarto",
 ] as const;
 
 export type WhatsAppExtraVariableKey = (typeof WHATSAPP_EXTRA_VARIABLE_KEYS)[number];
@@ -64,6 +66,8 @@ export const WHATSAPP_TEMPLATE_VARIABLE_KEYS: WhatsAppTemplateVariableKey[] = [
   "resumo_wifi",
   "resumo_instrucoes",
   "informacoes_checkin",
+  "preferencia_cama",
+  "capacidade_quarto",
 ];
 
 export function whatsAppVariableToken(key: WhatsAppTemplateVariableKey): string {
@@ -75,6 +79,10 @@ export function buildWhatsAppNotifyVariableContext(
   mainGuest: GuestLookup | null | undefined,
   usefulInfoItems: UsefulInfoItem[],
   locale: Locale = "pt-BR",
+  extras?: {
+    bedPreferenceLabel?: string | null;
+    roomCapacity?: number | null;
+  },
 ): Record<WhatsAppTemplateVariableKey, string> {
   const base = buildUsefulInfoVariableContext(reservation, mainGuest, locale);
   const wifiItem = usefulInfoItems.find((item) => item.kind === "wifi");
@@ -92,6 +100,11 @@ export function buildWhatsAppNotifyVariableContext(
     locale,
   );
   const compactAddress = formatWhatsAppCompactAddress(reservation);
+  const capacity =
+    extras?.roomCapacity ??
+    reservation.room?.capacity ??
+    reservation.capacity ??
+    null;
 
   return {
     ...base,
@@ -116,6 +129,8 @@ export function buildWhatsAppNotifyVariableContext(
       usefulInfoItems,
       locale,
     ),
+    preferencia_cama: extras?.bedPreferenceLabel?.trim() || "—",
+    capacidade_quarto: capacity != null && Number.isFinite(Number(capacity)) ? String(capacity) : "—",
   };
 }
 
@@ -177,7 +192,28 @@ export function renderWhatsAppTemplatePreview(
   return rendered.replace(/\{\{\s*\d+\s*\}\}/g, "—");
 }
 
-export function suggestWhatsAppVariableKeys(count: number): WhatsAppTemplateVariableKey[] {
+export function suggestWhatsAppVariableKeys(
+  count: number,
+  mode: "guest" | "governance" = "guest",
+): WhatsAppTemplateVariableKey[] {
+  if (mode === "governance") {
+    const governanceLayout: WhatsAppTemplateVariableKey[] = [
+      "hospede",
+      "preferencia_cama",
+      "numero_unidade",
+      "localizador",
+      "estabelecimento",
+      "categoria",
+      "capacidade_quarto",
+      "checkin_data",
+      "checkout_data",
+    ];
+    return Array.from(
+      { length: count },
+      (_, index) => governanceLayout[index] ?? "preferencia_cama",
+    );
+  }
+
   if (count <= 3) {
     return ["hospede", "estabelecimento", "informacoes_checkin"].slice(0, count);
   }
@@ -219,6 +255,7 @@ export function buildWhatsAppPreviewSampleContext(
     localizer: "ABC123",
     establishmentName: establishmentName || "Hotel Exemplo",
     unitNumber: "309",
+    capacity: 2,
     roomPassword: "562736#",
     checkinDate: "2026-09-25",
     checkinTime: "14:00",
@@ -226,6 +263,7 @@ export function buildWhatsAppPreviewSampleContext(
     checkoutTime: "12:00",
     guestsQuantity: 2,
     nights: 1,
+    room: { capacity: 2, unitNumber: "309", categoryName: "Standard" },
     establishment: {
       street: "Rua Exemplo",
       number: "123",
@@ -257,5 +295,10 @@ export function buildWhatsAppPreviewSampleContext(
     { name: "Maria Silva" },
     sampleUsefulInfo,
     locale,
+    {
+      bedPreferenceLabel:
+        locale === "en" ? "Double bed" : locale === "es" ? "Cama de matrimonio" : "Cama casal",
+      roomCapacity: 2,
+    },
   );
 }

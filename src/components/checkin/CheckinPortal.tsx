@@ -67,8 +67,11 @@ import {
 import {
   birthDatesMatch,
   DEFAULT_ESTABLISHMENT_SETTINGS,
+  shouldShowBedPreferenceStep,
+  type BedPreferenceChoice,
   type EstablishmentSettings,
 } from "@/lib/establishment-settings";
+import { BED_PREFERENCE_EXTRA_FIELD_KEY } from "@/lib/bed-preference";
 import { useI18n } from "@/lib/i18n/context";
 import {
   companionsHaveInboxPhotoUpdates,
@@ -397,6 +400,8 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
   const [establishmentSettings, setEstablishmentSettings] = useState<EstablishmentSettings>(
     DEFAULT_ESTABLISHMENT_SETTINGS,
   );
+  const [bedPreference, setBedPreference] = useState<BedPreferenceChoice | null>(null);
+  const [step6Kind, setStep6Kind] = useState<"bed" | "embratur">("embratur");
   const [faceValidationEnabled, setFaceValidationEnabled] = useState(false);
   const [birthDateConfirmInput, setBirthDateConfirmInput] = useState("");
   const [birthDateConfirmError, setBirthDateConfirmError] = useState("");
@@ -529,6 +534,10 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
     return merged;
   }
 
+  function needsBedPreferenceStep() {
+    return shouldShowBedPreferenceStep(establishmentSettings, reservation);
+  }
+
   async function loadEmbraturStep() {
     const raw = await loadReference({
       data: {
@@ -554,7 +563,18 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
             option.label.toLowerCase().includes(reservation.establishment.city.toLowerCase()),
         )?.value ?? ""),
     }));
+    setStep6Kind("embratur");
     setStep(6);
+  }
+
+  async function proceedAfterPhotos() {
+    if (needsBedPreferenceStep()) {
+      setStep6Kind("bed");
+      setStep(6);
+      return;
+    }
+    setBedPreference(null);
+    await loadEmbraturStep();
   }
 
   async function loadEstablishmentConfig(found: Reservation): Promise<EstablishmentSettings> {
@@ -943,7 +963,7 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
         setGuest(uploaded);
         setSelfie(uploaded.profilePhotoUrl ?? null);
         setDocPhoto(uploaded.documentPhotoUrl ?? null);
-        await loadEmbraturStep();
+        await proceedAfterPhotos();
       } catch (error) {
         showPhotoUploadError(error);
       } finally {
@@ -955,7 +975,7 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
     if (profile && documentPhoto) {
       setLoading(true);
       try {
-        await loadEmbraturStep();
+        await proceedAfterPhotos();
       } finally {
         setLoading(false);
       }
@@ -1023,7 +1043,7 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
       setGuest(uploaded);
       setSelfie(uploaded.profilePhotoUrl ?? null);
       setDocPhoto(uploaded.documentPhotoUrl ?? null);
-      await loadEmbraturStep();
+      await proceedAfterPhotos();
     } catch (error) {
       showPhotoUploadError(error);
     } finally {
@@ -1092,6 +1112,12 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
       showCheckinError(formatCheckinIssues(issues, labels));
       return;
     }
+    if (needsBedPreferenceStep() && !bedPreference) {
+      toast.error(t("checkin.bedPreference.required"));
+      setStep6Kind("bed");
+      setStep(6);
+      return;
+    }
 
     setLoading(true);
     // Mostra a tela de finalização imediatamente — o submit VB/Inbox/WhatsApp
@@ -1142,10 +1168,16 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
           termsAcceptedAt: termsAcceptedAt ?? undefined,
           termsVersion: termsVersion || undefined,
           ...(checkinSessionId ? { checkinSessionId } : {}),
-          extraFields: extraFieldValues,
+          extraFields: {
+            ...extraFieldValues,
+            ...(bedPreference
+              ? { [BED_PREFERENCE_EXTRA_FIELD_KEY]: bedPreference }
+              : {}),
+          },
         },
       });
     } catch (error) {
+      setStep6Kind("embratur");
       setStep(6);
       if (isEstablishmentNotRegisteredError(error)) {
         showCheckinError(t("checkin.search.establishmentNotRegistered"));
@@ -1979,12 +2011,78 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
             </section>
           )}
 
-          {step === 6 && reference && (
+          {step === 6 && step6Kind === "bed" && (
+            <section className="space-y-5">
+              <header className="space-y-1">
+                <h2 className="font-display text-2xl">{t("checkin.bedPreference.title")}</h2>
+                <p className="text-sm text-muted-foreground">{t("checkin.bedPreference.body")}</p>
+              </header>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <button
+                  type="button"
+                  className={cn(
+                    "rounded-2xl border p-5 text-left shadow-card transition",
+                    bedPreference === "double"
+                      ? "border-primary bg-primary/5 ring-2 ring-primary/30"
+                      : "border-border bg-card",
+                  )}
+                  onClick={() => setBedPreference("double")}
+                >
+                  <p className="font-display text-lg">{t("checkin.bedPreference.double")}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {t("checkin.bedPreference.doubleHint")}
+                  </p>
+                </button>
+                <button
+                  type="button"
+                  className={cn(
+                    "rounded-2xl border p-5 text-left shadow-card transition",
+                    bedPreference === "single"
+                      ? "border-primary bg-primary/5 ring-2 ring-primary/30"
+                      : "border-border bg-card",
+                  )}
+                  onClick={() => setBedPreference("single")}
+                >
+                  <p className="font-display text-lg">{t("checkin.bedPreference.single")}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {t("checkin.bedPreference.singleHint")}
+                  </p>
+                </button>
+              </div>
+              <div className="flex gap-3">
+                <Button variant="outline" className="tap-safe" onClick={() => setStep(5)}>
+                  {t("common.back")}
+                </Button>
+                <Button
+                  className="tap-safe flex-1"
+                  disabled={loading || !bedPreference}
+                  onClick={() => {
+                    if (!bedPreference) {
+                      toast.error(t("checkin.bedPreference.required"));
+                      return;
+                    }
+                    void loadEmbraturStep();
+                  }}
+                >
+                  {t("common.continue")}
+                </Button>
+              </div>
+            </section>
+          )}
+
+          {step === 6 && step6Kind === "embratur" && reference && (
             <EmbraturStep
               reference={reference}
               value={embratur}
               onChange={setEmbratur}
-              onBack={() => setStep(5)}
+              onBack={() => {
+                if (needsBedPreferenceStep()) {
+                  setStep6Kind("bed");
+                  setStep(6);
+                  return;
+                }
+                setStep(5);
+              }}
               onContinue={() => void handleSubmit()}
               submitting={loading}
             />

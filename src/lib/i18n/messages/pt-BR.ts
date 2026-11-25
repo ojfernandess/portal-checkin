@@ -346,6 +346,15 @@ export const ptBR = {
       newSelfieGuidanceConfirm: "Entendi",
       selfieGuidanceImageAlt: "Exemplos de selfie correta e incorreta para check-in",
     },
+    bedPreference: {
+      title: "Preferência de cama",
+      body: "Escolha o tipo de cama desejado para a acomodação.",
+      double: "Cama casal",
+      doubleHint: "Uma cama de casal",
+      single: "Cama solteiro",
+      singleHint: "Camas de solteiro",
+      required: "Selecione a preferência de cama para continuar.",
+    },
     camera: {
       accessError: "Não conseguimos acessar a câmera. Envie um arquivo do seu dispositivo.",
       photo: "Foto",
@@ -1165,8 +1174,24 @@ export const ptBR = {
       saveInboxSettings: "Salvar integração Inbox",
       inboxUnitsLoadFailed: "Não foi possível carregar unidades da Inbox.",
       tabWhatsApp: "WhatsApp",
+      bedPreferenceEnabled: "Preferência de cama no check-in",
+      bedPreferenceEnabledHint:
+        "Após as fotos, exibe a escolha Cama casal ou Solteiro quando o quarto no VB tiver capacity ≥ 2. Quartos com capacity 1 (individual) não mostram a etapa.",
+      whatsappSubTabGuest: "Hóspede",
+      whatsappSubTabGovernance: "Governança",
       whatsappBody:
         "Envia automaticamente ao hóspede um template WhatsApp aprovado pela Meta após concluir o check-in, com instruções de acesso (quarto, senha, Wi-Fi, endereço etc.).",
+      whatsappGovernanceBody:
+        "Envia automaticamente um template WhatsApp aprovado pela Meta para a equipe de governança após o check-in, com a preferência de cama escolhida pelo hóspede.",
+      whatsappGovernanceHint:
+        "Cadastre os números da equipe e escolha um template. Use a variável {preferencia_cama} no mapeamento.",
+      whatsappGovernanceEnable: "Enviar WhatsApp à governança ao concluir check-in",
+      whatsappGovernancePhones: "Números da equipe",
+      whatsappGovernancePhonesHint: "DDD + número com código do país (ex.: 5511999999999).",
+      whatsappGovernanceAddPhone: "Adicionar",
+      whatsappGovernancePhonesEmpty: "Nenhum número cadastrado.",
+      whatsappGovernancePhoneInvalid: "Informe um número válido com DDI (mín. 10 dígitos).",
+      whatsappGovernancePhoneLimit: "Limite de 10 números.",
       whatsappNotConfigured:
         "Integração WhatsApp não configurada. Solicite ao administrador da plataforma que informe token, organização e caixa WhatsApp, ou defina WHATSAPP_CHAT_* no servidor.",
       whatsappEnable: "Enviar WhatsApp ao concluir check-in",
@@ -1237,6 +1262,8 @@ export const ptBR = {
         linha_wifi_titulo: "Linha: 📶 Wi-Fi (1 parâmetro Meta)",
         linha_wifi_rede: "Linha: Rede Wi-Fi (1 parâmetro Meta)",
         linha_wifi_senha: "Linha: Senha Wi-Fi (1 parâmetro Meta)",
+        preferencia_cama: "Preferência de cama (casal/solteiro)",
+        capacidade_quarto: "Capacidade do quarto (VB)",
       },
       saveWhatsAppSettings: "Salvar integração WhatsApp",
       usefulInfoBody:

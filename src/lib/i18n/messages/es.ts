@@ -348,6 +348,15 @@ export const es: MessageTree = {
       newSelfieGuidanceConfirm: "Entendido",
       selfieGuidanceImageAlt: "Ejemplos de selfie correcta e incorrecta para check-in",
     },
+    bedPreference: {
+      title: "Preferencia de cama",
+      body: "Elija el tipo de cama deseado para la habitación.",
+      double: "Cama de matrimonio",
+      doubleHint: "Una cama de matrimonio",
+      single: "Camas individuales",
+      singleHint: "Camas individuales / twin",
+      required: "Seleccione la preferencia de cama para continuar.",
+    },
     camera: {
       accessError: "No pudimos acceder a la cámara. Envíe un archivo desde su dispositivo.",
       photo: "Foto",
@@ -1166,8 +1175,24 @@ export const es: MessageTree = {
       saveInboxSettings: "Guardar integración Inbox",
       inboxUnitsLoadFailed: "No se pudieron cargar las unidades de Inbox.",
       tabWhatsApp: "WhatsApp",
+      bedPreferenceEnabled: "Preferencia de cama en el check-in",
+      bedPreferenceEnabledHint:
+        "Después de las fotos, muestra Cama de matrimonio o Individuales cuando la habitación en VB tenga capacity ≥ 2. Habitaciones con capacity 1 (individual) no muestran el paso.",
+      whatsappSubTabGuest: "Huésped",
+      whatsappSubTabGovernance: "Gobernanza",
       whatsappBody:
         "Envía automáticamente al huésped una plantilla de WhatsApp aprobada por Meta al completar el check-in, con instrucciones de acceso (habitación, contraseña, Wi-Fi, dirección, etc.).",
+      whatsappGovernanceBody:
+        "Envía automáticamente una plantilla de WhatsApp aprobada por Meta al equipo de gobernanza tras el check-in, con la preferencia de cama elegida por el huésped.",
+      whatsappGovernanceHint:
+        "Registre los números del equipo y elija una plantilla. Use la variable {preferencia_cama} en el mapeo.",
+      whatsappGovernanceEnable: "Enviar WhatsApp a gobernanza al completar el check-in",
+      whatsappGovernancePhones: "Números del equipo",
+      whatsappGovernancePhonesHint: "Código de país + número (ej.: 5511999999999).",
+      whatsappGovernanceAddPhone: "Agregar",
+      whatsappGovernancePhonesEmpty: "Ningún número registrado.",
+      whatsappGovernancePhoneInvalid: "Ingrese un número válido con código de país (mín. 10 dígitos).",
+      whatsappGovernancePhoneLimit: "Límite de 10 números.",
       whatsappNotConfigured:
         "La integración WhatsApp no está configurada. Solicite al administrador de la plataforma token, organización y bandeja WhatsApp, o defina WHATSAPP_CHAT_* en el servidor.",
       whatsappEnable: "Enviar WhatsApp al completar el check-in",
@@ -1238,6 +1263,8 @@ export const es: MessageTree = {
         linha_wifi_titulo: "Línea: 📶 Wi-Fi (1 parámetro Meta)",
         linha_wifi_rede: "Línea: Red Wi-Fi (1 parámetro Meta)",
         linha_wifi_senha: "Línea: Contraseña Wi-Fi (1 parámetro Meta)",
+        preferencia_cama: "Preferencia de cama (matrimonio/individual)",
+        capacidade_quarto: "Capacidad de la habitación (VB)",
       },
       saveWhatsAppSettings: "Guardar integración WhatsApp",
       usefulInfoBody:

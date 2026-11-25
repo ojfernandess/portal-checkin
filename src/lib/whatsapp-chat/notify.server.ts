@@ -17,6 +17,7 @@ export type SendCheckinWhatsAppNotificationInput = {
   mainGuest: MainGuest;
   reservationSnapshot?: Reservation | null;
   checkinRecordId?: string | null;
+  extraFields?: Record<string, unknown> | null;
 };
 
 function resolveGuestWhatsAppNumber(mainGuest: MainGuest): string | null {
@@ -56,11 +57,19 @@ export async function sendCheckinWhatsAppNotification(
     return { sent: false, skipped: "missing_reservation_snapshot" };
   }
 
+  const { normalizeBedPreference, bedPreferenceLabel } = await import("@/lib/bed-preference");
+  const { resolveReservationRoomCapacity } = await import("@/lib/establishment-settings");
+  const bedPreference = normalizeBedPreference(input.extraFields?.bedPreference);
   const variableKeys = settings.whatsappTemplateVariableKeys ?? [];
   const context = buildWhatsAppNotifyVariableContext(
     reservation,
     input.mainGuest,
     settings.usefulInfoItems,
+    "pt-BR",
+    {
+      bedPreferenceLabel: bedPreferenceLabel(bedPreference, "pt-BR"),
+      roomCapacity: resolveReservationRoomCapacity(reservation),
+    },
   );
 
   const expectedCount = Math.max(
@@ -107,6 +116,98 @@ export async function sendCheckinWhatsAppNotification(
   return { sent: true };
 }
 
+export async function sendCheckinGovernanceWhatsAppNotification(
+  input: SendCheckinWhatsAppNotificationInput,
+): Promise<{ sent: boolean; skipped?: string; error?: string; sentCount?: number }> {
+  const { loadEstablishmentSettingsRow } = await import("@/lib/establishment-settings.server");
+  const settingsRow = await loadEstablishmentSettingsRow(input.establishmentId);
+  const settings = parseEstablishmentSettings(settingsRow?.settings ?? null);
+
+  if (!settings.whatsappGovernanceNotifyEnabled) {
+    return { sent: false, skipped: "disabled" };
+  }
+  if (!settings.whatsappGovernanceTemplateId?.trim()) {
+    return { sent: false, skipped: "missing_template" };
+  }
+  if (settings.whatsappGovernancePhones.length === 0) {
+    return { sent: false, skipped: "missing_phones" };
+  }
+
+  const config = await resolveWhatsAppChatConfigForTenant(input.tenantId);
+  if (!config) {
+    return { sent: false, skipped: "missing_credentials" };
+  }
+
+  const reservation = input.reservationSnapshot ?? null;
+  if (!reservation) {
+    return { sent: false, skipped: "missing_reservation_snapshot" };
+  }
+
+  const { normalizeBedPreference, bedPreferenceLabel } = await import("@/lib/bed-preference");
+  const { resolveReservationRoomCapacity } = await import("@/lib/establishment-settings");
+  const bedPreference = normalizeBedPreference(input.extraFields?.bedPreference);
+  const variableKeys = settings.whatsappGovernanceTemplateVariableKeys ?? [];
+  const context = buildWhatsAppNotifyVariableContext(
+    reservation,
+    input.mainGuest,
+    settings.usefulInfoItems,
+    "pt-BR",
+    {
+      bedPreferenceLabel: bedPreferenceLabel(bedPreference, "pt-BR"),
+      roomCapacity: resolveReservationRoomCapacity(reservation),
+    },
+  );
+  const expectedCount = Math.max(
+    settings.whatsappGovernanceTemplateVariableCount ?? 0,
+    variableKeys.length,
+  );
+  const bodyParameters = buildWhatsAppBodyParameters(variableKeys, context, expectedCount);
+
+  let sentCount = 0;
+  let lastError: string | undefined;
+  for (const to of settings.whatsappGovernancePhones) {
+    const result = await sendWhatsAppTemplateMessage({
+      config,
+      to,
+      templateId: settings.whatsappGovernanceTemplateId.trim(),
+      bodyParameters,
+      sendToWA: settings.whatsappGovernanceSendToWa,
+      inboxType: settings.whatsappGovernanceInboxType,
+    });
+
+    await writeAuditLog({
+      tenantId: input.tenantId,
+      action: result.ok ? "whatsapp.governance.sent" : "whatsapp.governance.failed",
+      entityType: "checkin_records",
+      entityId: input.checkinRecordId ?? input.localizer,
+      newData: {
+        establishmentId: input.establishmentId,
+        localizer: input.localizer,
+        to,
+        templateId: settings.whatsappGovernanceTemplateId,
+        bedPreference,
+        status: result.status,
+        error: result.error ?? null,
+      },
+    });
+
+    if (result.ok) {
+      sentCount += 1;
+      console.info(
+        `[whatsapp] Governança: template enviado para ${to} (localizador ${input.localizer})`,
+      );
+    } else {
+      lastError = result.error;
+      console.error("[whatsapp] Governança: falha ao enviar:", result.error, result.payload);
+    }
+  }
+
+  if (sentCount === 0) {
+    return { sent: false, error: lastError ?? "Nenhum envio de governança concluído." };
+  }
+  return { sent: true, sentCount };
+}
+
 export function sanitizeWhatsAppTemplateVariableKeys(
   value: unknown,
 ): WhatsAppTemplateVariableKey[] {
@@ -140,6 +241,8 @@ export function sanitizeWhatsAppTemplateVariableKeys(
     "resumo_wifi",
     "resumo_instrucoes",
     "informacoes_checkin",
+    "preferencia_cama",
+    "capacidade_quarto",
   ]);
 
   return value
