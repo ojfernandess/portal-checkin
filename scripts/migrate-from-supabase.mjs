@@ -1,19 +1,12 @@
 /**
  * Copy data from a Supabase Postgres (source) into the self-hosted schema (target).
  *
- * Prerequisites:
- *   1. Target schema already applied: DATABASE_URL=... npm run db:migrate
- *   2. SUPABASE_DATABASE_URL = direct Postgres URI from Supabase
- *      (Project Settings → Database → Connection string → URI, prefer "Session" / direct :5432)
- *   3. DATABASE_URL = target Postgres
- *
- * Usage:
- *   SUPABASE_DATABASE_URL=... DATABASE_URL=... npm run db:migrate-from-supabase
- *
- * Optional:
- *   MIGRATE_DRY_RUN=1          — count/read only, no writes
- *   MIGRATE_SKIP_RATE_LIMIT=1  — skip rate_limit_buckets
- *   MIGRATE_TRUNCATE=1         — truncate target tables before import (destructive)
+ * Optional env:
+ *   MIGRATE_DRY_RUN=1
+ *   MIGRATE_TRUNCATE=1
+ *   MIGRATE_INCLUDE_AUDIT=1     — include audit_logs (off by default; jsonb noise / not needed for admin)
+ *   MIGRATE_INCLUDE_RATE_LIMIT=1 — include rate_limit_buckets (off by default)
+ *   MIGRATE_SKIP_RATE_LIMIT=1    — legacy alias (same as default skip)
  */
 import crypto from "node:crypto";
 import bcrypt from "bcryptjs";
@@ -22,10 +15,12 @@ import pg from "pg";
 const sourceUrl = process.env.SUPABASE_DATABASE_URL?.trim();
 const targetUrl = process.env.DATABASE_URL?.trim();
 const dryRun = process.env.MIGRATE_DRY_RUN === "1";
-const skipRateLimit = process.env.MIGRATE_SKIP_RATE_LIMIT === "1";
 const truncateFirst = process.env.MIGRATE_TRUNCATE === "1";
+const includeAudit = process.env.MIGRATE_INCLUDE_AUDIT === "1";
+const includeRateLimit =
+  process.env.MIGRATE_INCLUDE_RATE_LIMIT === "1" &&
+  process.env.MIGRATE_SKIP_RATE_LIMIT !== "1";
 
-/** Real bcrypt hash of random bytes; login fails until password is reset. */
 function unusablePasswordHash() {
   return bcrypt.hashSync(crypto.randomBytes(32).toString("hex"), 12);
 }
@@ -39,7 +34,6 @@ if (!targetUrl) {
   process.exit(1);
 }
 
-/** Business tables copied as-is (public schema), in FK-safe order (after auth_users). */
 function businessTables() {
   const tables = [
     "tenants",
@@ -63,9 +57,11 @@ function businessTables() {
     "guest_portal_photos",
     "face_validation_logs",
     "app_settings",
-    "audit_logs",
   ];
-  if (!skipRateLimit) tables.push("rate_limit_buckets");
+  if (includeAudit) tables.push("audit_logs");
+  else console.log("Skipping audit_logs (set MIGRATE_INCLUDE_AUDIT=1 to import)");
+  if (includeRateLimit) tables.push("rate_limit_buckets");
+  else console.log("Skipping rate_limit_buckets (set MIGRATE_INCLUDE_RATE_LIMIT=1 to import)");
   return tables;
 }
 
@@ -93,7 +89,6 @@ const TRUNCATE_ORDER = [
   "profiles",
   "auth_users",
   "tenants",
-  // keep platform_integrations seed rows unless truncating everything
   "platform_integrations",
 ];
 
@@ -106,15 +101,18 @@ async function tableExists(client, schema, table) {
   return rows.length > 0;
 }
 
-async function getColumns(client, schema, table) {
+async function getColumnMeta(client, schema, table) {
   const { rows } = await client.query(
-    `SELECT column_name
+    `SELECT column_name, data_type, udt_name
      FROM information_schema.columns
      WHERE table_schema = $1 AND table_name = $2
      ORDER BY ordinal_position`,
     [schema, table],
   );
-  return rows.map((r) => r.column_name);
+  return rows.map((r) => ({
+    name: r.column_name,
+    isJson: r.data_type === "json" || r.data_type === "jsonb" || r.udt_name === "json" || r.udt_name === "jsonb",
+  }));
 }
 
 function quoteIdent(name) {
@@ -122,6 +120,31 @@ function quoteIdent(name) {
     throw new Error(`Invalid identifier: ${name}`);
   }
   return `"${name}"`;
+}
+
+/** Ensure jsonb/json params are valid JSON text for Postgres. */
+function normalizeParam(value, isJson) {
+  if (!isJson) return value;
+  if (value === null || value === undefined) return null;
+  if (Buffer.isBuffer(value)) {
+    return normalizeParam(value.toString("utf8"), true);
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    try {
+      return JSON.stringify(JSON.parse(trimmed));
+    } catch {
+      // Store as a JSON string scalar if it was not valid JSON text
+      return JSON.stringify(value);
+    }
+  }
+  // objects / arrays / numbers / booleans from node-pg jsonb parser
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return null;
+  }
 }
 
 async function copyTable(source, target, table) {
@@ -136,14 +159,16 @@ async function copyTable(source, target, table) {
     return { table, copied: 0, skipped: true };
   }
 
-  const sourceCols = await getColumns(source, "public", table);
-  const targetCols = new Set(await getColumns(target, "public", table));
-  const cols = sourceCols.filter((c) => targetCols.has(c));
+  const targetMeta = await getColumnMeta(target, "public", table);
+  const targetByName = new Map(targetMeta.map((c) => [c.name, c]));
+  const sourceMeta = await getColumnMeta(source, "public", table);
+  const cols = sourceMeta.map((c) => c.name).filter((name) => targetByName.has(name));
   if (cols.length === 0) {
     console.log(`  skip ${table} (no overlapping columns)`);
     return { table, copied: 0, skipped: true };
   }
 
+  const jsonFlags = cols.map((name) => Boolean(targetByName.get(name)?.isJson));
   const colList = cols.map(quoteIdent).join(", ");
   const { rows } = await source.query(`SELECT ${colList} FROM public.${quoteIdent(table)}`);
   console.log(`  ${table}: ${rows.length} row(s)`);
@@ -152,31 +177,43 @@ async function copyTable(source, target, table) {
     return { table, copied: rows.length, skipped: dryRun };
   }
 
-  const placeholders = cols.map((_, i) => `$${i + 1}`).join(", ");
+  const placeholders = cols
+    .map((_, i) => (jsonFlags[i] ? `$${i + 1}::jsonb` : `$${i + 1}`))
+    .join(", ");
   const sql = `INSERT INTO public.${quoteIdent(table)} (${colList})
                VALUES (${placeholders})
                ON CONFLICT DO NOTHING`;
 
+  // Commit per table so later noisy tables cannot roll back users/establishments.
+  await target.query("BEGIN");
   let copied = 0;
   let failed = 0;
-  for (const row of rows) {
-    const values = cols.map((c) => row[c]);
-    try {
-      await target.query("SAVEPOINT row_sp");
-      await target.query(sql, values);
-      await target.query("RELEASE SAVEPOINT row_sp");
-      copied += 1;
-    } catch (error) {
-      failed += 1;
-      await target.query("ROLLBACK TO SAVEPOINT row_sp").catch(() => {});
-      if (failed <= 5) {
-        console.warn(
-          `  ${table}: row insert failed: ${error instanceof Error ? error.message : error}`,
-        );
+  try {
+    for (const row of rows) {
+      const values = cols.map((name, i) => normalizeParam(row[name], jsonFlags[i]));
+      try {
+        await target.query("SAVEPOINT row_sp");
+        await target.query(sql, values);
+        await target.query("RELEASE SAVEPOINT row_sp");
+        copied += 1;
+      } catch (error) {
+        failed += 1;
+        await target.query("ROLLBACK TO SAVEPOINT row_sp").catch(() => {});
+        if (failed <= 3) {
+          console.warn(
+            `  ${table}: row insert failed: ${error instanceof Error ? error.message : error}`,
+          );
+        }
       }
     }
+    await target.query("COMMIT");
+  } catch (error) {
+    await target.query("ROLLBACK").catch(() => {});
+    throw error;
   }
+
   if (failed > 0) console.warn(`  ${table}: ${copied} ok, ${failed} failed`);
+  else console.log(`  ${table}: ${copied} inserted`);
   return { table, copied, skipped: false, failed };
 }
 
@@ -185,7 +222,7 @@ async function migrateAuthUsers(source, target) {
   const hasAuth = await tableExists(source, "auth", "users");
   if (!hasAuth) {
     console.error(
-      "  FATAL: auth.users not found/accessible. Use the Postgres URI as role postgres (Database → Connection string), not the API URL.",
+      "  FATAL: auth.users not found/accessible. Use the Postgres URI as role postgres (Database → Connection string).",
     );
     throw new Error("Cannot read auth.users on SUPABASE_DATABASE_URL");
   }
@@ -193,24 +230,24 @@ async function migrateAuthUsers(source, target) {
   let rows;
   try {
     const result = await source.query(`
-    SELECT
-      id,
-      lower(email) AS email,
-      encrypted_password,
-      coalesce(
-        nullif(raw_user_meta_data->>'full_name', ''),
-        nullif(raw_user_meta_data->>'name', ''),
-        nullif(raw_user_meta_data->>'fullName', '')
-      ) AS full_name,
-      created_at,
-      updated_at
-    FROM auth.users
-    WHERE email IS NOT NULL AND email <> ''
-  `);
+      SELECT
+        id,
+        lower(email) AS email,
+        encrypted_password,
+        coalesce(
+          nullif(raw_user_meta_data->>'full_name', ''),
+          nullif(raw_user_meta_data->>'name', ''),
+          nullif(raw_user_meta_data->>'fullName', '')
+        ) AS full_name,
+        created_at,
+        updated_at
+      FROM auth.users
+      WHERE email IS NOT NULL AND email <> ''
+    `);
     rows = result.rows;
   } catch (error) {
     console.error(
-      "  FATAL: failed to SELECT auth.users — connection user likely lacks access to schema auth.",
+      "  FATAL: failed to SELECT auth.users:",
       error instanceof Error ? error.message : error,
     );
     throw error;
@@ -226,7 +263,7 @@ async function migrateAuthUsers(source, target) {
     if (!passwordHash) {
       withoutPassword += 1;
       passwordHash = unusablePasswordHash();
-      console.warn(`  ${row.email}: sem senha no Supabase — importado com hash inválido (precisa redefinir senha)`);
+      console.warn(`  ${row.email}: sem senha no Supabase — hash placeholder`);
     }
     if (dryRun) {
       copied += 1;
@@ -279,9 +316,9 @@ async function main() {
 
   try {
     console.log(dryRun ? "DRY RUN — no writes on target" : "Starting Supabase → Postgres migration");
-    const srcProfiles = await source.query(
-      `SELECT COUNT(*)::int AS n FROM public.profiles`,
-    ).catch(() => ({ rows: [{ n: -1 }] }));
+    const srcProfiles = await source
+      .query(`SELECT COUNT(*)::int AS n FROM public.profiles`)
+      .catch(() => ({ rows: [{ n: -1 }] }));
     console.log(`Source public.profiles count: ${srcProfiles.rows[0]?.n}`);
 
     if (truncateFirst && !dryRun) {
@@ -303,21 +340,13 @@ async function main() {
 
     await migrateAuthUsers(source, target);
 
-    if (!dryRun) await target.query("BEGIN");
-    try {
-      for (const table of businessTables()) {
-        await copyTable(source, target, table);
-      }
-      if (!dryRun) {
-        await syncTenantSequence(target);
-        await target.query("COMMIT");
-      }
-    } catch (error) {
-      if (!dryRun) await target.query("ROLLBACK");
-      throw error;
+    for (const table of businessTables()) {
+      await copyTable(source, target, table);
     }
+    await syncTenantSequence(target);
 
-    console.log("Done.");
+    const { rows } = await target.query(`SELECT COUNT(*)::int AS n FROM public.profiles`);
+    console.log(`Done. Target profiles count: ${rows[0]?.n ?? 0}`);
     console.log("Next: log in with an existing staff email/password (hashes reused from Supabase Auth).");
   } finally {
     await source.end().catch(() => {});

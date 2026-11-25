@@ -90,7 +90,8 @@ Opcionais:
 | `MIGRATE_DRY_RUN=1` | Só lê/conta; **não grava**. No boot o entrypoint **ignora** isso (senão o painel fica em bootstrap). Use só em teste manual. |
 | `MIGRATE_ALLOW_DRY_RUN_ON_BOOT=1` | Permite dry-run também no boot (não use em sandbox/prod) |
 | `MIGRATE_TRUNCATE=1` | Apaga tabelas do destino antes de importar (**destrutivo**) |
-| `MIGRATE_SKIP_RATE_LIMIT=1` | Não copia `rate_limit_buckets` |
+| `MIGRATE_INCLUDE_AUDIT=1` | Importa `audit_logs` (off por padrão — erros de jsonb e volume grande) |
+| `MIGRATE_INCLUDE_RATE_LIMIT=1` | Importa `rate_limit_buckets` (off por padrão) |
 
 ## 4) Dry-run (recomendado)
 
