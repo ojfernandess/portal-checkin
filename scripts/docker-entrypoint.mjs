@@ -120,13 +120,28 @@ async function main() {
       } else {
         console.log("[entrypoint] MIGRATE_FROM_SUPABASE_ON_BOOT=1 — re-importing…");
       }
-      await runNode("scripts/migrate-from-supabase.mjs");
+
+      // EasyPanel often leaves MIGRATE_DRY_RUN=1 from a test — that counts rows but writes nothing.
+      // Real boot import always disables dry-run unless MIGRATE_ALLOW_DRY_RUN_ON_BOOT=1.
+      const allowDryRun = process.env.MIGRATE_ALLOW_DRY_RUN_ON_BOOT === "1";
+      const importEnv = {
+        ...process.env,
+        MIGRATE_DRY_RUN: allowDryRun && process.env.MIGRATE_DRY_RUN === "1" ? "1" : "0",
+      };
+      if (process.env.MIGRATE_DRY_RUN === "1" && importEnv.MIGRATE_DRY_RUN === "0") {
+        console.warn(
+          "[entrypoint] MIGRATE_DRY_RUN=1 was set but ignored on boot import (would leave profiles empty). Set MIGRATE_ALLOW_DRY_RUN_ON_BOOT=1 to keep dry-run.",
+        );
+      }
+
+      await runNode("scripts/migrate-from-supabase.mjs", importEnv);
       const after = await countProfiles(databaseUrl);
       console.log(`[entrypoint] Import finished. profiles now=${after}`);
       if (after === 0) {
         console.error(
-          "[entrypoint] WARNING: profiles still 0. Likely wrong SUPABASE_DATABASE_URL or no access to auth.users / public.profiles on source.",
+          "[entrypoint] ERROR: profiles still 0 after import. Check logs for DRY RUN, SUPABASE_DATABASE_URL, or row failures.",
         );
+        process.exit(1);
       }
     } else {
       console.log("[entrypoint] Skipping Supabase import (DB already has profiles, or MIGRATE_SKIP_IF_EMPTY=1).");

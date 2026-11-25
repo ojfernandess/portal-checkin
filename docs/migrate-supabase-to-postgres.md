@@ -87,7 +87,8 @@ Opcionais:
 | Variável | Efeito |
 |----------|--------|
 | `MIGRATE_FROM_SUPABASE_ON_BOOT=1` | Roda o import ao subir o container |
-| `MIGRATE_DRY_RUN=1` | Só lê/conta; não grava no destino |
+| `MIGRATE_DRY_RUN=1` | Só lê/conta; **não grava**. No boot o entrypoint **ignora** isso (senão o painel fica em bootstrap). Use só em teste manual. |
+| `MIGRATE_ALLOW_DRY_RUN_ON_BOOT=1` | Permite dry-run também no boot (não use em sandbox/prod) |
 | `MIGRATE_TRUNCATE=1` | Apaga tabelas do destino antes de importar (**destrutivo**) |
 | `MIGRATE_SKIP_RATE_LIMIT=1` | Não copia `rate_limit_buckets` |
 
