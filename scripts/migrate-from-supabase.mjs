@@ -158,23 +158,41 @@ async function copyTable(source, target, table) {
                ON CONFLICT DO NOTHING`;
 
   let copied = 0;
+  let failed = 0;
   for (const row of rows) {
     const values = cols.map((c) => row[c]);
-    await target.query(sql, values);
-    copied += 1;
+    try {
+      await target.query("SAVEPOINT row_sp");
+      await target.query(sql, values);
+      await target.query("RELEASE SAVEPOINT row_sp");
+      copied += 1;
+    } catch (error) {
+      failed += 1;
+      await target.query("ROLLBACK TO SAVEPOINT row_sp").catch(() => {});
+      if (failed <= 5) {
+        console.warn(
+          `  ${table}: row insert failed: ${error instanceof Error ? error.message : error}`,
+        );
+      }
+    }
   }
-  return { table, copied, skipped: false };
+  if (failed > 0) console.warn(`  ${table}: ${copied} ok, ${failed} failed`);
+  return { table, copied, skipped: false, failed };
 }
 
 async function migrateAuthUsers(source, target) {
   console.log("Migrating auth.users → auth_users …");
   const hasAuth = await tableExists(source, "auth", "users");
   if (!hasAuth) {
-    console.warn("  auth.users not found — staff passwords will not be imported.");
-    return { copied: 0, withoutPassword: 0 };
+    console.error(
+      "  FATAL: auth.users not found/accessible. Use the Postgres URI as role postgres (Database → Connection string), not the API URL.",
+    );
+    throw new Error("Cannot read auth.users on SUPABASE_DATABASE_URL");
   }
 
-  const { rows } = await source.query(`
+  let rows;
+  try {
+    const result = await source.query(`
     SELECT
       id,
       lower(email) AS email,
@@ -189,6 +207,16 @@ async function migrateAuthUsers(source, target) {
     FROM auth.users
     WHERE email IS NOT NULL AND email <> ''
   `);
+    rows = result.rows;
+  } catch (error) {
+    console.error(
+      "  FATAL: failed to SELECT auth.users — connection user likely lacks access to schema auth.",
+      error instanceof Error ? error.message : error,
+    );
+    throw error;
+  }
+
+  console.log(`  source auth.users with email: ${rows.length}`);
 
   let copied = 0;
   let withoutPassword = 0;
@@ -236,6 +264,13 @@ async function syncTenantSequence(target) {
 }
 
 async function main() {
+  if (!/^postgres(ql)?:\/\//i.test(sourceUrl)) {
+    console.error(
+      "SUPABASE_DATABASE_URL must be postgresql://... (Database connection string), not https://xxx.supabase.co",
+    );
+    process.exit(1);
+  }
+
   const source = new pg.Client({ connectionString: sourceUrl, ssl: { rejectUnauthorized: false } });
   const target = new pg.Client({ connectionString: targetUrl });
 
@@ -244,6 +279,10 @@ async function main() {
 
   try {
     console.log(dryRun ? "DRY RUN — no writes on target" : "Starting Supabase → Postgres migration");
+    const srcProfiles = await source.query(
+      `SELECT COUNT(*)::int AS n FROM public.profiles`,
+    ).catch(() => ({ rows: [{ n: -1 }] }));
+    console.log(`Source public.profiles count: ${srcProfiles.rows[0]?.n}`);
 
     if (truncateFirst && !dryRun) {
       console.log("Truncating target tables …");

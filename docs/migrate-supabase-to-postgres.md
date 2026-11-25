@@ -49,23 +49,32 @@ SUPABASE_DATABASE_URL="postgresql://postgres....@...:5432/postgres"
 DATABASE_URL="postgresql://welcome:SENHA@HOST:5432/welcome_inn"
 ```
 
-### Importante: só colocar na env **não** importa
+### Por que aparece “criar administrador”?
 
-`SUPABASE_DATABASE_URL` sozinha não faz nada no deploy. É preciso **uma** destas opções:
+A tela de bootstrap só aparece se `profiles` no Postgres destino está **vazio**. Isso significa que o dump **não** importou usuários (ou nem rodou).
 
-**A) EasyPanel / Docker (recomendado uma vez)** — no Environment do serviço `welcome-inn`:
+### EasyPanel / Docker
+
+No Environment do `welcome-inn`:
 
 ```env
-DATABASE_URL=postgresql://welcome:SENHA@postgres:5432/welcome_inn
-SUPABASE_DATABASE_URL=postgresql://postgres....@...:5432/postgres
-MIGRATE_FROM_SUPABASE_ON_BOOT=1
+POSTGRES_USER=welcome
+POSTGRES_PASSWORD=SenhaForte
+POSTGRES_DB=welcome_inn
+SUPABASE_DATABASE_URL=postgresql://postgres.[REF]:SENHA@aws-0-....pooler.supabase.com:5432/postgres
 ```
 
-1. Redeploy e abra os **logs** do container `welcome-inn`.
-2. Procure: `Importing data from Supabase…`, contagens por tabela, e `Done.`
-3. Depois do sucesso, mude para `MIGRATE_FROM_SUPABASE_ON_BOOT=0` (evita reimport em todo restart).
+- Com `SUPABASE_DATABASE_URL` setada e `profiles = 0`, o boot **importa automaticamente**.
+- `MIGRATE_FROM_SUPABASE_ON_BOOT=1` força reimport mesmo com dados.
+- `MIGRATE_SKIP_IF_EMPTY=1` desliga o auto-import.
+- `MIGRATE_TRUNCATE=1` apaga tabelas do destino antes (destrutivo).
 
-O entrypoint sempre roda `db:migrate` (schema). O dump de dados só roda com a flag `=1`.
+1. Redeploy e abra logs do **`welcome-inn`**.
+2. Procure: `profiles empty — importing`, `auth_users: N imported`, `profiles: N row(s)`, `Done.`, `profiles now=N`.
+3. Se `profiles now=0`, a URI do Supabase está errada ou sem acesso a `auth.users`.
+
+**URI correta:** Project Settings → **Database** → Connection string → **URI** (porta 5432 Session).  
+**URI errada:** `https://xxx.supabase.co` ou chave `anon` / `service_role`.
 
 **B) Manual** (máquina com acesso aos dois bancos):
 
