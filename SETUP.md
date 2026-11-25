@@ -165,26 +165,41 @@ Não commite `.env` — configure tudo no painel do EasyPanel.
 
 ### Domínios (check-in vs admin)
 
-Dois domínios apontam para o **mesmo** app Docker (porta 3000):
+Dois hosts apontam para o **mesmo** serviço `welcome-inn` (porta interna 3000). O app redireciona por path conforme as envs.
+
+#### Sandbox (agora)
+
+No EasyPanel → Environment:
+
+```env
+PUBLIC_CHECKIN_ORIGIN=https://meucheckin.audaar.com.br
+ADMIN_PANEL_ORIGIN=https://meucheckin.techospitality.com
+```
 
 | Domínio | Uso |
 |---------|-----|
-| `checkin.audaar.com.br` | Portal do hóspede (`/`, `/LOCALIZADOR`) |
-| `checkin.techospitality.com` | Login e painel (`/auth`, `/admin/*`) |
+| `meucheckin.audaar.com.br` | Portal do hóspede (`/`, `/LOCALIZADOR`) |
+| `meucheckin.techospitality.com` | Login e painel (`/auth`, `/admin/*`, `/platform/*`) |
 
-Variáveis de runtime (opcional — há defaults):
+1. DNS: CNAME/A dos dois hosts → IP/proxy do EasyPanel  
+2. EasyPanel: cadastre **os dois** domínios no mesmo app/serviço  
+3. Salve as envs e **reinicie** o `welcome-inn` (não precisa rebuild só por mudar domínio)  
+4. Remova redirect global no proxy entre esses hosts — o app faz:
+   - `meucheckin.techospitality.com/` → portal audaar  
+   - `meucheckin.audaar.com.br/auth` ou `/admin` → painel techospitality  
+
+#### Produção (depois)
+
+Só troque as envs e os domínios no EasyPanel (mesmo app):
 
 ```env
 PUBLIC_CHECKIN_ORIGIN=https://checkin.audaar.com.br
 ADMIN_PANEL_ORIGIN=https://checkin.techospitality.com
 ```
 
-**No EasyPanel:** cadastre os dois domínios no mesmo serviço. **Remova** redirecionamentos globais no proxy (ex.: techospitality → audaar para todas as rotas). O app faz o redirect por path:
+Cadastre/ative os hosts de produção no serviço, DNS apontando igual, reinicie o container. Código e imagem permanecem os mesmos.
 
-- `checkin.techospitality.com/` → `checkin.audaar.com.br/`
-- `checkin.audaar.com.br/auth` ou `/admin` → `checkin.techospitality.com` (mesmo path)
-
-Se o proxy redirecionar antes do Node, `/auth` no domínio audaar nunca chega à aplicação e o painel não abre no domínio correto.
+Se o proxy redirecionar antes do Node, `/auth` no domínio audaar nunca chega à aplicação.
 
 ### Variáveis de runtime
 

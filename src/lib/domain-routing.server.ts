@@ -1,15 +1,17 @@
 /**
- * Separação de domínios:
- * - checkin.audaar.com.br → portal público de check-in (/, /LOCALIZADOR)
- * - checkin.techospitality.com → login e painel admin (/auth, /admin/*)
+ * Separação de domínios (via env):
+ * - PUBLIC_CHECKIN_ORIGIN → portal público (/, /LOCALIZADOR)
+ * - ADMIN_PANEL_ORIGIN → login e painel (/auth, /admin/*, /platform/*)
  *
- * Configure PUBLIC_CHECKIN_ORIGIN e ADMIN_PANEL_ORIGIN no EasyPanel.
+ * Sandbox: meucheckin.audaar.com.br / meucheckin.techospitality.com
+ * Produção: checkin.audaar.com.br / checkin.techospitality.com
+ *
  * Remova redirecionamentos de domínio no proxy — ambos os hosts devem apontar
  * para o mesmo serviço; esta camada decide o redirect por path.
  */
 
-const DEFAULT_PUBLIC_ORIGIN = "https://checkin.audaar.com.br";
-const DEFAULT_ADMIN_ORIGIN = "https://checkin.techospitality.com";
+const DEFAULT_PUBLIC_ORIGIN = "https://meucheckin.audaar.com.br";
+const DEFAULT_ADMIN_ORIGIN = "https://meucheckin.techospitality.com";
 
 const STATIC_PATH =
   /\.(?:css|js|mjs|map|png|jpe?g|gif|webp|svg|ico|woff2?|ttf|txt|xml|json)$/i;
