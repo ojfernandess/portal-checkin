@@ -8,6 +8,8 @@ services:
       default:
         aliases:
           - db
+    entrypoint: ["/bin/sh", "/postgres-docker-entrypoint.sh"]
+    command: ["postgres"]
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-welcome}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-welcome}
@@ -18,11 +20,18 @@ services:
       - "5432"
     volumes:
       - welcome_inn_pg:/var/lib/postgresql/data
+      - ./scripts/postgres-docker-entrypoint.sh:/postgres-docker-entrypoint.sh:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-welcome} -d ${POSTGRES_DB:-welcome_inn}"]
+      # Wait until password was synced to POSTGRES_PASSWORD (see postgres-docker-entrypoint.sh)
+      test:
+        [
+          "CMD-SHELL",
+          "test -f /tmp/postgres-password-synced && pg_isready -U $${POSTGRES_USER:-welcome} -d $${POSTGRES_DB:-welcome_inn}",
+        ]
       interval: 5s
       timeout: 5s
-      retries: 10
+      retries: 20
+      start_period: 10s
 
   welcome-inn:
     build:
@@ -42,9 +51,13 @@ services:
       PORT: 3000
       NITRO_HOST: 0.0.0.0
       NITRO_PORT: 3000
-      # Password in this URL MUST match POSTGRES_PASSWORD used when the volume was first created.
-      # Changing POSTGRES_PASSWORD later does NOT update the existing volume.
-      DATABASE_URL: ${DATABASE_URL:-postgresql://welcome:welcome@postgres:5432/welcome_inn}
+      # App builds DATABASE_URL from these (password synced into the volume on every Postgres start).
+      POSTGRES_USER: ${POSTGRES_USER:-welcome}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-welcome}
+      POSTGRES_DB: ${POSTGRES_DB:-welcome_inn}
+      POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+      # Optional override; ignored when POSTGRES_PASSWORD is set (entrypoint rebuilds the URL).
+      DATABASE_URL: ${DATABASE_URL:-}
       AUTH_JWT_SECRET: ${AUTH_JWT_SECRET}
       AUTH_JWT_TTL: ${AUTH_JWT_TTL:-7d}
       # One-shot data import on container start (set to 0 after first successful migrate)

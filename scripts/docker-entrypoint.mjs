@@ -1,21 +1,42 @@
 /**
  * Container entrypoint:
- * 1) Always apply schema migrations (idempotent).
- * 2) Optionally import from Supabase when MIGRATE_FROM_SUPABASE_ON_BOOT=1.
- * 3) Start the Nitro server.
- *
- * Env for data import:
- *   MIGRATE_FROM_SUPABASE_ON_BOOT=1
- *   SUPABASE_DATABASE_URL=postgresql://...
- *   DATABASE_URL=postgresql://...   (already required by the app)
- *
- * Optional: MIGRATE_TRUNCATE=1, MIGRATE_DRY_RUN=1 (dry-run then still starts server)
+ * 1) Resolve DATABASE_URL from POSTGRES_* (avoids EasyPanel URL/password drift).
+ * 2) Apply schema migrations (idempotent), with retries while Postgres syncs password.
+ * 3) Optionally import from Supabase when MIGRATE_FROM_SUPABASE_ON_BOOT=1.
+ * 4) Start the Nitro server.
  */
 import { spawn } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { setTimeout as sleep } from "node:timers/promises";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+
+function resolveDatabaseUrl() {
+  const password = process.env.POSTGRES_PASSWORD?.trim();
+  const user = (process.env.POSTGRES_USER?.trim() || "welcome");
+  const db = (process.env.POSTGRES_DB?.trim() || "welcome_inn");
+  const host = (process.env.POSTGRES_HOST?.trim() || "postgres");
+  const port = (process.env.POSTGRES_PORT?.trim() || "5432");
+
+  // Prefer POSTGRES_* so DATABASE_URL cannot drift from the password Postgres syncs on boot.
+  if (password) {
+    const url = `postgresql://${encodeURIComponent(user)}:${encodeURIComponent(password)}@${host}:${port}/${encodeURIComponent(db)}`;
+    process.env.DATABASE_URL = url;
+    console.log(
+      `[entrypoint] DATABASE_URL built from POSTGRES_* → postgresql://${user}:***@${host}:${port}/${db}`,
+    );
+    return url;
+  }
+
+  const existing = process.env.DATABASE_URL?.trim();
+  if (!existing) {
+    throw new Error(
+      "Missing DATABASE_URL (or set POSTGRES_PASSWORD + POSTGRES_USER + POSTGRES_DB).",
+    );
+  }
+  return existing;
+}
 
 function runNode(scriptRel, env = process.env) {
   return new Promise((resolve, reject) => {
@@ -32,14 +53,28 @@ function runNode(scriptRel, env = process.env) {
   });
 }
 
-async function main() {
-  if (!process.env.DATABASE_URL?.trim()) {
-    console.error("[entrypoint] Missing DATABASE_URL — cannot migrate or start.");
-    process.exit(1);
+async function migrateWithRetry(attempts = 30, delayMs = 2000) {
+  let lastError;
+  for (let i = 1; i <= attempts; i += 1) {
+    try {
+      console.log(`[entrypoint] Applying schema migrations (attempt ${i}/${attempts})…`);
+      await runNode("scripts/db-migrate.mjs");
+      return;
+    } catch (error) {
+      lastError = error;
+      console.warn(
+        `[entrypoint] migrate failed (attempt ${i}/${attempts}): ${error instanceof Error ? error.message : error}`,
+      );
+      if (i < attempts) await sleep(delayMs);
+    }
   }
+  throw lastError;
+}
 
-  console.log("[entrypoint] Applying schema migrations…");
-  await runNode("scripts/db-migrate.mjs");
+async function main() {
+  resolveDatabaseUrl();
+
+  await migrateWithRetry();
 
   const importOnBoot = process.env.MIGRATE_FROM_SUPABASE_ON_BOOT === "1";
   const supabaseUrl = process.env.SUPABASE_DATABASE_URL?.trim();

@@ -159,7 +159,7 @@ App em `http://localhost:3000`.
 
 O container aplica o schema no start (`db:migrate`). Em produção defina `POSTGRES_PASSWORD` e `AUTH_JWT_SECRET` fortes.
 
-**Senha do Postgres:** `POSTGRES_PASSWORD` e a senha dentro de `DATABASE_URL` precisam ser **iguais**. O Postgres só grava a senha na **primeira** criação do volume; se mudar a env depois, aparece `password authentication failed for user "welcome"`. Solução: alinhar a senha na `DATABASE_URL` à senha original, **ou** apagar o volume `welcome_inn_pg` e redeploy (banco zerado).
+**Senha do Postgres:** defina só `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB`. No boot, o Postgres **sincroniza** a senha do role com `POSTGRES_PASSWORD` (sem precisar apagar o volume), e o app monta o `DATABASE_URL` a partir dessas variáveis.
 
 Não commite `.env` — configure tudo no painel do EasyPanel.
 
