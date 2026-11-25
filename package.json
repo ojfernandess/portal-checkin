@@ -17,6 +17,7 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "db:migrate": "node scripts/db-migrate.mjs",
+    "db:migrate-from-supabase": "node scripts/migrate-from-supabase.mjs",
     "test": "node --experimental-strip-types --test src/lib/face-validation/mapper.test.ts"
   },
   "dependencies": {

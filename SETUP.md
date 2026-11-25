@@ -139,7 +139,7 @@ App em `http://localhost:3000`.
 ### EasyPanel (recomendado)
 
 1. **Novo app** → tipo **Docker Compose** ou **Dockerfile** (repositório Git).
-2. **Repositório:** `https://github.com/ojfernandess/portal-checkin.git`, branch **`main`**.
+2. **Repositório:** `https://github.com/ojfernandess/portal-checkin.git`, branch **`main-backend`** (ou a branch de deploy).
 3. **Porta interna:** `3000` (variáveis `PORT`, `HOST=0.0.0.0`, `NITRO_HOST=0.0.0.0`).
 4. **Build args:**
    - `GIT_COMMIT` — use o SHA do commit (ex.: `$GIT_SHA` do webhook) para forçar rebuild sem cache Docker
@@ -148,7 +148,16 @@ App em `http://localhost:3000`.
    - Postgres / auth: `DATABASE_URL`, `AUTH_JWT_SECRET` (e opcionalmente `AUTH_JWT_TTL`)
    - TecHospitality: `TECHOSPITALITY_BASE_URL`, tokens (`RESERVATIONS`, `HUB`, `CHECKOUTS`, `CREATED`, …)
    - MinIO / AWS S3: `AWS_*` ou `MINIO_*`
-6. **Antes do primeiro start:** aplique o schema (`npm run db:migrate` apontando para o mesmo `DATABASE_URL`).
+6. **Schema + dados:** `npm run db:migrate` e, se for trazer o Supabase, `npm run db:migrate-from-supabase` (ver [docs/migrate-supabase-to-postgres.md](docs/migrate-supabase-to-postgres.md)).
+
+#### O deploy já instala o Postgres?
+
+| Tipo no EasyPanel | Postgres automático? |
+|-------------------|----------------------|
+| **Docker Compose** (`docker-compose.yml`) | **Sim** — sobe o serviço `postgres` + volume persistente |
+| **Dockerfile** apenas | **Não** — só o app Node; crie um Postgres no EasyPanel e configure `DATABASE_URL` |
+
+O container Postgres **não** aplica o schema sozinho. Sempre rode `db:migrate` no destino. Em produção defina `POSTGRES_PASSWORD` e `AUTH_JWT_SECRET` fortes.
 
 Não commite `.env` — configure tudo no painel do EasyPanel.
 
@@ -259,5 +268,6 @@ Fotos        →  s3.server.ts          →  MinIO / S3
 | `npm start` | Sobe o servidor `.output` (após build) |
 | `npm run preview` | Preview Vite (dev) |
 | `npm run db:migrate` | Aplica `db/migrations/*.sql` no Postgres (`DATABASE_URL`) |
+| `npm run db:migrate-from-supabase` | Copia dados do Supabase Postgres → destino (`SUPABASE_DATABASE_URL` + `DATABASE_URL`) |
 | `npm run lint` | ESLint |
 | `npm run format` | Prettier |
