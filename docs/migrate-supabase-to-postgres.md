@@ -164,3 +164,4 @@ Depois rode o script só para auth, ou use o fluxo Node completo (recomendado), 
 | `duplicate key` | Destino não estava vazio; use `MIGRATE_TRUNCATE=1` ou banco limpo |
 | Login falha após migrate | Usuário sem `encrypted_password`; recrie a senha via bootstrap/admin ou crie usuário novo |
 | App sobe mas tabelas vazias | Esqueceu `db:migrate` e/ou `db:migrate-from-supabase` |
+| `password authentication failed for user "welcome"` (destino) | Senha em `DATABASE_URL` ≠ senha gravada no volume. Postgres só aplica `POSTGRES_PASSWORD` na **1ª** criação. Alinhe as duas senhas **ou** apague o volume `welcome_inn_pg` e suba de novo. |

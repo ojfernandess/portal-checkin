@@ -157,7 +157,9 @@ App em `http://localhost:3000`.
 | **Docker Compose** (`docker-compose.yml`) | **Sim** — sobe o serviço `postgres` + volume persistente |
 | **Dockerfile** apenas | **Não** — só o app Node; crie um Postgres no EasyPanel e configure `DATABASE_URL` |
 
-O container Postgres **não** aplica o schema sozinho. Sempre rode `db:migrate` no destino. Em produção defina `POSTGRES_PASSWORD` e `AUTH_JWT_SECRET` fortes.
+O container aplica o schema no start (`db:migrate`). Em produção defina `POSTGRES_PASSWORD` e `AUTH_JWT_SECRET` fortes.
+
+**Senha do Postgres:** `POSTGRES_PASSWORD` e a senha dentro de `DATABASE_URL` precisam ser **iguais**. O Postgres só grava a senha na **primeira** criação do volume; se mudar a env depois, aparece `password authentication failed for user "welcome"`. Solução: alinhar a senha na `DATABASE_URL` à senha original, **ou** apagar o volume `welcome_inn_pg` e redeploy (banco zerado).
 
 Não commite `.env` — configure tudo no painel do EasyPanel.
 
