@@ -1,0 +1,12 @@
+# Copie para docker-compose.override.yml apenas em desenvolvimento local
+# (EasyPanel NÃO deve usar este arquivo — o proxy dele acessa a porta interna 3000).
+#
+#   cp docker-compose.override.example.yml docker-compose.override.yml
+#
+services:
+  welcome-inn:
+    ports:
+      - "3000:3000"
+  postgres:
+    ports:
+      - "5432:5432"

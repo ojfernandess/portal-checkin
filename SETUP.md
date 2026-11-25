@@ -140,7 +140,7 @@ App em `http://localhost:3000`.
 
 1. **Novo app** → tipo **Docker Compose** ou **Dockerfile** (repositório Git).
 2. **Repositório:** `https://github.com/ojfernandess/portal-checkin.git`, branch **`main-backend`** (ou a branch de deploy).
-3. **Porta interna:** `3000` (variáveis `PORT`, `HOST=0.0.0.0`, `NITRO_HOST=0.0.0.0`).
+3. **Porta interna do serviço `welcome-inn`:** `3000` (o Compose **não** publica `0.0.0.0:3000` no host — o EasyPanel faz proxy pelo domínio). Se aparecer `Bind for 0.0.0.0:3000 failed: port is already allocated`, outro app já usa a 3000; com este Compose isso deixa de ser necessário.
 4. **Build args:**
    - `GIT_COMMIT` — use o SHA do commit (ex.: `$GIT_SHA` do webhook) para forçar rebuild sem cache Docker
    - `BUILD_DATE` — opcional, timestamp ISO do deploy
