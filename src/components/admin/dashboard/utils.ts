@@ -3,7 +3,17 @@ import type { Locale } from "@/lib/i18n/types";
 import { localeToDateLocale } from "@/lib/i18n/types";
 import type { AttentionItem, PortalStats, TimelineEvent } from "./types";
 
-export function todayIso(): string {
+export function todayIso(timeZone = "America/Sao_Paulo"): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  const day = parts.find((part) => part.type === "day")?.value;
+  if (year && month && day) return `${year}-${month}-${day}`;
   return new Date().toISOString().slice(0, 10);
 }
 

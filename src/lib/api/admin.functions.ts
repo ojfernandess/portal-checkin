@@ -186,8 +186,47 @@ function addDaysIso(date: string, days: number): string {
   return next.toISOString().slice(0, 10);
 }
 
-function todayIso(): string {
+function todayIso(timeZone = "America/Sao_Paulo"): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  const day = parts.find((part) => part.type === "day")?.value;
+  if (year && month && day) return `${year}-${month}-${day}`;
   return new Date().toISOString().slice(0, 10);
+}
+
+function toIsoTimestamp(value: unknown): string | null {
+  if (value == null || value === "") return null;
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value.toISOString();
+  }
+  const raw = String(value).trim();
+  if (!raw) return null;
+  const normalized = raw.includes("T") ? raw : raw.replace(" ", "T");
+  const parsed = new Date(normalized);
+  if (!Number.isNaN(parsed.getTime())) return parsed.toISOString();
+  return raw;
+}
+
+function civilDateFromTimestamp(value: unknown, timeZone = "America/Sao_Paulo"): string | null {
+  const iso = toIsoTimestamp(value);
+  if (!iso) return null;
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date(iso));
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  const day = parts.find((part) => part.type === "day")?.value;
+  if (!year || !month || !day) return iso.slice(0, 10);
+  return `${year}-${month}-${day}`;
 }
 
 function monthStartIso(date: string): string {
@@ -1819,8 +1858,8 @@ export const adminDashboardPortalStats = createServerFn({ method: "POST" })
     await assertStaff(context as AdminHandlerContext);
     const { tenantId } = context as AdminHandlerContext;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const selectedDate = data.date || new Date().toISOString().slice(0, 10);
-    const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+    const selectedDate = data.date || todayIso();
+    const weekAgo = addDaysIso(selectedDate, -7);
 
     const { data: rows, error } = await supabaseAdmin
       .from("checkin_records")
@@ -1831,23 +1870,33 @@ export const adminDashboardPortalStats = createServerFn({ method: "POST" })
 
     if (error) throw new Error(error.message);
 
-    const records = rows ?? [];
-    const dayPrefix = `${selectedDate}T`;
-    const nextDay = addDaysIso(selectedDate, 1);
+    const hotelTz = "America/Sao_Paulo";
+    const records = (rows ?? []).map((row) => ({
+      ...row,
+      checked_in_at: toIsoTimestamp(row.checked_in_at),
+      started_at: toIsoTimestamp(row.started_at),
+    }));
 
-    const todayRecords = records.filter((row) => {
-      const at = String(row.checked_in_at ?? "");
-      return at >= `${selectedDate}T00:00:00` && at < `${nextDay}T00:00:00`;
-    });
-
-    const weekRecords = records.filter((row) =>
-      String(row.checked_in_at ?? "").slice(0, 10) >= weekAgo,
+    const todayRecords = records.filter(
+      (row) => civilDateFromTimestamp(row.checked_in_at, hotelTz) === selectedDate,
     );
+
+    const weekRecords = records.filter((row) => {
+      const day = civilDateFromTimestamp(row.checked_in_at, hotelTz);
+      return day != null && day >= weekAgo;
+    });
 
     const byHour: Record<string, number> = {};
     for (const row of todayRecords) {
-      const hour = new Date(String(row.checked_in_at)).getHours();
-      if (Number.isNaN(hour)) continue;
+      if (!row.checked_in_at) continue;
+      const parts = new Intl.DateTimeFormat("en-US", {
+        timeZone: hotelTz,
+        hour: "2-digit",
+        hourCycle: "h23",
+      }).formatToParts(new Date(row.checked_in_at));
+      let hour = Number(parts.find((part) => part.type === "hour")?.value);
+      if (hour === 24) hour = 0;
+      if (!Number.isFinite(hour)) continue;
       const key = String(hour).padStart(2, "0");
       byHour[key] = (byHour[key] ?? 0) + 1;
     }
@@ -1865,9 +1914,9 @@ export const adminDashboardPortalStats = createServerFn({ method: "POST" })
 
     const durationRows: DurationRow[] = [];
     for (const row of todayRecords) {
-      const startedAt = row.started_at ? String(row.started_at) : null;
-      const checkedInAt = String(row.checked_in_at ?? "");
-      if (!startedAt) continue;
+      const startedAt = row.started_at;
+      const checkedInAt = row.checked_in_at;
+      if (!startedAt || !checkedInAt) continue;
       const durationSeconds = computeDurationSeconds(startedAt, checkedInAt);
       if (durationSeconds == null) continue;
       durationRows.push({
@@ -1904,13 +1953,16 @@ export const adminDashboardPortalStats = createServerFn({ method: "POST" })
         fastest: sortedByDuration.slice(0, 5),
         slowest: [...sortedByDuration].reverse().slice(0, 5),
       },
-      recent: todayRecords.slice(0, 8).map((row) => ({
-        id: row.id,
-        localizer: row.localizer,
-        guestName: row.guest_name,
-        establishmentName: row.establishment_name,
-        checkedInAt: row.checked_in_at,
-      })),
+      recent: todayRecords
+        .filter((row) => row.checked_in_at)
+        .slice(0, 8)
+        .map((row) => ({
+          id: row.id,
+          localizer: row.localizer,
+          guestName: row.guest_name,
+          establishmentName: row.establishment_name,
+          checkedInAt: row.checked_in_at as string,
+        })),
     };
   });
 

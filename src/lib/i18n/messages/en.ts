@@ -1361,6 +1361,14 @@ export const en: MessageTree = {
         "Protects staff login and user creation in the admin panel against automated access.",
       turnstileActive: "Active",
       turnstileInactive: "Not configured",
+      turnstileSiteKeyOk: "Site key: ok",
+      turnstileSiteKeyMissing:
+        "Site key missing — set TURNSTILE_SITE_KEY (or VITE_TURNSTILE_SITE_KEY) in the environment.",
+      turnstileSecretKeyOk: "Secret key: ok",
+      turnstileSecretKeyMissing:
+        "Secret key missing — set TURNSTILE_SECRET_KEY in the environment.",
+      turnstileEnvHint:
+        "Both keys must be available at container runtime. In Cloudflare, allow your admin host (e.g. meucheckin.techospitality.com).",
     },
     termsEditor: {
       previewTitle: "Property policies",

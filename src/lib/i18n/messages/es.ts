@@ -1372,6 +1372,14 @@ export const es: MessageTree = {
         "Protege el inicio de sesión del equipo y la creación de usuarios en el panel contra accesos automatizados.",
       turnstileActive: "Activo",
       turnstileInactive: "No configurado",
+      turnstileSiteKeyOk: "Site key: ok",
+      turnstileSiteKeyMissing:
+        "Site key ausente — defina TURNSTILE_SITE_KEY (o VITE_TURNSTILE_SITE_KEY) en el entorno.",
+      turnstileSecretKeyOk: "Secret key: ok",
+      turnstileSecretKeyMissing:
+        "Secret key ausente — defina TURNSTILE_SECRET_KEY en el entorno.",
+      turnstileEnvHint:
+        "Las dos claves deben estar en el runtime del contenedor. En Cloudflare, autorice el dominio del panel (ej.: meucheckin.techospitality.com).",
     },
     termsEditor: {
       previewTitle: "Políticas del establecimiento",

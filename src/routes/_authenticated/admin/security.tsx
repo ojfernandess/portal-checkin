@@ -25,6 +25,8 @@ function AdminSecurityPage() {
 
   const [requireRegisteredEstablishment, setRequireRegisteredEstablishment] = useState(false);
   const [turnstileEnabled, setTurnstileEnabled] = useState<boolean | null>(null);
+  const [turnstileHasSiteKey, setTurnstileHasSiteKey] = useState(false);
+  const [turnstileHasSecretKey, setTurnstileHasSecretKey] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -33,6 +35,8 @@ function AdminSecurityPage() {
       .then(([settingsResult, turnstileResult]) => {
         setRequireRegisteredEstablishment(settingsResult.settings.requireRegisteredEstablishment);
         setTurnstileEnabled(turnstileResult.enabled);
+        setTurnstileHasSiteKey(turnstileResult.hasSiteKey === true);
+        setTurnstileHasSecretKey(turnstileResult.hasSecretKey === true);
       })
       .finally(() => setLoading(false));
   }, [fetchTurnstileConfig, getSettings]);
@@ -84,6 +88,21 @@ function AdminSecurityPage() {
                   : t("admin.securityPage.turnstileInactive")}
               </Badge>
             </div>
+            {!turnstileEnabled ? (
+              <ul className="mt-3 space-y-1 text-xs text-muted-foreground">
+                <li>
+                  {turnstileHasSiteKey
+                    ? t("admin.securityPage.turnstileSiteKeyOk")
+                    : t("admin.securityPage.turnstileSiteKeyMissing")}
+                </li>
+                <li>
+                  {turnstileHasSecretKey
+                    ? t("admin.securityPage.turnstileSecretKeyOk")
+                    : t("admin.securityPage.turnstileSecretKeyMissing")}
+                </li>
+                <li>{t("admin.securityPage.turnstileEnvHint")}</li>
+              </ul>
+            ) : null}
           </section>
 
           <label className="flex items-start gap-3 rounded-xl border border-border bg-card p-5 shadow-sm">

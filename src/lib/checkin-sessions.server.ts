@@ -101,9 +101,21 @@ export async function completeCheckinSession(
     .is("completed_at", null);
 }
 
+function parseTimestampMs(value: string): number {
+  const raw = String(value ?? "").trim();
+  if (!raw) return Number.NaN;
+  if (raw.includes("T") || raw.includes("Z") || /[+-]\d{2}:?\d{2}$/.test(raw)) {
+    return Date.parse(raw);
+  }
+  // Postgres text / Date#toString fallbacks
+  const asIso = Date.parse(raw.includes(" ") ? raw.replace(" ", "T") : raw);
+  if (!Number.isNaN(asIso)) return asIso;
+  return Date.parse(raw);
+}
+
 export function computeDurationSeconds(startedAt: string, checkedInAt: string): number | null {
-  const startMs = Date.parse(startedAt);
-  const endMs = Date.parse(checkedInAt);
+  const startMs = parseTimestampMs(startedAt);
+  const endMs = parseTimestampMs(checkedInAt);
   if (Number.isNaN(startMs) || Number.isNaN(endMs)) return null;
 
   const seconds = Math.round((endMs - startMs) / 1000);

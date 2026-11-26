@@ -1371,6 +1371,14 @@ export const ptBR = {
         "Protege o login da equipe e a criação de usuários no painel contra acessos automatizados.",
       turnstileActive: "Ativo",
       turnstileInactive: "Não configurado",
+      turnstileSiteKeyOk: "Site key: ok",
+      turnstileSiteKeyMissing:
+        "Site key ausente — defina TURNSTILE_SITE_KEY (ou VITE_TURNSTILE_SITE_KEY) no ambiente.",
+      turnstileSecretKeyOk: "Secret key: ok",
+      turnstileSecretKeyMissing:
+        "Secret key ausente — defina TURNSTILE_SECRET_KEY no ambiente.",
+      turnstileEnvHint:
+        "As duas chaves precisam estar no runtime do container. No Cloudflare, autorize o domínio do painel (ex.: meucheckin.techospitality.com).",
     },
     termsEditor: {
       previewTitle: "Políticas do estabelecimento",

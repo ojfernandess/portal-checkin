@@ -88,9 +88,17 @@ export const TurnstileWidget = forwardRef<TurnstileWidgetRef, TurnstileWidgetPro
           widgetIdRef.current = window.turnstile.render(containerRef.current, {
             sitekey: siteKey,
             theme,
-            callback: (token) => onTokenRef.current(token),
+            callback: (token) => {
+              setLoadError(null);
+              onTokenRef.current(token);
+            },
             "expired-callback": () => onTokenRef.current(null),
-            "error-callback": () => onTokenRef.current(null),
+            "error-callback": () => {
+              onTokenRef.current(null);
+              setLoadError(
+                "Falha no widget Turnstile. Confira a site key e se o domínio está autorizado no Cloudflare.",
+              );
+            },
           });
         })
         .catch(() => {

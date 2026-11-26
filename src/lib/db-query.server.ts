@@ -28,6 +28,26 @@ function toDbError(error: unknown): DbError {
   return { message: String(error) };
 }
 
+/** `pg` returns Date for timestamptz; consumers expect ISO strings (Supabase-compatible). */
+function serializeDbValue(value: unknown): unknown {
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value.toISOString();
+  }
+  return value;
+}
+
+function serializeDbRow<T extends QueryResultRow>(row: T): T {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(row)) {
+    out[key] = serializeDbValue(value);
+  }
+  return out as T;
+}
+
+function serializeDbRows<T extends QueryResultRow>(rows: T[]): T[] {
+  return rows.map((row) => serializeDbRow(row));
+}
+
 function quoteIdent(identifier: string): string {
   if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(identifier)) {
     throw new Error(`Invalid identifier: ${identifier}`);
@@ -258,14 +278,15 @@ class QueryBuilder<T extends QueryResultRow = QueryResultRow> implements Promise
   }
 
   private shapeMutationResult(rows: T[]): DbResult<T[] | T | null> {
+    const normalized = serializeDbRows(rows);
     if (this.singleMode === "maybe") {
-      return { data: (rows[0] ?? null) as T | null, error: null };
+      return { data: (normalized[0] ?? null) as T | null, error: null };
     }
     if (this.singleMode === "single") {
-      if (!rows[0]) return { data: null, error: { message: "No rows found" } };
-      return { data: rows[0] as T, error: null };
+      if (!normalized[0]) return { data: null, error: { message: "No rows found" } };
+      return { data: normalized[0] as T, error: null };
     }
-    return { data: rows as T[], error: null };
+    return { data: normalized as T[], error: null };
   }
 
   private async runSelect(): Promise<DbResult<T[] | T | null>> {
@@ -293,16 +314,17 @@ class QueryBuilder<T extends QueryResultRow = QueryResultRow> implements Promise
 
     const selectSql = `SELECT ${this.parseSelectColumns()} FROM ${quoteIdent(this.table)}${where}${orderSql}${limitSql}`;
     const result = await query<T>(selectSql, params);
+    const rows = serializeDbRows(result.rows);
     if (this.singleMode === "maybe") {
-      return { data: (result.rows[0] ?? null) as T | null, error: null, count };
+      return { data: (rows[0] ?? null) as T | null, error: null, count };
     }
     if (this.singleMode === "single") {
-      if (!result.rows[0]) {
+      if (!rows[0]) {
         return { data: null, error: { message: "No rows found" }, count };
       }
-      return { data: result.rows[0] as T, error: null, count };
+      return { data: rows[0] as T, error: null, count };
     }
-    return { data: result.rows as T[], error: null, count };
+    return { data: rows as T[], error: null, count };
   }
 
   private async runInsert(

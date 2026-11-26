@@ -4,15 +4,16 @@ import { z } from "zod";
 import { getClientIp } from "@/lib/rate-limit";
 import {
   assertTurnstileIfConfigured,
-  getTurnstileSiteKey,
-  isTurnstileConfigured,
+  getTurnstileConfigStatus,
 } from "@/lib/turnstile.server";
 
 export const getTurnstileConfig = createServerFn({ method: "GET" }).handler(async () => {
-  const enabled = isTurnstileConfigured();
+  const status = getTurnstileConfigStatus();
   return {
-    enabled,
-    siteKey: enabled ? getTurnstileSiteKey() : undefined,
+    enabled: status.enabled,
+    siteKey: status.siteKey,
+    hasSiteKey: status.hasSiteKey,
+    hasSecretKey: status.hasSecretKey,
   };
 });
 

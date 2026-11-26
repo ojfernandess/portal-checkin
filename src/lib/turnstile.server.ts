@@ -16,16 +16,42 @@ function readEnv(name: string): string | undefined {
   return trimmed;
 }
 
+function readEnvAny(...names: string[]): string | undefined {
+  for (const name of names) {
+    const value = readEnv(name);
+    if (value) return value;
+  }
+  return undefined;
+}
+
+/** Site key pública — aceita TURNSTILE_SITE_KEY (preferido) ou VITE_TURNSTILE_SITE_KEY. */
 export function getTurnstileSiteKey(): string | undefined {
-  return readEnv("VITE_TURNSTILE_SITE_KEY");
+  return readEnvAny("TURNSTILE_SITE_KEY", "VITE_TURNSTILE_SITE_KEY");
 }
 
 export function getTurnstileSecretKey(): string | undefined {
-  return readEnv("TURNSTILE_SECRET_KEY");
+  return readEnvAny("TURNSTILE_SECRET_KEY");
 }
 
 export function isTurnstileConfigured(): boolean {
   return !!(getTurnstileSiteKey() && getTurnstileSecretKey());
+}
+
+export function getTurnstileConfigStatus(): {
+  enabled: boolean;
+  hasSiteKey: boolean;
+  hasSecretKey: boolean;
+  siteKey: string | undefined;
+} {
+  const siteKey = getTurnstileSiteKey();
+  const hasSecretKey = !!getTurnstileSecretKey();
+  const hasSiteKey = !!siteKey;
+  return {
+    enabled: hasSiteKey && hasSecretKey,
+    hasSiteKey,
+    hasSecretKey,
+    siteKey: hasSiteKey && hasSecretKey ? siteKey : undefined,
+  };
 }
 
 type SiteVerifyResponse = {
@@ -60,11 +86,14 @@ export async function verifyTurnstileToken(
   });
 
   if (!response.ok) {
+    console.error("[turnstile] siteverify HTTP", response.status);
     throw new Error("Não foi possível validar a verificação de segurança.");
   }
 
   const result = (await response.json()) as SiteVerifyResponse;
   if (!result.success) {
+    const codes = result["error-codes"]?.join(", ") || "unknown";
+    console.error("[turnstile] siteverify failed:", codes);
     throw new Error("Verificação de segurança falhou. Tente novamente.");
   }
 }
