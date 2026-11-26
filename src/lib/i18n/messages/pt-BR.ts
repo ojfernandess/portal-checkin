@@ -347,12 +347,15 @@ export const ptBR = {
       selfieGuidanceImageAlt: "Exemplos de selfie correta e incorreta para check-in",
     },
     bedPreference: {
-      title: "Preferência de cama",
-      body: "Escolha o tipo de cama desejado para a acomodação.",
+      eyebrow: "Sua acomodação",
+      title: "Como prefere a cama?",
+      body: "Escolha a montagem ideal para a sua estadia. A equipe de governança prepara o quarto com base nesta opção.",
       double: "Cama casal",
-      doubleHint: "Uma cama de casal",
-      single: "Cama solteiro",
-      singleHint: "Camas de solteiro",
+      doubleHint: "Uma cama de casal para o quarto",
+      single: "Camas de solteiro",
+      singleHint: "Duas camas individuais (twin)",
+      helper: "Você pode confirmar a escolha com a recepção na chegada, se precisar alterar.",
+      unitContext: "Quarto {unit}",
       required: "Selecione a preferência de cama para continuar.",
     },
     camera: {
@@ -1176,7 +1179,11 @@ export const ptBR = {
       tabWhatsApp: "WhatsApp",
       bedPreferenceEnabled: "Preferência de cama no check-in",
       bedPreferenceEnabledHint:
-        "Após as fotos, exibe a escolha Cama casal ou Solteiro quando o quarto no VB tiver capacity ≥ 2 e ainda for antes do horário de check-in (stay.checkinDate/Time). Após o horário ou com capacity 1, a etapa não aparece.",
+        "Após as fotos, exibe Cama casal ou Solteiro quando capacity ≥ 2 e ainda for antes de stay.checkinDate/Time no fuso do hotel (padrão America/Sao_Paulo). Após esse instante ou com capacity 1, a etapa não aparece.",
+      timeZone: "Fuso horário do estabelecimento",
+      timeZoneHint:
+        "Usado para liberar a preferência de cama e outras regras de horário. Formato IANA (ex.: America/Sao_Paulo).",
+      timeZonePlaceholder: "America/Sao_Paulo",
       whatsappSubTabGuest: "Hóspede",
       whatsappSubTabGovernance: "Governança",
       whatsappBody:

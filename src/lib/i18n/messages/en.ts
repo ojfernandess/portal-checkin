@@ -348,12 +348,15 @@ export const en: MessageTree = {
       selfieGuidanceImageAlt: "Examples of correct and incorrect check-in selfies",
     },
     bedPreference: {
-      title: "Bed preference",
-      body: "Choose the bed type for your room.",
+      eyebrow: "Your room",
+      title: "How do you prefer the bed?",
+      body: "Pick the setup that fits your stay. Housekeeping prepares the room based on this choice.",
       double: "Double bed",
-      doubleHint: "One double bed",
-      single: "Single beds",
-      singleHint: "Twin / single beds",
+      doubleHint: "One double bed in the room",
+      single: "Twin beds",
+      singleHint: "Two single / twin beds",
+      helper: "You can still confirm with reception on arrival if you need to change it.",
+      unitContext: "Room {unit}",
       required: "Select a bed preference to continue.",
     },
     camera: {
@@ -1167,7 +1170,11 @@ export const en: MessageTree = {
       tabWhatsApp: "WhatsApp",
       bedPreferenceEnabled: "Bed preference at check-in",
       bedPreferenceEnabledHint:
-        "After photos, show Double bed or Single beds when the VB room has capacity ≥ 2 and it is still before check-in time (stay.checkinDate/Time). After that time, or with capacity 1, the step is skipped.",
+        "After photos, show Double or Twin when capacity ≥ 2 and it is still before stay.checkinDate/Time in the hotel timezone (default America/Sao_Paulo). After that instant, or with capacity 1, the step is skipped.",
+      timeZone: "Establishment time zone",
+      timeZoneHint:
+        "Used for bed preference and other time rules. IANA format (e.g. America/Sao_Paulo).",
+      timeZonePlaceholder: "America/Sao_Paulo",
       whatsappSubTabGuest: "Guest",
       whatsappSubTabGovernance: "Housekeeping",
       whatsappBody:

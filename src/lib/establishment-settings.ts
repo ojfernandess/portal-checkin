@@ -1,4 +1,8 @@
-import { isCheckinTimePassed } from "@/lib/format-dates";
+import {
+  DEFAULT_HOTEL_TIME_ZONE,
+  isZonedCheckinDateTimePassed,
+  normalizeTimeZone,
+} from "@/lib/timezone";
 
 export type InboxUnitMapping = {
   /** Fragmento do número/nome da unidade (ex.: "01", "Quarto 101") */
@@ -54,9 +58,11 @@ export type EstablishmentSettings = {
   usefulInfoItems: UsefulInfoItem[];
   /**
    * Preferência de cama (Casal/Solteiro) após fotos no check-in.
-   * Só aparece se capacity do quarto (VB) for ≥ 2.
+   * Só aparece se capacity do quarto (VB) for ≥ 2 e ainda antes do horário de check-in.
    */
   bedPreferenceEnabled: boolean;
+  /** IANA timezone do estabelecimento (padrão America/Sao_Paulo). */
+  timeZone: string;
   /** Envia template WhatsApp ao hóspede após check-in concluído. */
   whatsappNotifyEnabled: boolean;
   /** ID do template (AgentsLabs Chat API). */
@@ -98,6 +104,7 @@ export const DEFAULT_ESTABLISHMENT_SETTINGS: EstablishmentSettings = {
   inboxUnitMappings: [],
   usefulInfoItems: [],
   bedPreferenceEnabled: false,
+  timeZone: DEFAULT_HOTEL_TIME_ZONE,
   whatsappNotifyEnabled: false,
   whatsappTemplateId: null,
   whatsappTemplateName: null,
@@ -145,7 +152,7 @@ export function resolveReservationRoomCapacity(
 
 /** Etapa de preferência de cama: setting ligado, capacity VB ≥ 2 e ainda antes do horário de check-in. */
 export function shouldShowBedPreferenceStep(
-  settings: Pick<EstablishmentSettings, "bedPreferenceEnabled">,
+  settings: Pick<EstablishmentSettings, "bedPreferenceEnabled" | "timeZone">,
   reservation: {
     capacity?: number;
     room?: { capacity?: number };
@@ -160,15 +167,15 @@ export function shouldShowBedPreferenceStep(
   const capacity = resolveReservationRoomCapacity(reservation);
   if (capacity == null || capacity < 2) return false;
 
-  const checkinDate =
-    reservation?.stay?.checkinDate ||
-    reservation?.checkinDate ||
-    null;
-  const checkinTime =
-    reservation?.stay?.checkinTime ||
-    reservation?.checkinTime ||
-    null;
-  if (isCheckinTimePassed(checkinDate, checkinTime, now)) return false;
+  const timeZone = normalizeTimeZone(settings.timeZone ?? DEFAULT_HOTEL_TIME_ZONE);
+  if (
+    isZonedCheckinDateTimePassed(reservation, {
+      now,
+      timeZone,
+    })
+  ) {
+    return false;
+  }
 
   return true;
 }
@@ -370,6 +377,7 @@ export function parseEstablishmentSettings(raw: unknown): EstablishmentSettings 
     inboxUnitMappings: parseInboxUnitMappings(settings.inboxUnitMappings),
     usefulInfoItems: parseUsefulInfoItems(settings.usefulInfoItems),
     bedPreferenceEnabled: settings.bedPreferenceEnabled === true,
+    timeZone: normalizeTimeZone(settings.timeZone),
     whatsappNotifyEnabled: settings.whatsappNotifyEnabled === true,
     whatsappTemplateId:
       typeof settings.whatsappTemplateId === "string" && settings.whatsappTemplateId.trim()

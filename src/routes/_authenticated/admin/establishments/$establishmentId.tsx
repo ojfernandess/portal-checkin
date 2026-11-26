@@ -100,6 +100,7 @@ function EstablishmentConfigPage() {
   const [inboxConfigured, setInboxConfigured] = useState(false);
   const [inboxUnitsLoading, setInboxUnitsLoading] = useState(false);
   const [bedPreferenceEnabled, setBedPreferenceEnabled] = useState(false);
+  const [timeZone, setTimeZone] = useState("America/Sao_Paulo");
   const [whatsappNotifyEnabled, setWhatsappNotifyEnabled] = useState(false);
   const [whatsappTemplateId, setWhatsappTemplateId] = useState<string | null>(null);
   const [whatsappTemplateName, setWhatsappTemplateName] = useState<string | null>(null);
@@ -160,6 +161,7 @@ function EstablishmentConfigPage() {
         setVbApiToken(settings.settings.vbApiToken ?? "");
         setVbPhotoLinkEnabled(settings.settings.vbPhotoLinkEnabled);
         setBedPreferenceEnabled(settings.settings.bedPreferenceEnabled);
+        setTimeZone(settings.settings.timeZone || "America/Sao_Paulo");
         setWhatsappNotifyEnabled(settings.settings.whatsappNotifyEnabled);
         setWhatsappTemplateId(settings.settings.whatsappTemplateId);
         setWhatsappTemplateName(settings.settings.whatsappTemplateName);
@@ -274,6 +276,7 @@ function EstablishmentConfigPage() {
           vbApiToken: vbApiToken.trim() || null,
           vbPhotoLinkEnabled,
           bedPreferenceEnabled,
+          timeZone,
           whatsappNotifyEnabled,
           whatsappTemplateId,
           whatsappTemplateName,
@@ -555,6 +558,21 @@ function EstablishmentConfigPage() {
                 </span>
               </span>
             </label>
+
+            <div className="space-y-2 rounded-xl border border-border p-4">
+              <Label htmlFor="establishment-timezone">
+                {t("admin.establishmentConfig.timeZone")}
+              </Label>
+              <Input
+                id="establishment-timezone"
+                value={timeZone}
+                onChange={(e) => setTimeZone(e.target.value)}
+                placeholder={t("admin.establishmentConfig.timeZonePlaceholder")}
+              />
+              <p className="text-xs text-muted-foreground">
+                {t("admin.establishmentConfig.timeZoneHint")}
+              </p>
+            </div>
 
             <label className="flex items-start gap-3 rounded-xl border border-border p-4">
               <Checkbox

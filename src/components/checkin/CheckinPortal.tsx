@@ -18,6 +18,7 @@ import { Stepper } from "@/components/checkin/Stepper";
 import { ReservationCard } from "@/components/checkin/ReservationCard";
 import { GuestForm } from "@/components/checkin/GuestForm";
 import { CompanionsStep } from "@/components/checkin/CompanionsStep";
+import { BedPreferenceStep } from "@/components/checkin/BedPreferenceStep";
 import { EmbraturStep } from "@/components/checkin/EmbraturStep";
 import { CameraCapture } from "@/components/checkin/CameraCapture";
 import { SelfieCapture, type SelfieValidationOutcome } from "@/components/checkin/SelfieCapture";
@@ -617,6 +618,21 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
     setBedPreference(null);
     await loadEmbraturStep();
   }
+
+  // Se o hóspede ficar nesta etapa após o horário de check-in, pula automaticamente.
+  useEffect(() => {
+    if (step !== 6 || step6Kind !== "bed") return;
+    let cancelled = false;
+    void (async () => {
+      const { show } = await resolveBedPreferenceFromLocalizer();
+      if (cancelled || show) return;
+      setBedPreference(null);
+      await loadEmbraturStep();
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [step, step6Kind]);
 
   async function loadEstablishmentConfig(found: Reservation): Promise<EstablishmentSettings> {
     const establishmentId = String(found.establishmentId ?? "");
@@ -2056,62 +2072,28 @@ export function CheckinPortal({ initialLocalizer = "", autoSearch = false }: Che
           )}
 
           {step === 6 && step6Kind === "bed" && (
-            <section className="space-y-5">
-              <header className="space-y-1">
-                <h2 className="font-display text-2xl">{t("checkin.bedPreference.title")}</h2>
-                <p className="text-sm text-muted-foreground">{t("checkin.bedPreference.body")}</p>
-              </header>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <button
-                  type="button"
-                  className={cn(
-                    "rounded-2xl border p-5 text-left shadow-card transition",
-                    bedPreference === "double"
-                      ? "border-primary bg-primary/5 ring-2 ring-primary/30"
-                      : "border-border bg-card",
-                  )}
-                  onClick={() => setBedPreference("double")}
-                >
-                  <p className="font-display text-lg">{t("checkin.bedPreference.double")}</p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {t("checkin.bedPreference.doubleHint")}
-                  </p>
-                </button>
-                <button
-                  type="button"
-                  className={cn(
-                    "rounded-2xl border p-5 text-left shadow-card transition",
-                    bedPreference === "single"
-                      ? "border-primary bg-primary/5 ring-2 ring-primary/30"
-                      : "border-border bg-card",
-                  )}
-                  onClick={() => setBedPreference("single")}
-                >
-                  <p className="font-display text-lg">{t("checkin.bedPreference.single")}</p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {t("checkin.bedPreference.singleHint")}
-                  </p>
-                </button>
-              </div>
-              <div className="flex gap-3">
-                <Button variant="outline" className="tap-safe" onClick={() => setStep(5)}>
-                  {t("common.back")}
-                </Button>
-                <Button
-                  className="tap-safe flex-1"
-                  disabled={loading || !bedPreference}
-                  onClick={() => {
-                    if (!bedPreference) {
-                      toast.error(t("checkin.bedPreference.required"));
-                      return;
-                    }
-                    void loadEmbraturStep();
-                  }}
-                >
-                  {t("common.continue")}
-                </Button>
-              </div>
-            </section>
+            <BedPreferenceStep
+              value={bedPreference}
+              onChange={setBedPreference}
+              submitting={loading}
+              unitLabel={
+                reservation?.unitNumber != null
+                  ? String(reservation.unitNumber)
+                  : reservation?.room?.unitNumber != null
+                    ? String(reservation.room.unitNumber)
+                    : reservation?.room?.roomNumber != null
+                      ? String(reservation.room.roomNumber)
+                      : null
+              }
+              onBack={() => setStep(5)}
+              onContinue={() => {
+                if (!bedPreference) {
+                  toast.error(t("checkin.bedPreference.required"));
+                  return;
+                }
+                void loadEmbraturStep();
+              }}
+            />
           )}
 
           {step === 6 && step6Kind === "embratur" && reference && (

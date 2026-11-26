@@ -1290,6 +1290,7 @@ export const adminSaveSettings = createServerFn({ method: "POST" })
         vbApiToken: z.string().trim().max(500).nullable().optional(),
         vbPhotoLinkEnabled: z.boolean().optional(),
         bedPreferenceEnabled: z.boolean().optional(),
+        timeZone: z.string().trim().max(64).optional(),
         whatsappNotifyEnabled: z.boolean().optional(),
         whatsappTemplateId: z.string().trim().max(120).nullable().optional(),
         whatsappTemplateName: z.string().trim().max(120).nullable().optional(),
@@ -1316,6 +1317,7 @@ export const adminSaveSettings = createServerFn({ method: "POST" })
     const { parseEstablishmentSettings, MAX_SUCCESS_PAGE_PHOTO_BYTES, sanitizeUsefulInfoItems } =
       await import("@/lib/establishment-settings");
     const { sanitizeWhatsAppTemplateVariableKeys } = await import("@/lib/whatsapp-chat/notify.server");
+    const { normalizeTimeZone } = await import("@/lib/timezone");
     const email = await getStaffEmail(adminContext);
 
     await assertEstablishmentInTenant(data.establishmentId, tenantId);
@@ -1377,6 +1379,7 @@ export const adminSaveSettings = createServerFn({ method: "POST" })
       ...(data.bedPreferenceEnabled !== undefined
         ? { bedPreferenceEnabled: data.bedPreferenceEnabled }
         : {}),
+      ...(data.timeZone !== undefined ? { timeZone: normalizeTimeZone(data.timeZone) } : {}),
       ...(data.whatsappNotifyEnabled !== undefined
         ? { whatsappNotifyEnabled: data.whatsappNotifyEnabled }
         : {}),

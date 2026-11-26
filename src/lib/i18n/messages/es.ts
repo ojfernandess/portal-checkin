@@ -349,12 +349,15 @@ export const es: MessageTree = {
       selfieGuidanceImageAlt: "Ejemplos de selfie correcta e incorrecta para check-in",
     },
     bedPreference: {
-      title: "Preferencia de cama",
-      body: "Elija el tipo de cama deseado para la habitación.",
+      eyebrow: "Su habitación",
+      title: "¿Cómo prefiere la cama?",
+      body: "Elija la configuración ideal para su estadía. El equipo de gobernanza prepara la habitación según esta opción.",
       double: "Cama de matrimonio",
-      doubleHint: "Una cama de matrimonio",
+      doubleHint: "Una cama de matrimonio en la habitación",
       single: "Camas individuales",
-      singleHint: "Camas individuales / twin",
+      singleHint: "Dos camas individuales (twin)",
+      helper: "Puede confirmar con recepción al llegar si necesita cambiarla.",
+      unitContext: "Habitación {unit}",
       required: "Seleccione la preferencia de cama para continuar.",
     },
     camera: {
@@ -1177,7 +1180,11 @@ export const es: MessageTree = {
       tabWhatsApp: "WhatsApp",
       bedPreferenceEnabled: "Preferencia de cama en el check-in",
       bedPreferenceEnabledHint:
-        "Después de las fotos, muestra Cama de matrimonio o Individuales cuando la habitación en VB tenga capacity ≥ 2 y aún sea antes de la hora de check-in (stay.checkinDate/Time). Después de esa hora, o con capacity 1, el paso no aparece.",
+        "Después de las fotos, muestra Matrimonio o Individuales cuando capacity ≥ 2 y aún sea antes de stay.checkinDate/Time en la zona horaria del hotel (por defecto America/Sao_Paulo). Después de ese instante, o con capacity 1, el paso no aparece.",
+      timeZone: "Zona horaria del establecimiento",
+      timeZoneHint:
+        "Usada para la preferencia de cama y otras reglas de horario. Formato IANA (ej.: America/Sao_Paulo).",
+      timeZonePlaceholder: "America/Sao_Paulo",
       whatsappSubTabGuest: "Huésped",
       whatsappSubTabGovernance: "Gobernanza",
       whatsappBody:

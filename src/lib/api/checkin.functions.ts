@@ -958,16 +958,54 @@ export const resolveBedPreferenceStep = createServerFn({ method: "POST" })
     }
 
     const { loadEstablishmentSettingsRow } = await import("@/lib/establishment-settings.server");
-    const { parseEstablishmentSettings, shouldShowBedPreferenceStep } = await import(
-      "@/lib/establishment-settings"
-    );
+    const {
+      parseEstablishmentSettings,
+      resolveReservationRoomCapacity,
+      shouldShowBedPreferenceStep,
+    } = await import("@/lib/establishment-settings");
+    const {
+      formatInTimeZone,
+      isZonedCheckinDateTimePassed,
+      resolveStayCheckinFields,
+    } = await import("@/lib/timezone");
     const settingsRow = establishmentId
       ? await loadEstablishmentSettingsRow(establishmentId)
       : null;
     const settings = parseEstablishmentSettings(settingsRow?.settings ?? null);
-    const show = shouldShowBedPreferenceStep(settings, reservation);
+    const now = new Date();
+    const stayFields = resolveStayCheckinFields(reservation);
+    const capacity = resolveReservationRoomCapacity(reservation);
+    const checkinPassed = isZonedCheckinDateTimePassed(reservation, {
+      now,
+      timeZone: settings.timeZone,
+    });
+    const show = shouldShowBedPreferenceStep(settings, reservation, now);
 
-    return { show, reservation };
+    console.info("[bed-preference] resolve", {
+      localizer: data.localizer,
+      establishmentId,
+      enabled: settings.bedPreferenceEnabled,
+      timeZone: settings.timeZone,
+      capacity,
+      stayCheckinDate: stayFields.date,
+      stayCheckinTime: stayFields.time,
+      nowHotel: formatInTimeZone(now, settings.timeZone),
+      checkinPassed,
+      show,
+    });
+
+    return {
+      show,
+      reservation,
+      meta: {
+        timeZone: settings.timeZone,
+        capacity,
+        checkinDate: stayFields.date,
+        checkinTime: stayFields.time,
+        checkinPassed,
+        nowHotel: formatInTimeZone(now, settings.timeZone),
+      },
+    };
   });
 
 export const getCheckinFaceValidationSettings = createServerFn({ method: "POST" })
