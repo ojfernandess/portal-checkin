@@ -262,14 +262,14 @@ export const en: MessageTree = {
       featureProtectedEstablishmentsDesc: "Your stay is our priority",
     },
     confirmation: {
-      title: "Are you the main guest on this reservation?",
-      bodyPrefix: "This reservation is under the name",
+      title: "Will you stay as the main guest?",
+      bodyPrefix: "In our system, this reservation is listed under",
       bodyHint:
-        "Online check-in must be completed by the main guest who will stay.",
-      yes: "Yes, that's me",
+        "That name is only the reservation holder — it does not mean only that person can check in. If you are the one staying, continue and enter your own details: check-in will be completed in your name.",
+      yes: "Yes, I'll check in",
       no: "No, I'm a companion",
       onlyMainGuest:
-        "Only the main guest can start check-in. Companions are added in the following steps.",
+        "Online check-in is started by the person staying as the main guest. Companions are added in the following steps.",
     },
     terms: {
       title: "Property policies",
