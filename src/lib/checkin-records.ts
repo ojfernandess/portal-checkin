@@ -188,7 +188,32 @@ export async function updateCheckinRecordDependents(
   return recordId != null;
 }
 
+function toIsoOrNull(value: unknown): string | null {
+  if (value == null || value === "") return null;
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value.toISOString();
+  }
+  const raw = String(value).trim();
+  if (!raw) return null;
+  const parsed = new Date(raw.includes("T") ? raw : raw.replace(" ", "T"));
+  if (!Number.isNaN(parsed.getTime())) return parsed.toISOString();
+  return raw;
+}
+
+function parseJsonbField<T>(value: unknown, fallback: T): T {
+  if (value == null) return fallback;
+  if (typeof value === "string") {
+    try {
+      return JSON.parse(value) as T;
+    } catch {
+      return fallback;
+    }
+  }
+  return value as T;
+}
+
 export function mapCheckinRecordRow(row: Record<string, unknown>): CheckinRecordRow {
+  const dependentsRaw = parseJsonbField<unknown>(row.dependents, []);
   return {
     id: String(row.id),
     localizer: String(row.localizer),
@@ -200,16 +225,16 @@ export function mapCheckinRecordRow(row: Record<string, unknown>): CheckinRecord
     guest_document: row.guest_document != null ? String(row.guest_document) : null,
     guest_document_type: row.guest_document_type != null ? String(row.guest_document_type) : null,
     guest_phone: row.guest_phone != null ? String(row.guest_phone) : null,
-    main_guest: (row.main_guest as MainGuest) ?? {},
-    dependents: Array.isArray(row.dependents) ? (row.dependents as Dependent[]) : [],
-    embratur: (row.embratur as EmbraturForm | null) ?? null,
-    reservation_snapshot: (row.reservation_snapshot as Reservation | null) ?? null,
-    extra_fields: (row.extra_fields as Record<string, unknown> | null) ?? null,
+    main_guest: parseJsonbField<MainGuest>(row.main_guest, {}),
+    dependents: Array.isArray(dependentsRaw) ? (dependentsRaw as Dependent[]) : [],
+    embratur: parseJsonbField<EmbraturForm | null>(row.embratur, null),
+    reservation_snapshot: parseJsonbField<Reservation | null>(row.reservation_snapshot, null),
+    extra_fields: parseJsonbField<Record<string, unknown> | null>(row.extra_fields, null),
     terms_accepted: row.terms_accepted === true,
-    terms_accepted_at: row.terms_accepted_at != null ? String(row.terms_accepted_at) : null,
+    terms_accepted_at: toIsoOrNull(row.terms_accepted_at),
     terms_version: row.terms_version != null ? Number(row.terms_version) : null,
-    started_at: row.started_at != null ? String(row.started_at) : null,
-    checked_in_at: String(row.checked_in_at),
-    created_at: String(row.created_at),
+    started_at: toIsoOrNull(row.started_at),
+    checked_in_at: toIsoOrNull(row.checked_in_at) ?? "",
+    created_at: toIsoOrNull(row.created_at) ?? "",
   };
 }

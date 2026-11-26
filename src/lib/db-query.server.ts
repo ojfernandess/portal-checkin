@@ -7,7 +7,9 @@ type Filter =
   | { type: "in"; column: string; values: unknown[] }
   | { type: "ilike"; column: string; value: string }
   | { type: "gte"; column: string; value: unknown }
+  | { type: "gt"; column: string; value: unknown }
   | { type: "lte"; column: string; value: unknown }
+  | { type: "lt"; column: string; value: unknown }
   | { type: "is"; column: string; value: null | boolean }
   | { type: "not_is"; column: string; value: null | boolean }
   | { type: "contains"; column: string; value: unknown };
@@ -48,6 +50,31 @@ function serializeDbRows<T extends QueryResultRow>(rows: T[]): T[] {
   return rows.map((row) => serializeDbRow(row));
 }
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  if (value === null || typeof value !== "object") return false;
+  if (Array.isArray(value) || value instanceof Date) return false;
+  if (typeof Buffer !== "undefined" && Buffer.isBuffer(value)) return false;
+  const proto = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
+}
+
+/**
+ * Prepare values for INSERT/UPDATE.
+ * `pg` treats JS arrays as Postgres arrays (`{}`), which breaks jsonb columns
+ * (e.g. checkin_records.dependents). Plain objects/arrays must be JSON text.
+ */
+function prepareWriteValue(value: unknown): unknown {
+  if (value === undefined) return null;
+  if (value === null) return null;
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value.toISOString();
+  }
+  if (Array.isArray(value) || isPlainObject(value)) {
+    return JSON.stringify(value);
+  }
+  return value;
+}
+
 function quoteIdent(identifier: string): string {
   if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(identifier)) {
     throw new Error(`Invalid identifier: ${identifier}`);
@@ -83,9 +110,17 @@ function buildWhere(filters: Filter[], params: unknown[]): string {
         params.push(filter.value);
         return `${quoteIdent(filter.column)} >= $${params.length}`;
       }
+      case "gt": {
+        params.push(filter.value);
+        return `${quoteIdent(filter.column)} > $${params.length}`;
+      }
       case "lte": {
         params.push(filter.value);
         return `${quoteIdent(filter.column)} <= $${params.length}`;
+      }
+      case "lt": {
+        params.push(filter.value);
+        return `${quoteIdent(filter.column)} < $${params.length}`;
       }
       case "is": {
         if (filter.value === null) return `${quoteIdent(filter.column)} IS NULL`;
@@ -162,8 +197,18 @@ class QueryBuilder<T extends QueryResultRow = QueryResultRow> implements Promise
     return this;
   }
 
+  gt(column: string, value: unknown) {
+    this.filters.push({ type: "gt", column, value });
+    return this;
+  }
+
   lte(column: string, value: unknown) {
     this.filters.push({ type: "lte", column, value });
+    return this;
+  }
+
+  lt(column: string, value: unknown) {
+    this.filters.push({ type: "lt", column, value });
     return this;
   }
 
@@ -337,7 +382,7 @@ class QueryBuilder<T extends QueryResultRow = QueryResultRow> implements Promise
     const params: unknown[] = [];
     const valueGroups = rows.map((row) => {
       const placeholders = columns.map((column) => {
-        params.push(row[column]);
+        params.push(prepareWriteValue(row[column]));
         return `$${params.length}`;
       });
       return `(${placeholders.join(", ")})`;
@@ -350,7 +395,7 @@ class QueryBuilder<T extends QueryResultRow = QueryResultRow> implements Promise
     if (!Array.isArray(values) || this.singleMode !== "none") {
       return this.shapeMutationResult(result.rows);
     }
-    return { data: result.rows as T[], error: null };
+    return { data: serializeDbRows(result.rows) as T[], error: null };
   }
 
   private async runUpdate(values: Record<string, unknown>): Promise<DbResult<T[] | T | null>> {
@@ -358,7 +403,7 @@ class QueryBuilder<T extends QueryResultRow = QueryResultRow> implements Promise
     if (columns.length === 0) return { data: null, error: { message: "No columns to update" } };
     const params: unknown[] = [];
     const sets = columns.map((column) => {
-      params.push(values[column]);
+      params.push(prepareWriteValue(values[column]));
       return `${quoteIdent(column)} = $${params.length}`;
     });
     const where = buildWhere(this.filters, params);
@@ -381,7 +426,7 @@ class QueryBuilder<T extends QueryResultRow = QueryResultRow> implements Promise
     const params: unknown[] = [];
     const valueGroups = rows.map((row) => {
       const placeholders = columns.map((column) => {
-        params.push(row[column]);
+        params.push(prepareWriteValue(row[column]));
         return `$${params.length}`;
       });
       return `(${placeholders.join(", ")})`;
@@ -399,7 +444,7 @@ class QueryBuilder<T extends QueryResultRow = QueryResultRow> implements Promise
     if (!Array.isArray(values) || this.singleMode !== "none") {
       return this.shapeMutationResult(result.rows);
     }
-    return { data: result.rows as T[], error: null };
+    return { data: serializeDbRows(result.rows) as T[], error: null };
   }
 
   private async runDelete(): Promise<DbResult<T[] | T | null>> {

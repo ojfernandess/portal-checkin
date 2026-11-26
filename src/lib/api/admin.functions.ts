@@ -2196,21 +2196,27 @@ export const adminListCheckinRecords = createServerFn({ method: "POST" })
     if (data.establishmentId) {
       query = query.eq("establishment_id", data.establishmentId);
     }
+    // Broad UTC window around the civil date so Postgres filters cheaply;
+    // exact hotel-TZ day match is applied below (same approach as dashboard KPIs).
     if (data.date) {
-      const next = new Date(`${data.date}T00:00:00`);
-      next.setDate(next.getDate() + 1);
+      const day = data.date.slice(0, 10);
       query = query
-        .gte("checked_in_at", `${data.date}T00:00:00`)
-        .lt("checked_in_at", next.toISOString().slice(0, 10) + "T00:00:00");
+        .gte("checked_in_at", `${day}T00:00:00.000Z`)
+        .lt("checked_in_at", `${addDaysIso(day, 2)}T00:00:00.000Z`);
     }
 
     const { data: rows, error } = await query;
     if (error) throw new Error(error.message);
 
+    const hotelTz = "America/Sao_Paulo";
+    let mapped = (rows ?? []).map((row) => mapCheckinRecordRow(row as Record<string, unknown>));
+    if (data.date) {
+      const day = data.date.slice(0, 10);
+      mapped = mapped.filter((row) => civilDateFromTimestamp(row.checked_in_at, hotelTz) === day);
+    }
+
     return {
-      records: dedupeCheckinRecordsForDisplay(
-        (rows ?? []).map((row) => mapCheckinRecordRow(row as Record<string, unknown>)),
-      ),
+      records: dedupeCheckinRecordsForDisplay(mapped),
     };
   });
 
